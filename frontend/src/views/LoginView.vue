@@ -17,7 +17,14 @@ async function submit() {
     await auth.login(email.value, password.value);
     router.push('/');
   } catch (e) {
-    error.value = e.response?.data?.message || e.message || 'Login failed';
+    const status = e.response?.status;
+    if (status === 404) {
+      error.value = 'API not reachable. Wait for Render deploy to finish, then hard-refresh (Cmd+Shift+R).';
+    } else if (status === 400) {
+      error.value = 'Wrong email or password. Use the ADMIN_EMAIL and ADMIN_PASSWORD from your Render environment.';
+    } else {
+      error.value = e.response?.data?.message || e.message || 'Login failed';
+    }
   } finally {
     loading.value = false;
   }
@@ -46,7 +53,7 @@ async function submit() {
         </button>
       </form>
       <p class="mt-6 text-center text-xs text-slate-500">
-        Use admin credentials from backend/.env
+        Use the ADMIN_EMAIL and ADMIN_PASSWORD from your Render dashboard (not localhost .env)
       </p>
     </div>
   </div>
