@@ -10,7 +10,7 @@ async function listJobs(req, res, next) {
       const query = {};
       if (section !== 'all') query.emailSection = section;
       if (Number(minMatch) > 0) query.matchPct = { $gte: Number(minMatch) };
-      jobs = await Job.find(query).sort({ matchPct: -1, score: -1 }).limit(200).lean();
+      jobs = await Job.find(query).sort({ matchPct: -1, score: -1 }).limit(5000).lean();
       if (search) {
         const needle = search.toLowerCase();
         jobs = jobs.filter((j) =>

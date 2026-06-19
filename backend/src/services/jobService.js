@@ -99,7 +99,7 @@ async function syncApplicationsToMongo() {
 }
 
 function listJobsFromSqlite(filters = {}) {
-  let jobs = readJobsFromSqlite(800);
+  let jobs = readJobsFromSqlite(5000);
   if (filters.section && filters.section !== 'all') {
     jobs = jobs.filter((j) => j.emailSection === filters.section);
   }
