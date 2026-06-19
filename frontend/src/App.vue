@@ -19,6 +19,8 @@ const nav = computed(() => {
     { to: '/chat', label: 'Connect', icon: '💬', mobile: false },
     { to: '/intelligence', label: 'AI Intel', icon: '🧠', mobile: false },
     { to: '/interview', label: 'Interview', icon: '🎙', mobile: false },
+    { to: '/resumes', label: 'Resumes', icon: '📄', mobile: false },
+    { to: '/calendar', label: 'Calendar', icon: '📆', mobile: true },
     { to: '/conferences', label: 'Events', icon: '📅', mobile: false },
     { to: '/social', label: 'Social', icon: '🤝', mobile: false },
     { to: '/swarm', label: 'Swarm', icon: '⚡', mobile: false },

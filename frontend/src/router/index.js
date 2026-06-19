@@ -18,6 +18,8 @@ import InterviewView from '../views/InterviewView.vue';
 import ConferencesView from '../views/ConferencesView.vue';
 import SocialView from '../views/SocialView.vue';
 import SwarmView from '../views/SwarmView.vue';
+import ResumesView from '../views/ResumesView.vue';
+import CalendarView from '../views/CalendarView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -34,6 +36,8 @@ const router = createRouter({
     { path: '/conferences', component: ConferencesView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/social', component: SocialView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/swarm', component: SwarmView, meta: { requiresAuth: true, skipOnboarding: true } },
+    { path: '/resumes', component: ResumesView, meta: { requiresAuth: true, skipOnboarding: true } },
+    { path: '/calendar', component: CalendarView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/applications', component: ApplicationsView, meta: { requiresAuth: true } },
     { path: '/generator', component: GeneratorView, meta: { requiresAuth: true } },
     { path: '/agent', component: AgentView, meta: { requiresAuth: true } },

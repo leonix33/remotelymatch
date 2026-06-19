@@ -25,6 +25,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const outcomeRoutes = require('./routes/outcomeRoutes');
 const conferenceRoutes = require('./routes/conferenceRoutes');
 const swarmRoutes = require('./routes/swarmRoutes');
+const resumeCommunityRoutes = require('./routes/resumeCommunityRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
 
 function createApp() {
   const app = express();
@@ -69,6 +71,8 @@ function createApp() {
   app.use('/api/outcomes', outcomeRoutes);
   app.use('/api/conferences', conferenceRoutes);
   app.use('/api/swarm', swarmRoutes);
+  app.use('/api/resumes', resumeCommunityRoutes);
+  app.use('/api/calendar', calendarRoutes);
 
   const distPath = path.join(__dirname, '../../frontend/dist');
   app.use(express.static(distPath));

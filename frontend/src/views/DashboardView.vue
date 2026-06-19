@@ -127,6 +127,8 @@ onMounted(async () => {
         <RouterLink to="/jobs" class="btn-primary">Browse Jobs</RouterLink>
         <RouterLink to="/intelligence" class="btn-secondary">AI Intelligence</RouterLink>
         <RouterLink to="/interview" class="btn-secondary">Interview Sim</RouterLink>
+        <RouterLink to="/resumes" class="btn-secondary">Community Resumes</RouterLink>
+        <RouterLink to="/calendar" class="btn-secondary">Calendar</RouterLink>
         <RouterLink to="/conferences" class="btn-secondary">Conferences</RouterLink>
         <RouterLink to="/swarm" class="btn-secondary">Launch Swarm</RouterLink>
         <RouterLink to="/chat" class="btn-secondary">AI Coach & Chat</RouterLink>
