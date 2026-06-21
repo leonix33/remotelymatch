@@ -42,7 +42,8 @@ async function load() {
     items.value = data;
     await loadSummary();
   } catch (e) {
-    error.value = e.response?.data?.message || 'Could not load approval queue';
+    const msg = e.response?.data?.message || e.message || 'Could not load approval queue';
+    error.value = `${msg} — try logging out and back in, or click Refresh below.`;
     items.value = [];
   } finally {
     loading.value = false;
@@ -129,7 +130,7 @@ watch(status, load);
       </div>
     </div>
 
-    <div class="mt-6 flex flex-wrap gap-2">
+    <div class="mt-6 flex flex-wrap items-center gap-2">
       <button
         v-for="tab in ['pending', 'approved', 'rejected', 'all']"
         :key="tab"
@@ -138,6 +139,9 @@ watch(status, load);
         @click="status = tab"
       >
         {{ tab }}
+      </button>
+      <button class="btn-secondary ml-2 px-3 py-2 text-sm" :disabled="loading" @click="load">
+        {{ loading ? 'Loading…' : 'Refresh queue' }}
       </button>
     </div>
 

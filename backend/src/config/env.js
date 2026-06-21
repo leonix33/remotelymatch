@@ -18,7 +18,7 @@ module.exports = {
   appUrl: trim(process.env.APP_URL) || trim(process.env.CLIENT_ORIGIN) || 'https://remotematch.onrender.com',
   agentHome: process.env.AGENT_HOME || path.resolve(__dirname, '../../../..'),
   appName: trim(process.env.APP_NAME) || 'RemoteMatch',
-  deployTag: 'sync-v2',
+  deployTag: 'sync-v3',
   resendApiKey: trim(process.env.RESEND_API_KEY) || '',
   emailFrom: trim(process.env.EMAIL_FROM) || 'RemoteMatch <onboarding@resend.dev>',
   vapidPublicKey: trim(process.env.VAPID_PUBLIC_KEY) || '',
