@@ -4,7 +4,13 @@
   "version": "1.0.0",
   "description": "Send any job page to your RemoteMatch Apply Queue",
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://remotematch.onrender.com/*", "http://localhost:5100/*", "http://localhost:5173/*"],
+  "host_permissions": [
+    "https://remotematch.onrender.com/*",
+    "https://remotematch.app/*",
+    "https://www.remotematch.app/*",
+    "http://localhost:5100/*",
+    "http://localhost:5173/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Send to RemoteMatch"
@@ -19,6 +25,8 @@
     {
       "matches": [
         "https://remotematch.onrender.com/*",
+        "https://remotematch.app/*",
+        "https://www.remotematch.app/*",
         "http://localhost:5173/*",
         "http://127.0.0.1:5173/*"
       ],

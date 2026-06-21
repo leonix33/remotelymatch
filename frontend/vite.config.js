@@ -5,7 +5,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const appUrl = env.VITE_APP_URL || 'https://remotematch.onrender.com';
+  const appUrl = env.VITE_APP_URL || 'https://remotematch.app';
+  const appName = env.VITE_APP_NAME || 'RemoteMatch';
 
   return {
     plugins: [
@@ -16,9 +17,9 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['icon.svg', 'offline.html'],
         manifest: {
           id: appUrl,
-          name: 'RemoteMatch',
-          short_name: 'RemoteMatch',
-          description: 'Find, match, and apply to remote jobs — mobile-ready dashboard',
+          name: appName,
+          short_name: appName,
+          description: 'Find, match, and apply to remote DevOps & SRE jobs — mobile-ready dashboard',
           theme_color: '#0f172a',
           background_color: '#0f172a',
           display: 'standalone',

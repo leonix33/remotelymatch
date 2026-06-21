@@ -23,7 +23,7 @@
     <p id="status"></p>
     <script>
       chrome.storage.sync.get(['apiBase', 'accessToken'], (data) => {
-        document.getElementById('apiBase').value = data.apiBase || 'https://remotematch.onrender.com';
+        document.getElementById('apiBase').value = data.apiBase || 'https://remotematch.app';
         document.getElementById('accessToken').value = data.accessToken || '';
       });
       document.getElementById('save').addEventListener('click', () => {

@@ -6,6 +6,7 @@ import PwaPrompt from './components/PwaPrompt.vue';
 import AppLogo from './components/AppLogo.vue';
 import NotificationBell from './components/NotificationBell.vue';
 import { isProduction, appUrl } from './config';
+import { brand, displayDomain } from './brand';
 
 const route = useRoute();
 const router = useRouter();
@@ -54,8 +55,8 @@ function logout() {
     <aside class="hidden w-64 shrink-0 border-r border-teal-900/40 bg-slate-950/80 p-6 lg:flex lg:flex-col">
       <div class="mb-10">
         <AppLogo size="md" />
-        <p class="mt-3 text-xs text-slate-400">AI-powered remote job intelligence</p>
-        <p v-if="isProduction" class="mt-2 truncate text-[10px] text-slate-600">{{ appUrl }}</p>
+        <p class="mt-3 text-xs text-slate-400">{{ brand.tagline }}</p>
+        <p v-if="isProduction" class="mt-2 truncate text-[10px] text-slate-600">{{ displayDomain() }}</p>
       </div>
       <nav class="space-y-1">
         <RouterLink

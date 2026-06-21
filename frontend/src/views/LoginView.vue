@@ -1,8 +1,9 @@
 <script setup>
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, RouterLink } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import AppLogo from '../components/AppLogo.vue';
+import { brand } from '../brand';
 
 const email = ref('');
 const password = ref('');
@@ -36,7 +37,7 @@ async function submit() {
   <div class="flex min-h-screen items-center justify-center p-4">
     <div class="card w-full max-w-md p-8">
       <AppLogo size="lg" />
-      <p class="mt-4 text-sm text-slate-400">Sign in to your remote job command center</p>
+      <p class="mt-4 text-sm text-slate-400">{{ brand.tagline }}</p>
 
       <form class="mt-8 space-y-4" @submit.prevent="submit">
         <div>
@@ -53,6 +54,9 @@ async function submit() {
         </button>
       </form>
       <p class="mt-6 text-center text-xs text-slate-500">Invite-only access · Admin creates accounts</p>
+      <p class="mt-3 text-center text-sm">
+        <RouterLink to="/welcome" class="text-teal-400 hover:underline">← Back to home</RouterLink>
+      </p>
     </div>
   </div>
 </template>

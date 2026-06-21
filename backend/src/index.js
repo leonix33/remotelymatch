@@ -56,7 +56,7 @@ async function start() {
   const app = createApp();
   const server = http.createServer(app);
   const io = new Server(server, {
-    cors: { origin: env.clientOrigin, credentials: true },
+    cors: { origin: env.clientOrigins, credentials: true },
     path: '/socket.io',
   });
   initSocket(io);

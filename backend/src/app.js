@@ -34,7 +34,18 @@ function createApp() {
   const app = express();
 
   app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cors({ origin: env.clientOrigin, credentials: true }));
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin || env.clientOrigins.includes(origin)) return callback(null, true);
+        if (env.customDomain && origin.includes(env.customDomain.replace(/^https?:\/\//, ''))) {
+          return callback(null, true);
+        }
+        callback(null, env.clientOrigins[0] || true);
+      },
+      credentials: true,
+    })
+  );
   app.use(express.json({ limit: '10mb' }));
   app.use(cookieParser());
   app.use(morgan('dev'));
@@ -54,6 +65,8 @@ function createApp() {
       mongoConfigured: Boolean(env.mongoUri),
       openaiConfigured: Boolean(env.openaiApiKey),
       pushConfigured: Boolean(env.vapidPublicKey && env.vapidPrivateKey),
+      customDomain: env.customDomain || null,
+      clientOrigins: env.clientOrigins,
       time: new Date().toISOString(),
     });
   });

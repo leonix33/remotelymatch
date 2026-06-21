@@ -1,9 +1,11 @@
 FROM node:20-alpine AS frontend-build
 WORKDIR /app
-ARG VITE_APP_URL=https://remotematch.onrender.com
+ARG VITE_APP_URL=https://remotematch.app
 ARG VITE_APP_NAME=RemoteMatch
+ARG VITE_CUSTOM_DOMAIN=remotematch.app
 ENV VITE_APP_URL=$VITE_APP_URL
 ENV VITE_APP_NAME=$VITE_APP_NAME
+ENV VITE_CUSTOM_DOMAIN=$VITE_CUSTOM_DOMAIN
 COPY frontend/package*.json ./frontend/
 RUN npm install --prefix frontend
 COPY frontend ./frontend
