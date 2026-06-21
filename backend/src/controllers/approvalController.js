@@ -12,9 +12,16 @@ async function queueExternal(req, res, next) {
 
 async function list(req, res, next) {
   try {
-    const status = req.query.status || 'pending';
-    const items = await approvalService.listForUser(req.user.sub, status);
-    res.json(items);
+    const result = await approvalService.listForUser(req.user.sub, {
+      status: req.query.status || 'pending',
+      search: req.query.search || '',
+      minMatch: req.query.minMatch || '',
+      ats: req.query.ats || '',
+      sort: req.query.sort || 'match',
+      limit: req.query.limit || 0,
+      offset: req.query.offset || 0,
+    });
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -47,4 +54,30 @@ async function reject(req, res, next) {
   }
 }
 
-module.exports = { list, summary, approve, reject, queueExternal };
+async function bulkApprove(req, res, next) {
+  try {
+    const { jobIds } = req.body;
+    if (!Array.isArray(jobIds) || !jobIds.length) {
+      return res.status(400).json({ message: 'jobIds array required' });
+    }
+    const results = await approvalService.bulkSetStatus(req.user.sub, jobIds, 'approved');
+    res.json({ count: results.length, message: `Approved ${results.length} job(s)` });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function bulkReject(req, res, next) {
+  try {
+    const { jobIds } = req.body;
+    if (!Array.isArray(jobIds) || !jobIds.length) {
+      return res.status(400).json({ message: 'jobIds array required' });
+    }
+    const results = await approvalService.bulkSetStatus(req.user.sub, jobIds, 'rejected');
+    res.json({ count: results.length, message: `Skipped ${results.length} job(s)` });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { list, summary, approve, reject, queueExternal, bulkApprove, bulkReject };

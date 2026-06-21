@@ -1,5 +1,6 @@
 const Profile = require('../models/Profile');
 const env = require('../config/env');
+const profileFileService = require('./profileFileService');
 
 function isComplete(profile) {
   return Boolean(
@@ -15,22 +16,13 @@ function toResponse(profile) {
   return {
     ...doc,
     complete: isComplete(doc),
+    mongoRequired: false,
   };
 }
 
 async function getOrCreate(userId) {
   if (!env.mongoUri) {
-    return {
-      userId,
-      displayName: '',
-      targetTitles: [],
-      mustHaveSkills: [],
-      niceToHaveSkills: [],
-      targetCompanies: [],
-      onboardingComplete: false,
-      complete: false,
-      mongoRequired: true,
-    };
+    return toResponse(profileFileService.get(userId));
   }
   let profile = await Profile.findOne({ userId });
   if (!profile) {
@@ -41,7 +33,8 @@ async function getOrCreate(userId) {
 
 async function update(userId, data) {
   if (!env.mongoUri) {
-    throw new Error('MongoDB is required to save profiles. Add MONGODB_URI in Render.');
+    const profile = profileFileService.save(userId, data);
+    return toResponse(profile);
   }
   const profile = await Profile.findOneAndUpdate(
     { userId },

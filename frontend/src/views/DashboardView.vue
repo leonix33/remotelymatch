@@ -1,47 +1,32 @@
 <script setup>
 import { onMounted, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import http from '../api/http';
-import { isProduction } from '../config';
 import { useProfileStore } from '../stores/profile';
 
 const profileStore = useProfileStore();
 const stats = ref(null);
-const syncStatus = ref(null);
-const loading = ref(true);
-const syncing = ref(false);
-const syncMessage = ref('');
-const victories = ref([]);
+const queue = ref({ pending: 0, approved: 0 });
+const topJobs = ref([]);
 const marketPulse = ref(null);
+const loading = ref(true);
 
 async function load() {
   loading.value = true;
   try {
-    const [statsRes, syncRes, vicRes, pulseRes] = await Promise.all([
+    const [statsRes, summaryRes, jobsRes, pulseRes] = await Promise.all([
       http.get('/analytics/summary'),
-      http.get('/sync/status').catch(() => ({ data: null })),
-      http.get('/social/victories').catch(() => ({ data: [] })),
+      http.get('/approvals/summary'),
+      http.get('/approvals', { params: { status: 'pending', limit: 5, minMatch: 85 } }),
       http.get('/intelligence/market-pulse').catch(() => ({ data: null })),
     ]);
     stats.value = statsRes.data;
-    syncStatus.value = syncRes.data;
-    victories.value = vicRes.data.slice(0, 5);
+    queue.value = summaryRes.data;
+    const payload = jobsRes.data;
+    topJobs.value = payload?.items || payload || [];
     marketPulse.value = pulseRes.data;
   } finally {
     loading.value = false;
-  }
-}
-
-async function syncNow() {
-  syncing.value = true;
-  syncMessage.value = '';
-  try {
-    const { data } = await http.post('/sync/all');
-    syncMessage.value = `Synced ${data.jobs ?? 0} jobs and ${data.applications ?? 0} applications`;
-    await load();
-  } catch (e) {
-    syncMessage.value = e.response?.data?.message || 'Sync failed';
-  } finally {
-    syncing.value = false;
   }
 }
 
@@ -53,108 +38,99 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h2 class="text-2xl font-bold text-slate-100">Dashboard</h2>
-    <p class="mt-1 text-slate-400">Your remote job search at a glance</p>
+    <h2 class="text-2xl font-bold text-slate-100">Good to see you{{ profileStore.profile?.displayName ? `, ${profileStore.profile.displayName.split(' ')[0]}` : '' }}</h2>
+    <p class="mt-1 text-slate-400">Your remote job search command center</p>
 
-    <div v-if="profileStore.profile?.displayName" class="mt-6 card flex flex-wrap items-center justify-between gap-4 p-4">
-      <div>
-        <p class="font-medium text-slate-200">{{ profileStore.profile.displayName }}</p>
-        <p class="text-sm text-slate-500">{{ profileStore.profile.headline || 'Add a headline in Profile' }}</p>
+    <!-- Primary action -->
+    <div v-if="queue.pending > 0" class="mt-8 card border-teal-600/30 bg-gradient-to-r from-teal-950/80 to-slate-900/80 p-6">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p class="text-sm font-medium uppercase tracking-wider text-teal-400">Today's focus</p>
+          <h3 class="mt-1 text-xl font-bold text-slate-100">{{ queue.pending }} jobs waiting for your review</h3>
+          <p class="mt-2 text-sm text-slate-400">
+            {{ queue.approved }} already approved
+            <span v-if="queue.approved > 0"> — ready to apply when you are</span>
+          </p>
+        </div>
+        <RouterLink to="/approvals" class="btn-primary px-6 py-3">Review apply queue →</RouterLink>
       </div>
-      <RouterLink to="/profile" class="btn-secondary text-sm">Edit profile</RouterLink>
+    </div>
+
+    <div v-else-if="queue.approved > 0" class="mt-8 card border-amber-600/30 p-6">
+      <h3 class="text-xl font-bold text-amber-300">{{ queue.approved }} jobs approved — ready to apply</h3>
+      <p class="mt-2 text-sm text-slate-400">Head to Apply Queue and click Apply Approved.</p>
+      <RouterLink to="/approvals" class="btn-primary mt-4 inline-block">Go to queue →</RouterLink>
     </div>
 
     <div v-if="loading" class="mt-8 text-slate-400">Loading…</div>
-    <div v-else-if="stats" class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div class="card p-5">
-        <p class="text-sm text-slate-400">Total Jobs</p>
-        <p class="mt-1 text-3xl font-bold text-teal-300">{{ stats.totalJobs }}</p>
-      </div>
-      <div class="card p-5">
-        <p class="text-sm text-slate-400">Apply Today</p>
-        <p class="mt-1 text-3xl font-bold text-amber-300">{{ stats.applyToday }}</p>
-      </div>
-      <div class="card p-5">
-        <p class="text-sm text-slate-400">Submitted</p>
-        <p class="mt-1 text-3xl font-bold text-teal-300">{{ stats.submitted }}</p>
-      </div>
-      <div class="card p-5">
-        <p class="text-sm text-slate-400">High Match (80%+)</p>
-        <p class="mt-1 text-3xl font-bold text-amber-300">{{ stats.highMatch }}</p>
-      </div>
-    </div>
 
-    <div v-if="syncStatus" class="mt-8 card p-6">
-      <h3 class="font-semibold text-slate-200">Data sync</h3>
-      <p class="mt-2 text-sm text-slate-400">
-        Source: <span class="text-teal-300">{{ syncStatus.source }}</span>
-        · SQLite: {{ syncStatus.sqliteJobs }} jobs, {{ syncStatus.sqliteApps }} apps
-        <span v-if="syncStatus.mongoJobs"> · MongoDB: {{ syncStatus.mongoJobs }} jobs, {{ syncStatus.mongoApps }} apps</span>
-      </p>
-      <p v-if="syncStatus.inSync" class="mt-2 text-sm text-teal-300">Data is in sync</p>
-      <p v-else-if="isProduction" class="mt-2 text-sm text-amber-300">
-        Production data may be behind your Mac. Run <code class="text-teal-300">npm run sync:render</code> locally to push latest jobs.
-      </p>
-      <button v-if="isProduction && syncStatus.mongoJobs" class="btn-secondary mt-4" :disabled="syncing" @click="syncNow">
-        {{ syncing ? 'Syncing…' : 'Re-sync bundled data to MongoDB' }}
-      </button>
-      <p v-if="syncMessage" class="mt-3 text-sm text-slate-300">{{ syncMessage }}</p>
-    </div>
-
-    <div v-if="stats" class="mt-8 grid gap-6 lg:grid-cols-2">
-      <div class="card p-6">
-        <h3 class="font-semibold text-slate-200">Job Sections</h3>
-        <ul class="mt-4 space-y-2 text-sm">
-          <li class="flex justify-between"><span class="text-slate-400">Apply Today</span><span class="badge badge-gold">{{ stats.applyToday }}</span></li>
-          <li class="flex justify-between"><span class="text-slate-400">Strong Review</span><span class="badge badge-teal">{{ stats.strongReview }}</span></li>
-          <li class="flex justify-between"><span class="text-slate-400">Manual Browse</span><span class="badge badge-slate">{{ stats.manualBrowse }}</span></li>
-        </ul>
+    <template v-else>
+      <div v-if="stats" class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="card p-5">
+          <p class="text-sm text-slate-400">Jobs tracked</p>
+          <p class="mt-1 text-3xl font-bold text-teal-300">{{ stats.totalJobs }}</p>
+        </div>
+        <div class="card p-5">
+          <p class="text-sm text-slate-400">Apply today</p>
+          <p class="mt-1 text-3xl font-bold text-amber-300">{{ stats.applyToday }}</p>
+        </div>
+        <div class="card p-5">
+          <p class="text-sm text-slate-400">Submitted</p>
+          <p class="mt-1 text-3xl font-bold text-teal-300">{{ stats.submitted }}</p>
+        </div>
+        <div class="card p-5">
+          <p class="text-sm text-slate-400">80%+ match</p>
+          <p class="mt-1 text-3xl font-bold text-amber-300">{{ stats.highMatch }}</p>
+        </div>
       </div>
-      <div class="card p-6">
-        <h3 class="font-semibold text-slate-200">Application Status</h3>
-        <ul class="mt-4 space-y-2 text-sm">
-          <li v-for="(count, status) in stats.byStatus" :key="status" class="flex justify-between">
-            <span class="text-slate-400">{{ status }}</span>
-            <span class="badge badge-teal">{{ count }}</span>
-          </li>
-        </ul>
+
+      <div v-if="topJobs.length" class="mt-8 card p-6">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold text-slate-200">Top matches to review</h3>
+          <RouterLink to="/approvals" class="text-sm text-teal-400 hover:underline">See all →</RouterLink>
+        </div>
+        <div class="mt-4 space-y-3">
+          <div v-for="job in topJobs" :key="job.jobId" class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3 last:border-0">
+            <div>
+              <p class="font-medium text-slate-200">{{ job.title }}</p>
+              <p class="text-sm text-slate-500">{{ job.company }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="badge badge-teal">{{ job.personalMatchPct || job.matchPct }}%</span>
+              <RouterLink to="/approvals" class="btn-secondary px-2 py-1 text-xs">Review</RouterLink>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="mt-8 card p-6">
-      <h3 class="font-semibold text-slate-200">Quick actions</h3>
-      <div class="mt-4 flex flex-wrap gap-3">
-        <RouterLink to="/jobs" class="btn-primary">Browse Jobs</RouterLink>
-        <RouterLink to="/intelligence" class="btn-secondary">AI Intelligence</RouterLink>
-        <RouterLink to="/interview" class="btn-secondary">Interview Sim</RouterLink>
-        <RouterLink to="/resumes" class="btn-secondary">Community Resumes</RouterLink>
-        <RouterLink to="/calendar" class="btn-secondary">Calendar</RouterLink>
-        <RouterLink to="/conferences" class="btn-secondary">Conferences</RouterLink>
-        <RouterLink to="/swarm" class="btn-secondary">Launch Swarm</RouterLink>
-        <RouterLink to="/chat" class="btn-secondary">AI Coach & Chat</RouterLink>
-        <RouterLink to="/approvals" class="btn-secondary">Apply Queue</RouterLink>
-        <RouterLink to="/social" class="btn-secondary">Social Hub</RouterLink>
-        <RouterLink to="/agent" class="btn-secondary">Run Agent</RouterLink>
+      <div v-if="!profileStore.profile?.complete" class="mt-8 card border-amber-700/30 p-6">
+        <h3 class="font-semibold text-amber-200">Complete your profile for better matches</h3>
+        <p class="mt-2 text-sm text-slate-400">Add your skills and target titles so jobs are scored to you — not just the agent default.</p>
+        <RouterLink to="/profile" class="btn-primary mt-4 inline-block">Set up profile</RouterLink>
       </div>
-    </div>
 
-    <div v-if="marketPulse" class="mt-8 card p-6">
-      <h3 class="font-semibold text-slate-200">Market pulse</h3>
-      <p class="mt-2 text-sm text-slate-400">
-        Hot skills:
-        <span v-for="s in marketPulse.trendingSkills?.slice(0, 6)" :key="s.skill" class="ml-2 badge badge-teal">{{ s.skill }}</span>
-      </p>
-    </div>
-
-    <div v-if="victories.length" class="mt-8 card p-6">
-      <h3 class="font-semibold text-slate-200">Victory feed</h3>
-      <div class="mt-4 space-y-2">
-        <p v-for="v in victories" :key="v._id" class="text-sm text-slate-400">
-          <span class="text-teal-300">{{ v.userName }}</span> — {{ v.type }} @ {{ v.company }}
-          <span v-if="v.message"> · {{ v.message }}</span>
+      <div v-if="marketPulse" class="mt-8 card p-6">
+        <h3 class="font-semibold text-slate-200">Market pulse</h3>
+        <p class="mt-2 text-sm text-slate-400">
+          {{ marketPulse.totalJobs }} jobs · {{ marketPulse.remotePercent }}% remote · Avg {{ marketPulse.avgMatchPct }}% match
         </p>
+        <p class="mt-3 text-sm text-slate-500">
+          Hot:
+          <span v-for="s in marketPulse.trendingSkills?.slice(0, 6)" :key="s.skill" class="ml-2 badge badge-teal">{{ s.skill }}</span>
+        </p>
+        <RouterLink to="/intelligence" class="mt-3 inline-block text-sm text-teal-400">Full intelligence hub →</RouterLink>
       </div>
-      <RouterLink to="/social" class="mt-3 inline-block text-sm text-teal-400">View social hub →</RouterLink>
-    </div>
+
+      <div class="mt-8 card p-6">
+        <h3 class="font-semibold text-slate-200">Quick actions</h3>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <RouterLink to="/approvals" class="btn-primary">Apply Queue</RouterLink>
+          <RouterLink to="/jobs" class="btn-secondary">Browse jobs</RouterLink>
+          <RouterLink to="/agent" class="btn-secondary">Run agent</RouterLink>
+          <RouterLink to="/intelligence" class="btn-secondary">AI intel</RouterLink>
+          <RouterLink to="/chat" class="btn-secondary">AI coach</RouterLink>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
