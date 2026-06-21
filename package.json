@@ -11,7 +11,10 @@
     "sync:mongo": "node scripts/sync-sqlite-to-mongo.js",
     "refresh:data": "node scripts/refresh-agent-data.js",
     "sync:render": "node scripts/refresh-agent-data.js && node scripts/push-local-data-to-render.js",
-    "deploy:data": "node scripts/deploy-data-to-render.js"
+    "deploy:data": "node scripts/deploy-data-to-render.js",
+    "mongo:up": "docker compose up -d mongo",
+    "mongo:down": "docker compose down",
+    "mongo:logs": "docker compose logs -f mongo"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

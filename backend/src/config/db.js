@@ -3,7 +3,7 @@ const { mongoUri } = require('./env');
 
 async function connectDb() {
   if (!mongoUri) {
-    console.warn('MONGODB_URI is missing — user auth and generations require MongoDB Atlas.');
+    console.warn('MONGODB_URI is missing — using file/SQLite fallbacks. Run: npm run mongo:up');
     return false;
   }
   await mongoose.connect(mongoUri);
