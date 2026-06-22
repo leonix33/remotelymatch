@@ -71,7 +71,7 @@ async function createUser() {
 }
 
 async function toggleActive(user) {
-  if (user._id === auth.user?.id || user.id === auth.user?.id) return;
+  if (isSelf(user)) return;
   error.value = '';
   success.value = '';
   try {
@@ -84,8 +84,8 @@ async function toggleActive(user) {
 }
 
 async function changeRole(user, role) {
-  const id = user._id || user.id;
-  if (id === auth.user?.id || user.role === role) return;
+  const id = userId(user);
+  if (isSelf(user) || user.role === role) return;
   roleSaving.value = id;
   error.value = '';
   success.value = '';
@@ -99,6 +99,15 @@ async function changeRole(user, role) {
   } finally {
     roleSaving.value = '';
   }
+}
+
+function userId(user) {
+  return String(user?._id || user?.id || '');
+}
+
+function isSelf(user) {
+  const currentId = String(auth.user?.id || auth.user?._id || '');
+  return userId(user) === currentId;
 }
 
 function openDelete(user) {
@@ -285,17 +294,7 @@ onMounted(load);
               <p class="text-slate-500">{{ u.email }}</p>
             </td>
             <td class="px-6 py-4">
-              <select
-                v-if="(u._id || u.id) !== auth.user?.id"
-                class="input py-1.5 text-xs capitalize"
-                :value="u.role"
-                :disabled="roleSaving === (u._id || u.id)"
-                @change="changeRole(u, $event.target.value)"
-              >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-              <span v-else class="badge" :class="roleClass(u.role)">{{ u.role }} (you)</span>
+              <span class="badge capitalize" :class="roleClass(u.role)">{{ u.role }}</span>
             </td>
             <td class="px-6 py-4">
               <span class="badge" :class="u.active !== false ? 'badge-teal' : 'badge-slate'">
@@ -303,7 +302,23 @@ onMounted(load);
               </span>
             </td>
             <td class="px-6 py-4 text-right">
-              <div v-if="(u._id || u.id) !== auth.user?.id" class="flex flex-wrap justify-end gap-2">
+              <div v-if="!isSelf(u)" class="flex flex-wrap justify-end gap-2">
+                <button
+                  v-if="u.role !== 'admin'"
+                  class="btn-secondary px-3 py-1.5 text-xs text-amber-200"
+                  :disabled="roleSaving === userId(u)"
+                  @click="changeRole(u, 'admin')"
+                >
+                  {{ roleSaving === userId(u) ? 'Saving…' : 'Make admin' }}
+                </button>
+                <button
+                  v-else
+                  class="btn-secondary px-3 py-1.5 text-xs"
+                  :disabled="roleSaving === userId(u)"
+                  @click="changeRole(u, 'user')"
+                >
+                  {{ roleSaving === userId(u) ? 'Saving…' : 'Make user' }}
+                </button>
                 <button class="btn-secondary px-3 py-1.5 text-xs" @click="openReset(u)">Reset pwd</button>
                 <button class="btn-secondary px-3 py-1.5 text-xs" @click="toggleActive(u)">
                   {{ u.active !== false ? 'Disable' : 'Enable' }}
@@ -312,7 +327,7 @@ onMounted(load);
                   Delete
                 </button>
               </div>
-              <span v-else class="text-xs text-slate-500">You</span>
+              <span v-else class="text-xs text-slate-500">You · {{ u.role }}</span>
             </td>
           </tr>
         </tbody>

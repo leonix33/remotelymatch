@@ -106,6 +106,9 @@ async function updateUser(req, res, next) {
     if (body.role) user.role = body.role;
     if (typeof body.active === 'boolean') user.active = body.active;
     await user.save();
+    if (body.role === 'admin') {
+      await teamService.ensureTeamForUser(user);
+    }
     res.json({ id: user._id, name: user.name, email: user.email, role: user.role, active: user.active });
   } catch (err) {
     next(err);
