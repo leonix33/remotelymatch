@@ -38,6 +38,38 @@ onMounted(async () => {
 
       <div class="mt-8 grid gap-6 lg:grid-cols-2">
         <div class="card p-6">
+          <h3 class="font-semibold">Matches by job board</h3>
+          <div class="mt-4 space-y-3">
+            <div v-for="(count, board) in stats.byJobBoard" :key="board" class="flex items-center gap-3">
+              <div class="h-2 flex-1 rounded-full bg-slate-800">
+                <div class="h-2 rounded-full bg-teal-500" :style="{ width: `${Math.min(100, (count / stats.totalJobs) * 100)}%` }" />
+              </div>
+              <span class="w-36 truncate text-sm text-slate-400" :title="board">{{ board }}</span>
+              <span class="badge badge-teal">{{ count }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="card p-6">
+          <h3 class="font-semibold">Applications by job board</h3>
+          <div class="mt-4 space-y-3">
+            <div
+              v-for="(count, board) in stats.byApplicationSource"
+              :key="`app-${board}`"
+              class="flex items-center gap-3"
+            >
+              <div class="h-2 flex-1 rounded-full bg-slate-800">
+                <div class="h-2 rounded-full bg-amber-400" :style="{ width: `${Math.min(100, (count / Math.max(stats.totalApplications, 1)) * 100)}%` }" />
+              </div>
+              <span class="w-36 truncate text-sm text-slate-400" :title="board">{{ board }}</span>
+              <span class="badge badge-gold">{{ count }}</span>
+            </div>
+            <p v-if="!stats.totalApplications" class="text-sm text-slate-500">No applications yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-8 grid gap-6 lg:grid-cols-2">
+        <div class="card p-6">
           <h3 class="font-semibold">Queue by section</h3>
           <div class="mt-4 space-y-3">
             <div v-for="(count, key) in stats.bySection" :key="key" class="flex items-center gap-3">

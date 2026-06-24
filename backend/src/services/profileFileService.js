@@ -19,6 +19,7 @@ const DEFAULT = {
   extractedSkills: [],
   resumeFileName: '',
   savedJobs: [],
+  linkedinSavedSearches: [],
 };
 
 function storePath() {

@@ -41,28 +41,38 @@ function readApplicationsFromSqlite(limit = 5000) {
   const dbFile = sqlitePath('application_tracker.db');
   if (!fs.existsSync(dbFile)) return [];
   const db = new Database(dbFile, { readonly: true });
+  const hasCompany = db
+    .prepare("SELECT 1 FROM pragma_table_info('applications') WHERE name = 'company'")
+    .get();
+  const companySelect = hasCompany ? 'company' : "'' AS company";
   const rows = db
     .prepare(
-      `SELECT job_id, title, source, tier, job_url, apply_url, status, notes,
+      `SELECT job_id, title, ${companySelect}, source, tier, job_url, apply_url, status, notes,
               filled_fields, attempts, last_attempted, submitted_at
        FROM applications ORDER BY last_attempted DESC LIMIT ?`
     )
     .all(limit);
   db.close();
-  return rows.map((row) => ({
-    jobId: row.job_id,
-    title: row.title,
-    source: row.source,
-    tier: row.tier,
-    jobUrl: row.job_url,
-    applyUrl: row.apply_url,
-    status: row.status,
-    notes: row.notes,
-    filledFields: row.filled_fields || 0,
-    attempts: row.attempts || 0,
-    lastAttempted: row.last_attempted,
-    submittedAt: row.submitted_at,
-  }));
+
+  const jobsById = new Map(readJobsFromSqlite(limit).map((job) => [job.jobId, job]));
+  return rows.map((row) => {
+    const seen = jobsById.get(row.job_id);
+    return {
+      jobId: row.job_id,
+      title: row.title,
+      company: row.company || seen?.company || 'Unknown',
+      source: row.source || seen?.source || 'Unknown',
+      tier: row.tier,
+      jobUrl: row.job_url,
+      applyUrl: row.apply_url,
+      status: row.status,
+      notes: row.notes,
+      filledFields: row.filled_fields || 0,
+      attempts: row.attempts || 0,
+      lastAttempted: row.last_attempted,
+      submittedAt: row.submitted_at,
+    };
+  });
 }
 
 function detectAts(url = '') {

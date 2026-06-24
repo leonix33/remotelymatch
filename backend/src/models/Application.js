@@ -4,6 +4,7 @@ const applicationSchema = new mongoose.Schema(
   {
     jobId: { type: String, required: true, index: true },
     title: String,
+    company: String,
     source: String,
     tier: String,
     jobUrl: String,

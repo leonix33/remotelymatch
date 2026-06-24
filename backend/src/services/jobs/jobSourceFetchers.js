@@ -158,24 +158,47 @@ async function fetchAshbyOrgs(orgs = jobSourcesConfig.ashbyOrgs) {
 }
 
 async function fetchWellfound() {
+  // Wellfound blocks server-side access (DataDome); queue jobs via the Chrome extension.
+  return [];
+}
+
+async function fetchDice() {
+  const { diceApiKey, diceSearchKeyword } = jobSourcesConfig;
+  if (!diceApiKey) return [];
+
+  const params = new URLSearchParams({
+    q: diceSearchKeyword,
+    page: '1',
+    pageSize: '50',
+    'filters.workplaceTypes': 'Remote',
+    includeRemote: 'true',
+  });
+
   try {
     const data = await fetchJson(
-      'https://wellfound.com/api/startup_jobs?job_listing_slug=&page=1&per_page=50'
+      `https://job-search-api.svc.dhigroupinc.com/v1/dice/jobs/search?${params}`,
+      {
+        headers: {
+          Accept: 'application/json, text/plain, */*',
+          Origin: 'https://www.dice.com',
+          Referer: 'https://www.dice.com/',
+          'x-api-key': diceApiKey,
+        },
+      }
     );
-    const listings = data.startup_jobs || data.jobs || [];
-    return listings.map((item) => {
-      const startup = item.startup || {};
+    return (data.data || []).map((item) => {
+      const jobLocation = item.jobLocation || {};
       return rawJob({
-        id: `wellfound-${item.id || item.slug}`,
-        title: item.title || item.role,
-        company: startup.name || item.company_name || 'Startup',
-        location: item.location || 'Remote',
-        applyUrl: item.url || item.job_url || `https://wellfound.com/jobs/${item.id}`,
-        source: 'Wellfound',
-        description: stripHtml(item.description || ''),
-        postedAt: item.published_at || item.created_at || null,
-        remoteType: /remote/i.test(item.remote_policy || '') ? 'remote' : 'unknown',
-        atsType: 'wellfound',
+        id: `dice-${item.id || item.jobId}`,
+        title: item.title,
+        company: item.companyName || item.company || 'Unknown',
+        location: jobLocation.displayName || 'Remote',
+        applyUrl: item.detailsPageUrl || item.jobUrl,
+        source: 'Dice',
+        description: stripHtml(item.summary || ''),
+        postedAt: item.postedDate || null,
+        remoteType: 'remote',
+        atsType: 'dice',
       });
     });
   } catch {
@@ -244,13 +267,263 @@ async function fetchUsajobs() {
   });
 }
 
+async function fetchHimalayas() {
+  try {
+    const data = await fetchJson('https://himalayas.app/jobs/api?limit=200');
+    return (data.jobs || []).map((item) => {
+      const restrictions = (item.locationRestrictions || []).join(', ');
+      const categories = (item.categories || []).join(' ');
+      return rawJob({
+        id: `himalayas-${item.id || item.slug}`,
+        title: item.title,
+        company: item.companyName || 'Unknown',
+        location: restrictions || 'Remote',
+        applyUrl: item.url,
+        source: 'Himalayas',
+        description: stripHtml(`${categories} ${item.description || ''}`),
+        atsType: 'job-board',
+      });
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchWeWorkRemotely() {
+  try {
+    const res = await fetch('https://weworkremotely.com/remote-jobs.rss', {
+      headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotematch.app)' },
+    });
+    const rss = await res.text();
+    return parseRssJobs(rss, 'We Work Remotely', 'weworkremotely');
+  } catch {
+    return [];
+  }
+}
+
+async function fetchWorkingNomads() {
+  try {
+    const data = await fetchJson('https://www.workingnomads.co/api/exposed_jobs/');
+    if (!Array.isArray(data)) return [];
+    return data.map((item) =>
+      rawJob({
+        id: `workingnomads-${item.url}`,
+        title: item.title,
+        company: item.company_name || 'Unknown',
+        location: item.location || 'Remote',
+        applyUrl: item.url,
+        source: 'Working Nomads',
+        description: stripHtml(`${item.category_name || ''} ${(item.tags || []).join(' ')}`),
+        atsType: 'job-board',
+      })
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function fetchIndeed() {
+  const { indeedRssUrl, indeedSearchQuery, indeedSearchLocation } = jobSourcesConfig;
+  let feedUrl = indeedRssUrl;
+  if (!feedUrl && indeedSearchQuery) {
+    feedUrl = `https://www.indeed.com/jobs?q=${encodeURIComponent(indeedSearchQuery)}&l=${encodeURIComponent(indeedSearchLocation)}&format=rss`;
+  }
+  if (!feedUrl) return [];
+
+  try {
+    const res = await fetch(feedUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RemoteMatch/1.0)' },
+    });
+    if (!res.ok) return [];
+    const rss = await res.text();
+    return parseRssJobs(rss, 'Indeed', 'indeed');
+  } catch {
+    return [];
+  }
+}
+
+async function fetchAdzuna() {
+  const { adzunaAppId, adzunaAppKey, adzunaWhat, adzunaWhere, adzunaMaxDaysOld } = jobSourcesConfig;
+  if (!adzunaAppId || !adzunaAppKey) return [];
+
+  const params = new URLSearchParams({
+    app_id: adzunaAppId,
+    app_key: adzunaAppKey,
+    what: adzunaWhat,
+    where: adzunaWhere,
+    results_per_page: '50',
+    sort_by: 'date',
+    max_days_old: adzunaMaxDaysOld,
+    'content-type': 'application/json',
+  });
+
+  try {
+    const data = await fetchJson(`https://api.adzuna.com/v1/api/jobs/us/search/1?${params}`);
+    return (data.results || []).map((item) =>
+      rawJob({
+        id: `adzuna-${item.id}`,
+        title: item.title,
+        company: item.company?.display_name || 'Unknown',
+        location: item.location?.display_name || 'United States',
+        applyUrl: item.redirect_url,
+        source: 'Adzuna',
+        description: stripHtml(item.description || ''),
+        postedAt: item.created || null,
+        atsType: 'adzuna',
+      })
+    );
+  } catch {
+    return [];
+  }
+}
+
+function parseRssJobs(rssText, source, idPrefix) {
+  const jobs = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+  let match;
+  while ((match = itemRegex.exec(rssText))) {
+    const block = match[1];
+    const title = (block.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || block.match(/<title>(.*?)<\/title>/))?.[1] || '';
+    const link = (block.match(/<link>(.*?)<\/link>/) || [])[1] || '';
+    const description = stripHtml(
+      (block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) ||
+        block.match(/<description>([\s\S]*?)<\/description>/))?.[1] || ''
+    );
+    if (!title || !link) continue;
+    jobs.push(
+      rawJob({
+        id: `${idPrefix}-${link}`,
+        title,
+        company: title.split(':')[0]?.trim() || 'See posting',
+        location: 'Remote',
+        applyUrl: link,
+        source,
+        description,
+        atsType: 'job-board',
+      })
+    );
+  }
+  return jobs;
+}
+
+async function fetchDevItJobs() {
+  const jobs = [];
+  for (const [feedUrl, source] of [
+    ['https://devitjobs.com/job_feed.xml', 'DevITJobs'],
+    ['https://devitjobs.uk/job_feed.xml', 'DevITJobs UK'],
+  ]) {
+    try {
+      const res = await fetch(feedUrl, {
+        headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotematch.app)' },
+      });
+      const xml = await res.text();
+      const jobRegex = /<job>([\s\S]*?)<\/job>/gi;
+      let match;
+      while ((match = jobRegex.exec(xml))) {
+        const block = match[1];
+        const title = (block.match(/<title>([\s\S]*?)<\/title>/) || [])[1]?.trim() || '';
+        const company = (block.match(/<name>([\s\S]*?)<\/name>/) || [])[1]?.trim() || 'Unknown';
+        const link =
+          (block.match(/<apply_url>([\s\S]*?)<\/apply_url>/) || block.match(/<link>([\s\S]*?)<\/link>/))?.[1]?.trim() ||
+          '';
+        const id = (block.match(/<id>([\s\S]*?)<\/id>/) || [])[1]?.trim() || link;
+        if (!title || !link) continue;
+        jobs.push(
+          rawJob({
+            id: `devitjobs-${id}`,
+            title,
+            company,
+            location: 'Remote',
+            applyUrl: link,
+            source,
+            description: stripHtml((block.match(/<description>([\s\S]*?)<\/description>/) || [])[1] || ''),
+            atsType: 'job-board',
+          })
+        );
+      }
+    } catch {
+      /* skip feed */
+    }
+  }
+  return jobs;
+}
+
+async function fetchAijobs() {
+  try {
+    const res = await fetch('https://aijobs.net/jobs/search?remote=1', {
+      headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotematch.app)' },
+    });
+    const html = await res.text();
+    const links = new Set();
+    for (const m of html.matchAll(/href="(https:\/\/aijobs\.net\/job\/[^"]+)"/g)) links.add(m[1]);
+    for (const m of html.matchAll(/href="(\/job\/[^"]+)"/g)) links.add(`https://aijobs.net${m[1]}`);
+    return [...links].slice(0, 120).map((link) => {
+      const slug = link.replace(/\/$/, '').split('/job/')[1] || '';
+      const slugBody = slug.replace(/-\d+$/, '');
+      return rawJob({
+        id: `aijobs-${slug}`,
+        title: slugBody.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'AI/ML Role',
+        company: 'See posting',
+        location: 'Remote',
+        applyUrl: link,
+        source: 'AIJobs.net',
+        description: 'AI and machine learning job listing from aijobs.net.',
+        atsType: 'job-board',
+      });
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchYCombinatorJobs() {
+  try {
+    const storyIds = await fetchJson('https://hacker-news.firebaseio.com/v0/jobstories.json');
+    if (!Array.isArray(storyIds)) return [];
+    const jobs = [];
+    for (const storyId of storyIds.slice(0, 40)) {
+      try {
+        const item = await fetchJson(`https://hacker-news.firebaseio.com/v0/item/${storyId}.json`);
+        if (!item?.title || !item?.url) continue;
+        const company = item.title.split(/ is hiring/i)[0].trim();
+        jobs.push(
+          rawJob({
+            id: `yc-hn-${storyId}`,
+            title: item.title,
+            company: company || 'YC Startup',
+            location: 'Remote',
+            applyUrl: item.url,
+            source: 'Y Combinator Jobs',
+            description: stripHtml(item.text || item.title),
+            atsType: 'job-board',
+          })
+        );
+      } catch {
+        /* skip story */
+      }
+    }
+    return jobs;
+  } catch {
+    return [];
+  }
+}
+
 const SOURCE_FETCHERS = {
   remoteok: fetchRemoteOk,
   remotive: fetchRemotive,
+  himalayas: fetchHimalayas,
+  weworkremotely: fetchWeWorkRemotely,
   greenhouse: fetchGreenhouseBoards,
   lever: fetchLeverCompanies,
   ashby: fetchAshbyOrgs,
   wellfound: fetchWellfound,
+  dice: fetchDice,
+  indeed: fetchIndeed,
+  adzuna: fetchAdzuna,
+  workingnomads: fetchWorkingNomads,
+  devitjobs: fetchDevItJobs,
+  aijobs: fetchAijobs,
+  ycombinator: fetchYCombinatorJobs,
   workatastartup: fetchWorkAtAStartup,
   usajobs: fetchUsajobs,
 };
@@ -264,6 +537,15 @@ module.exports = {
   fetchLeverCompanies,
   fetchAshbyOrgs,
   fetchWellfound,
+  fetchDice,
+  fetchIndeed,
+  fetchAdzuna,
+  fetchHimalayas,
+  fetchWeWorkRemotely,
+  fetchWorkingNomads,
+  fetchDevItJobs,
+  fetchAijobs,
+  fetchYCombinatorJobs,
   fetchWorkAtAStartup,
   fetchUsajobs,
 };

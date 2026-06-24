@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "RemoteMatch Queue",
-  "version": "1.0.0",
-  "description": "Send any job page to your RemoteMatch Apply Queue",
+  "version": "1.1.0",
+  "description": "Send job pages to RemoteMatch (LinkedIn, Wellfound, Indeed, and more)",
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://remotematch.onrender.com/*",

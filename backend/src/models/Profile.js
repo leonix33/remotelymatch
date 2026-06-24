@@ -32,6 +32,17 @@ const profileSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    linkedinSavedSearches: {
+      type: [
+        {
+          id: String,
+          label: String,
+          url: String,
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

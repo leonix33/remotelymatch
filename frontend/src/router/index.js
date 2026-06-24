@@ -23,6 +23,7 @@ import OutcomesView from '../views/OutcomesView.vue';
 import ResumesView from '../views/ResumesView.vue';
 import CalendarView from '../views/CalendarView.vue';
 import LegalView from '../views/LegalView.vue';
+import LinkedInWorkflowView from '../views/LinkedInWorkflowView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -36,6 +37,7 @@ const router = createRouter({
     { path: '/profile', component: ProfileView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/jobs', component: JobsView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/approvals', component: ApprovalsView, meta: { requiresAuth: true, skipOnboarding: true } },
+    { path: '/linkedin', component: LinkedInWorkflowView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/chat', component: ChatView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/intelligence', component: IntelligenceView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/interview', component: InterviewView, meta: { requiresAuth: true, skipOnboarding: true } },

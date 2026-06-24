@@ -34,6 +34,16 @@ const updateSchema = z.object({
       })
     )
     .optional(),
+  linkedinSavedSearches: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        label: z.string().min(1),
+        url: z.string().min(8),
+        createdAt: z.union([z.string(), z.date()]).optional(),
+      })
+    )
+    .optional(),
 });
 
 const parseResumeSchema = z.object({

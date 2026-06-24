@@ -61,6 +61,8 @@ onMounted(load);
         <thead>
           <tr class="border-b border-slate-700 text-slate-400">
             <th class="py-3 pr-4">Title</th>
+            <th class="py-3 pr-4">Job board</th>
+            <th class="py-3 pr-4">Company</th>
             <th class="py-3 pr-4">Status</th>
             <th class="py-3 pr-4">Attempts</th>
             <th class="py-3">Last tried</th>
@@ -70,8 +72,13 @@ onMounted(load);
           <tr v-for="app in apps" :key="app.jobId || app._id" class="border-b border-slate-800">
             <td class="py-3 pr-4">
               <p class="font-medium text-slate-200">{{ app.title }}</p>
+              <p class="text-xs text-slate-500">
+                {{ app.company || 'Unknown company' }} · {{ app.source || 'Unknown board' }}
+              </p>
               <a v-if="app.applyUrl || app.jobUrl" :href="app.applyUrl || app.jobUrl" target="_blank" class="text-xs text-teal-400 hover:underline">Open →</a>
             </td>
+            <td class="py-3 pr-4 text-slate-400">{{ app.source || '—' }}</td>
+            <td class="py-3 pr-4 text-slate-400">{{ app.company || '—' }}</td>
             <td class="py-3 pr-4">
               <RouterLink to="/calendar" class="badge hover:opacity-80" :class="statusClass(app.status)">
                 {{ app.status }} · follow up

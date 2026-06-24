@@ -153,6 +153,19 @@ onMounted(async () => {
 
     <ApplyWorkflowBanner class="mt-6" />
 
+    <RouterLink
+      to="/linkedin"
+      class="mt-6 card flex flex-wrap items-center justify-between gap-4 border-sky-900/40 bg-sky-950/20 p-5 transition hover:border-sky-700/50"
+    >
+      <div>
+        <p class="text-sm font-medium text-sky-200">LinkedIn workflow</p>
+        <p class="mt-1 text-sm text-slate-400">
+          Saved searches, extension queueing, and approve → agent apply — no bots.
+        </p>
+      </div>
+      <span class="btn-secondary text-sm">Open →</span>
+    </RouterLink>
+
     <p v-if="queueMessage" class="mt-4 rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ queueMessage }}</p>
     <p v-if="queueError" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ queueError }}</p>
 

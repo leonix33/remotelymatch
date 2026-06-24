@@ -169,6 +169,7 @@ watch([section, minMatch], load);
           <div>
             <h3 class="font-semibold text-slate-100">{{ job.title }}</h3>
             <p class="text-sm text-slate-400">{{ job.company }} · {{ job.location || 'Remote' }}</p>
+            <p class="mt-1 text-xs text-slate-500">Job board: <span class="text-teal-300/90">{{ job.source || 'Unknown' }}</span></p>
           </div>
           <div class="flex flex-wrap gap-2">
             <span class="badge badge-teal">{{ job.personalMatchPct ?? job.matchPct ?? 0 }}% match</span>
@@ -177,7 +178,6 @@ watch([section, minMatch], load);
           </div>
         </div>
         <div class="mt-3 flex flex-wrap gap-2 text-sm">
-          <span class="text-slate-500">{{ job.source }}</span>
           <a v-if="job.url" :href="job.url" target="_blank" rel="noopener" class="text-teal-400 hover:underline">View job →</a>
           <button
             class="btn-secondary px-2 py-1 text-xs"

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import http from '../api/http';
 import ApplyWorkflowBanner from '../components/ApplyWorkflowBanner.vue';
+import { buildLinkedInSearchFromJob, isLinkedInJob, isLinkedInUrl, openLinkedIn } from '../utils/linkedin';
 
 const items = ref([]);
 const total = ref(0);
@@ -207,6 +208,14 @@ function sectionBadge(s) {
   return 'badge-slate';
 }
 
+function openJobLinkedIn(job) {
+  if (isLinkedInUrl(job.url)) {
+    openLinkedIn(job.url);
+    return;
+  }
+  openLinkedIn(buildLinkedInSearchFromJob(job));
+}
+
 function resetPage() {
   page.value = 1;
 }
@@ -332,13 +341,16 @@ onMounted(() => { load(); loadWhisper(); });
               <div class="min-w-0">
                 <h3 class="font-semibold text-slate-100">{{ job.title }}</h3>
                 <p class="text-sm text-slate-400">{{ job.company }}</p>
+                <p class="mt-1 text-xs text-slate-500">
+                  Job board: <span class="text-teal-300/90">{{ job.source || 'Unknown' }}</span>
+                </p>
                 <p v-if="job.strengths?.length" class="mt-2 text-xs text-teal-400/80">
                   Match: {{ job.strengths.slice(0, 3).join(' · ') }}
                 </p>
                 <p v-if="job.gaps?.length" class="mt-1 text-xs text-slate-500">
                   Gaps: {{ job.gaps.slice(0, 3).join(' · ') }}
                 </p>
-                <p v-if="job.source === 'chrome-extension'" class="mt-1 text-xs text-amber-400">From Chrome extension</p>
+                <p v-if="job.source === 'chrome-extension'" class="mt-1 text-xs text-sky-400">Queued from browser (often LinkedIn)</p>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -356,6 +368,14 @@ onMounted(() => { load(); loadWhisper(); });
           </div>
           <div class="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <a v-if="job.url" :href="job.url" target="_blank" rel="noopener" class="text-teal-400 hover:underline">View job →</a>
+            <button
+              type="button"
+              class="text-sky-400 hover:underline"
+              @click="openJobLinkedIn(job)"
+            >
+              {{ isLinkedInJob(job) ? 'Open in LinkedIn →' : 'Search on LinkedIn →' }}
+            </button>
+            <RouterLink to="/linkedin" class="text-xs text-slate-500 hover:text-slate-300">LinkedIn workflow</RouterLink>
             <template v-if="status === 'pending' || job.status === 'pending'">
               <button class="btn-primary px-3 py-1.5 text-xs" :disabled="acting === job.jobId" @click="approve(job.jobId)">
                 Approve

@@ -16,6 +16,7 @@ const nav = computed(() => {
   const items = [
     { to: '/', label: 'Home', icon: '◉', mobile: true },
     { to: '/jobs', label: 'Jobs', icon: '◎', mobile: true },
+    { to: '/linkedin', label: 'LinkedIn', icon: 'in', mobile: true },
     { to: '/approvals', label: 'Apply Queue', icon: '✓', mobile: false },
     { to: '/chat', label: 'Connect', icon: '💬', mobile: false },
     { to: '/intelligence', label: 'AI Intel', icon: '🧠', mobile: false },

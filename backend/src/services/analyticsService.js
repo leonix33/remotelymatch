@@ -32,6 +32,18 @@ async function summary() {
     return acc;
   }, {});
 
+  const byJobBoard = jobs.reduce((acc, job) => {
+    const key = job.source || 'Unknown';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const byApplicationSource = applications.reduce((acc, app) => {
+    const key = app.source || 'Unknown';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
   return {
     appName: env.appName,
     totalJobs: jobs.length,
@@ -47,6 +59,8 @@ async function summary() {
     agentRuns,
     bySection,
     byStatus,
+    byJobBoard,
+    byApplicationSource,
   };
 }
 
