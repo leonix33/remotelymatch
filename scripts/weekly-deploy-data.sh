@@ -1,7 +1,7 @@
 #!/bin/bash
 # Weekly sync: refresh agent SQLite snapshots and push to Render.
 # Install on Mac: crontab -e
-# 0 9 * * 1 cd /Users/user/job-event-agent/savannah-career-engine && ./scripts/weekly-deploy-data.sh >> /tmp/remotematch-sync.log 2>&1
+# 0 9 * * 1 cd /Users/user/job-event-agent/remotematch && ./scripts/weekly-deploy-data.sh >> /tmp/remotematch-sync.log 2>&1
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

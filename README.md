@@ -53,7 +53,7 @@ This copies your latest `seen_jobs.db` and `application_tracker.db`, commits the
 ## Quick start (local)
 
 ```bash
-cd savannah-career-engine
+cd remotematch
 npm install
 cd frontend && npm install && cd ..
 cd backend && npm install && cd ..

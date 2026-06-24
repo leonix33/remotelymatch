@@ -21,7 +21,7 @@ const profile = computed(() => profileStore.profile || {});
 const linkedinProfileUrl = computed(() => profile.value.linkedin || '');
 const searches = computed(() => mergeLinkedInSearches(profile.value));
 
-const extensionPath = 'savannah-career-engine/chrome-extension';
+const extensionPath = 'remotematch/chrome-extension';
 const profileSetupUrl = computed(() => `${appUrl.replace(/\/$/, '')}/profile`);
 
 async function saveSearches(next) {

@@ -1,5 +1,5 @@
 {
-  "name": "savannah-career-engine-backend",
+  "name": "remotematch-backend",
   "private": true,
   "main": "src/index.js",
   "scripts": {
