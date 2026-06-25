@@ -26,6 +26,12 @@ import LegalView from '../views/LegalView.vue';
 import LinkedInWorkflowView from '../views/LinkedInWorkflowView.vue';
 import FollowUpView from '../views/FollowUpView.vue';
 import TailoredResumesView from '../views/TailoredResumesView.vue';
+import MonitorLayout from '../views/monitor/MonitorLayout.vue';
+import MonitorOverviewView from '../views/monitor/MonitorOverviewView.vue';
+import MonitorPipelineView from '../views/monitor/MonitorPipelineView.vue';
+import MonitorAgentView from '../views/monitor/MonitorAgentView.vue';
+import MonitorSwarmView from '../views/monitor/MonitorSwarmView.vue';
+import MonitorApplicationsView from '../views/monitor/MonitorApplicationsView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -36,6 +42,18 @@ const router = createRouter({
     { path: '/terms', component: LegalView, meta: { guest: true } },
     { path: '/onboarding', component: OnboardingView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/', component: DashboardView, meta: { requiresAuth: true, skipOnboarding: true } },
+    {
+      path: '/monitor',
+      component: MonitorLayout,
+      meta: { requiresAuth: true, skipOnboarding: true },
+      children: [
+        { path: '', component: MonitorOverviewView },
+        { path: 'pipeline', component: MonitorPipelineView },
+        { path: 'agent', component: MonitorAgentView },
+        { path: 'swarm', component: MonitorSwarmView },
+        { path: 'applications', component: MonitorApplicationsView },
+      ],
+    },
     { path: '/profile', component: ProfileView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/jobs', component: JobsView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/approvals', component: ApprovalsView, meta: { requiresAuth: true, skipOnboarding: true } },
