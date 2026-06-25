@@ -3,7 +3,7 @@
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 EXT="$ROOT/chrome-extension"
-APP="https://remotematch.onrender.com/profile"
+APP="https://remotelymatch.app/profile"
 
 echo "RemoteMatch — automated setup"
 echo "Extension folder: $EXT"
@@ -32,4 +32,4 @@ echo "4. Click 'Connect extension automatically'"
 echo ""
 echo "=== Test ==="
 echo "5. Open any job posting → RemoteMatch icon → Add to queue"
-echo "6. https://remotematch.onrender.com/approvals"
+echo "6. https://remotelymatch.app/approvals"

@@ -2,8 +2,8 @@ const approvalService = require('../services/approvalService');
 
 async function queueExternal(req, res, next) {
   try {
-    const { url, title, company } = req.body;
-    const item = await approvalService.addExternal(req.user.sub, { url, title, company });
+    const { url, title, company, source } = req.body;
+    const item = await approvalService.addExternal(req.user.sub, { url, title, company, source });
     res.status(201).json({ message: 'Added to Apply Queue', item });
   } catch (err) {
     next(err);

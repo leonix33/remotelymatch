@@ -17,13 +17,13 @@
       Log in to RemoteMatch, open DevTools → Application → Local Storage → copy your
       <code>accessToken</code> value (or use the token from your auth session).
     </p>
-    <label>API base URL<input id="apiBase" placeholder="https://remotematch.onrender.com" /></label>
+    <label>API base URL<input id="apiBase" placeholder="https://remotelymatch.app" /></label>
     <label>Access token (JWT)<input id="accessToken" type="password" /></label>
     <button id="save">Save</button>
     <p id="status"></p>
     <script>
       chrome.storage.sync.get(['apiBase', 'accessToken'], (data) => {
-        document.getElementById('apiBase').value = data.apiBase || 'https://remotematch.app';
+        document.getElementById('apiBase').value = data.apiBase || 'https://remotelymatch.app';
         document.getElementById('accessToken').value = data.accessToken || '';
       });
       document.getElementById('save').addEventListener('click', () => {

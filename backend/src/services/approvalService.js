@@ -287,7 +287,7 @@ async function markApplied(userId, jobIds) {
   );
 }
 
-async function addExternal(userId, { url, title, company }) {
+async function addExternal(userId, { url, title, company, source }) {
   if (!url) throw new Error('URL is required');
   const jobId = `ext-${crypto.createHash('sha256').update(url).digest('hex').slice(0, 16)}`;
   const row = {
@@ -295,7 +295,7 @@ async function addExternal(userId, { url, title, company }) {
     company: company || 'Unknown',
     url,
     matchPct: 0,
-    source: 'chrome-extension',
+    source: source || 'chrome-extension',
     status: 'pending',
     notes: 'Queued from browser extension',
   };
