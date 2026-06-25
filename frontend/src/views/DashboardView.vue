@@ -160,7 +160,7 @@ onMounted(async () => {
       <div>
         <p class="text-sm font-medium text-sky-200">LinkedIn workflow</p>
         <p class="mt-1 text-sm text-slate-400">
-          Saved searches, extension queueing, and approve → agent apply — no bots.
+          Saved searches, extension queueing, project posts for visibility, and approve → agent apply.
         </p>
       </div>
       <span class="btn-secondary text-sm">Open →</span>
