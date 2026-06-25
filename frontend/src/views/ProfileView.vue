@@ -102,10 +102,12 @@ async function connectExtension() {
   extConnectMsg.value = '';
   extConnected.value = false;
   await loadExtensionToken();
+  const apiBase = (typeof window !== 'undefined' ? window.location.origin : extApiUrl.value).replace(/\/$/, '');
+  extApiUrl.value = apiBase;
   window.postMessage(
     {
       type: 'REMOTEMATCH_EXT_CONFIG',
-      apiBase: extApiUrl.value,
+      apiBase,
       accessToken: extToken.value,
     },
     window.location.origin
@@ -113,9 +115,9 @@ async function connectExtension() {
   setTimeout(() => {
     if (!extConnected.value) {
       extConnectMsg.value =
-        'Extension not detected. Load it once in chrome://extensions (Load unpacked), then click Connect again.';
+        'Extension not detected. Reload this page (⌘⇧R), then click Connect again — or paste API URL + token into extension Settings (right-click extension icon → Options).';
     }
-  }, 800);
+  }, 1500);
 }
 
 onMounted(async () => {
@@ -176,7 +178,12 @@ async function loadExtensionToken() {
   extLoading.value = true;
   try {
     const { data } = await http.post('/auth/extension-token');
-    extApiUrl.value = data.apiUrl;
+    const origin = typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : '';
+    const onApp =
+      /^https:\/\/(www\.)?(remotelymatch|remotematch)\.app$/i.test(origin) ||
+      origin.includes('remotematch.onrender.com') ||
+      /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    extApiUrl.value = onApp ? origin : (data.apiUrl || origin);
     extToken.value = data.accessToken;
   } finally {
     extLoading.value = false;

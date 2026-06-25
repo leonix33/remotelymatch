@@ -11,13 +11,13 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # Custom domain — update these after buying a domain (e.g. remotematch.app)
+      # Custom domain
       - key: APP_URL
-        value: https://remotematch.app
+        value: https://remotelymatch.app
       - key: CLIENT_ORIGIN
-        value: https://remotematch.app,https://remotematch.onrender.com
+        value: https://remotelymatch.app,https://www.remotelymatch.app,https://remotematch.onrender.com
       - key: CUSTOM_DOMAIN
-        value: remotematch.app
+        value: remotelymatch.app
       - key: APP_NAME
         value: RemoteMatch
       - key: AGENT_HOME
