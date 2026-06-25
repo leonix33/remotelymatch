@@ -20,5 +20,5 @@ COPY agent-data ./agent-data
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 ENV NODE_ENV=production
 ENV AGENT_HOME=/app/agent-data
-EXPOSE 5100
+EXPOSE 10000
 CMD ["npm", "start", "--prefix", "backend"]

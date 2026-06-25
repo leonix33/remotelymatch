@@ -37,18 +37,22 @@ async function ensureAdmin() {
   console.log('Admin user created');
 }
 
+async function bootstrapData() {
+  if (!env.mongoUri) return;
+  await ensureAdmin();
+  try {
+    const synced = await jobService.syncJobsToMongo();
+    const apps = await jobService.syncApplicationsToMongo();
+    console.log(`Synced ${synced} jobs and ${apps} applications from agent SQLite`);
+  } catch (err) {
+    console.warn('SQLite sync skipped:', err.message);
+  }
+  await conferenceService.ensureSeed();
+}
+
 async function start() {
   if (env.mongoUri) {
     await connectDb();
-    await ensureAdmin();
-    try {
-      const synced = await jobService.syncJobsToMongo();
-      const apps = await jobService.syncApplicationsToMongo();
-      console.log(`Synced ${synced} jobs and ${apps} applications from agent SQLite`);
-    } catch (err) {
-      console.warn('SQLite sync skipped:', err.message);
-    }
-    await conferenceService.ensureSeed();
   } else {
     console.warn('MONGODB_URI not set — running in SQLite-only mode (read-only from agent DBs)');
   }
@@ -61,10 +65,13 @@ async function start() {
   });
   initSocket(io);
 
-  server.listen(env.port, () => {
+  server.listen(env.port, '0.0.0.0', () => {
     console.log(`${env.appName} running on port ${env.port} (HTTP + WebSocket)`);
     startReminderCron();
     startWeeklyPulseCron();
+    bootstrapData().catch((err) => {
+      console.warn('Background bootstrap failed:', err.message);
+    });
   });
 }
 
