@@ -83,4 +83,4 @@ async function clearOpenAiKey(userId) {
   return update(userId, { openaiApiKeyEncrypted: '', openaiKeyHint: '' });
 }
 
-module.exports = { getOrCreate, getRaw, update, setOpenAiKey, clearOpenAiKey, isComplete, toResponse };
+module.exports = { getOrCreate, getRaw, update, setOpenAiKey, clearOpenAiKey, isComplete, toResponse, openaiMeta };

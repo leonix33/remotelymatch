@@ -343,7 +343,9 @@ async function fetchIndeed() {
 }
 
 async function fetchAdzuna() {
-  const { adzunaAppId, adzunaAppKey, adzunaWhat, adzunaWhere, adzunaMaxDaysOld } = jobSourcesConfig;
+  const platformSettingsService = require('../platformSettingsService');
+  const { adzunaAppId, adzunaAppKey, adzunaWhat, adzunaWhere, adzunaMaxDaysOld } =
+    await platformSettingsService.getAdzunaCredentials();
   if (!adzunaAppId || !adzunaAppKey) return [];
 
   const params = new URLSearchParams({

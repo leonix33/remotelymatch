@@ -32,6 +32,8 @@ const pushRoutes = require('./routes/pushRoutes');
 const linkedinVisibilityRoutes = require('./routes/linkedinVisibilityRoutes');
 const tractionRoutes = require('./routes/tractionRoutes');
 const conciergeRoutes = require('./routes/conciergeRoutes');
+const setupRoutes = require('./routes/setupRoutes');
+const { buildHealthBase } = require('./controllers/setupController');
 const { CANONICAL_DOMAIN, LEGACY_REDIRECT_HOSTS } = require('./config/domains');
 
 function createApp() {
@@ -65,33 +67,12 @@ function createApp() {
   app.use(morgan('dev'));
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
-  app.get('/api/health', (req, res) => {
-    const mongoose = require('mongoose');
-    const email = env.adminEmail || '';
-    const mongoConnected = mongoose.connection.readyState === 1;
-    res.json({
-      ok: true,
-      appName: env.appName,
-      appUrl: env.appUrl,
-      environment: env.nodeEnv,
-      deployTag: env.deployTag,
-      adminConfigured: Boolean(email && env.adminPassword),
-      adminEmailHint: email.includes('@') ? `${email.split('@')[0].slice(0, 3)}***@${email.split('@')[1]}` : 'unset',
-      emailConfigured: Boolean(env.resendApiKey),
-      emailFrom: env.emailFrom || null,
-      emailProduction: Boolean(env.resendApiKey && env.emailFrom && !env.emailFrom.includes('resend.dev')),
-      adzunaConfigured: Boolean(
-        require('./config/jobSources').adzunaAppId && require('./config/jobSources').adzunaAppKey
-      ),
-      mongoConfigured: Boolean(env.mongoUri),
-      mongoConnected,
-      openaiConfigured: Boolean(env.openaiApiKey),
-      openaiModel: env.openaiModel,
-      pushConfigured: Boolean(env.vapidPublicKey && env.vapidPrivateKey),
-      customDomain: env.customDomain || null,
-      clientOrigins: env.clientOrigins,
-      time: new Date().toISOString(),
-    });
+  app.get('/api/health', async (req, res, next) => {
+    try {
+      res.json(await buildHealthBase());
+    } catch (err) {
+      next(err);
+    }
   });
 
   app.use('/api/auth', authRoutes);
@@ -120,6 +101,7 @@ function createApp() {
   app.use('/api/linkedin/visibility', linkedinVisibilityRoutes);
   app.use('/api/traction', tractionRoutes);
   app.use('/api/concierge', conciergeRoutes);
+  app.use('/api/setup', setupRoutes);
 
   const distPath = path.join(__dirname, '../../frontend/dist');
   app.use(express.static(distPath));
