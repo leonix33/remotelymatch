@@ -84,6 +84,7 @@ async function approve(req, res, next) {
   try {
     const item = await approvalService.setStatus(req.user.sub, req.params.jobId, 'approved', req.body.notes, {
       tailorResume: req.body.tailorResume,
+      authEmail: req.user.email,
     });
     res.json(item);
   } catch (err) {
@@ -108,6 +109,7 @@ async function bulkApprove(req, res, next) {
     }
     const results = await approvalService.bulkSetStatus(req.user.sub, jobIds, 'approved', {
       tailorResume: req.body.tailorResume,
+      authEmail: req.user.email,
     });
     res.json({ count: results.length, message: `Approved ${results.length} job(s)` });
   } catch (err) {

@@ -1,365 +1,294 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import http from '../api/http';
 import { useProfileStore } from '../stores/profile';
+import { useAuthStore } from '../stores/auth';
 import ResumeUpload from '../components/ResumeUpload.vue';
-import ApplyWorkflowBanner from '../components/ApplyWorkflowBanner.vue';
-import { useApplyQueue } from '../composables/useApplyQueue';
+import ResumePreview from '../components/ResumePreview.vue';
+import TailorApplySettings from '../components/TailorApplySettings.vue';
+import { useQuickApply } from '../composables/useQuickApply';
 
 const profileStore = useProfileStore();
-const { queueing, addToQueue } = useApplyQueue();
-const recommendedJobs = ref([]);
-const applications = ref([]);
-const followUps = ref([]);
-const loading = ref(true);
-const queueMessage = ref('');
-const queueError = ref('');
+const auth = useAuthStore();
+const { applying, message, error: applyError, step, quickApply } = useQuickApply();
 
-const savedJobs = computed(() => profileStore.profile?.savedJobs || []);
-const extractedSkills = computed(() => profileStore.extractedSkills.slice(0, 10));
+const resumeText = ref('');
+const resumeMode = ref('tailored');
+const supplementPages = ref(3);
+const tailorMode = ref('balanced');
+const digestEmail = ref('');
+const contactPhone = ref('');
+const jobCount = ref(5);
+const savingResume = ref(false);
+const saveMessage = ref('');
+const queueCounts = ref({ pending: 0, approved: 0, applied: 0 });
+const recentApplied = ref([]);
+const loading = ref(true);
 
 const firstName = computed(() => {
-  const name = profileStore.profile?.displayName?.trim();
+  const name = profileStore.profile?.displayName?.trim() || auth.user?.name || '';
   return name ? name.split(' ')[0] : '';
 });
 
-const profileIncomplete = computed(() => !profileStore.complete);
+const hasResume = computed(() => (resumeText.value || '').trim().length >= 50);
+const hasEmail = computed(() => Boolean(digestEmail.value?.trim()));
+const profileReady = computed(() => hasResume.value && profileStore.profile?.onboardingComplete && hasEmail.value);
+const canApply = computed(() => profileReady.value && !applying.value);
 
-const resumeScoreLabel = computed(() => {
-  const score = profileStore.resumeScore;
-  if (score >= 80) return 'Strong';
-  if (score >= 50) return 'Good start';
-  if (score > 0) return 'Needs work';
-  return 'Not started';
+const extractedSkills = computed(() => profileStore.extractedSkills);
+
+const applyPlanSummary = computed(() => {
+  if (resumeMode.value === 'base') {
+    return `Base resume · submitted as ${digestEmail.value || 'your email'}`;
+  }
+  const mode =
+    tailorMode.value === 'high_match'
+      ? 'high-match (word-for-word JD alignment)'
+      : 'balanced tailoring';
+  return `Tailored · ${supplementPages.value} supplement page${supplementPages.value === 1 ? '' : 's'} · ${mode} · ${digestEmail.value || 'your email'}`;
 });
 
-const resumeScoreColor = computed(() => {
-  const score = profileStore.resumeScore;
-  if (score >= 80) return 'text-teal-300';
-  if (score >= 50) return 'text-amber-300';
-  return 'text-slate-400';
-});
-
-function matchPct(job) {
-  return job.personalMatchPct || job.matchPct || 0;
+function syncFromProfile(p) {
+  if (!p) return;
+  resumeText.value = p.resumeText || '';
+  resumeMode.value = p.defaultApplyResumeMode === 'base' ? 'base' : 'tailored';
+  supplementPages.value = p.defaultSupplementPages || 3;
+  tailorMode.value = p.defaultTailorMode === 'high_match' ? 'high_match' : 'balanced';
+  digestEmail.value = p.digestEmail || '';
+  contactPhone.value = p.contactPhone || '';
 }
 
-function statusClass(status) {
-  if (status === 'submitted') return 'badge-teal';
-  if (status === 'bot-blocked') return 'badge-red';
-  return 'badge-slate';
-}
+watch(() => profileStore.profile, syncFromProfile, { immediate: true });
 
-function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
+async function saveApplySettings() {
+  await profileStore.save({
+    defaultApplyResumeMode: resumeMode.value,
+    defaultSupplementPages: supplementPages.value,
+    defaultTailorMode: tailorMode.value,
+    digestEmail: digestEmail.value.trim(),
+    contactPhone: contactPhone.value.trim(),
   });
 }
 
-function followUpIcon(type) {
-  if (type === 'application') return '📋';
-  if (type === 'interview') return '🎙';
-  if (type === 'deadline') return '⏰';
-  return '📌';
-}
-
-async function queueJob(job) {
-  queueMessage.value = '';
-  queueError.value = '';
+async function saveResumeText() {
+  savingResume.value = true;
+  saveMessage.value = '';
   try {
-    await addToQueue(job, 'dashboard');
-    queueMessage.value = `${job.title} added to your apply queue`;
-    await loadRecommendedJobs();
+    await profileStore.save({ resumeText: resumeText.value });
+    saveMessage.value = 'Resume saved';
+    setTimeout(() => { saveMessage.value = ''; }, 2500);
   } catch (e) {
-    queueError.value = e.response?.data?.message || 'Could not add to queue';
-  }
-}
-
-async function loadRecommendedJobs() {
-  try {
-    const { data } = await http.get('/approvals', {
-      params: { status: 'pending', limit: 5, minMatch: 70 },
-    });
-    const items = data?.items || data || [];
-    if (items.length) {
-      recommendedJobs.value = items;
-      return;
-    }
-  } catch {
-    /* fall through to jobs list */
-  }
-  try {
-    const { data } = await http.get('/jobs', { params: { minMatch: 75 } });
-    recommendedJobs.value = (data || []).slice(0, 5);
-  } catch {
-    recommendedJobs.value = [];
-  }
-}
-
-async function load() {
-  loading.value = true;
-  try {
-    const [appsRes, followUpsRes] = await Promise.all([
-      http.get('/applications'),
-      http.get('/calendar/upcoming', { params: { days: 14 } }).catch(() => ({ data: [] })),
-    ]);
-    applications.value = (appsRes.data || []).slice(0, 5);
-    followUps.value = (followUpsRes.data || [])
-      .filter((e) => e.type === 'application' || e.type === 'interview' || e.type === 'deadline')
-      .slice(0, 5);
-    await loadRecommendedJobs();
+    saveMessage.value = e.response?.data?.message || 'Could not save resume';
   } finally {
-    loading.value = false;
+    savingResume.value = false;
+  }
+}
+
+function onResumeParsed() {
+  resumeText.value = profileStore.profile?.resumeText || resumeText.value;
+}
+
+async function startApplying() {
+  await saveResumeText();
+  await saveApplySettings();
+  try {
+    await quickApply({
+      count: jobCount.value,
+      useTailoredResume: resumeMode.value === 'tailored',
+      minMatch: profileStore.profile?.minMatchScore || 70,
+      runSearch: false,
+    });
+    await loadStatus();
+  } catch {
+    /* error shown via applyError */
+  }
+}
+
+async function loadStatus() {
+  try {
+    const [summaryRes, appliedRes] = await Promise.all([
+      http.get('/approvals/summary'),
+      http.get('/approvals', { params: { status: 'applied', limit: 5, offset: 0 } }),
+    ]);
+    queueCounts.value = summaryRes.data || { pending: 0, approved: 0, applied: 0 };
+    recentApplied.value = appliedRes.data?.items || [];
+  } catch {
+    queueCounts.value = { pending: 0, approved: 0, applied: 0 };
+    recentApplied.value = [];
   }
 }
 
 onMounted(async () => {
   if (!profileStore.loaded) await profileStore.fetch().catch(() => {});
-  load();
+  syncFromProfile(profileStore.profile);
+  loading.value = false;
+  await loadStatus();
 });
 </script>
 
 <template>
-  <div>
-    <!-- Top card -->
-    <div class="card border-teal-600/30 bg-gradient-to-r from-teal-950/80 to-slate-900/80 p-6">
-      <div class="flex flex-wrap items-start justify-between gap-6">
-        <div class="min-w-0 flex-1">
-          <h2 class="mt-1 text-2xl font-bold text-slate-100">
-            Welcome back{{ firstName ? `, ${firstName}` : '' }}
-          </h2>
-          <div class="mt-4 max-w-sm">
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-slate-400">Profile completion</span>
-              <span class="font-semibold text-teal-300">{{ profileStore.completionPct }}%</span>
-            </div>
-            <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
-              <div
-                class="h-full rounded-full bg-teal-500 transition-all"
-                :style="{ width: `${profileStore.completionPct}%` }"
-              />
-            </div>
-          </div>
-        </div>
-        <RouterLink to="/jobs" class="btn-primary btn-continue shrink-0 px-6 py-3">
-          <span>Find matches</span>
-          <span aria-hidden="true">→</span>
-        </RouterLink>
-      </div>
+  <div class="mx-auto max-w-3xl">
+    <div class="text-center lg:text-left">
+      <h1 class="text-2xl font-bold text-slate-100">
+        {{ firstName ? `Hi ${firstName}` : 'Welcome' }}
+      </h1>
+      <p class="mt-1 text-slate-400">Upload your resume, set tailoring options, and apply with your email.</p>
     </div>
 
-    <ApplyWorkflowBanner class="mt-6" />
-
-    <RouterLink
-      to="/linkedin"
-      class="mt-6 card flex flex-wrap items-center justify-between gap-4 border-sky-900/40 bg-sky-950/20 p-5 transition hover:border-sky-700/50"
-    >
-      <div>
-        <p class="text-sm font-medium text-sky-200">LinkedIn workflow</p>
-        <p class="mt-1 text-sm text-slate-400">
-          Saved searches, extension queueing, project posts for visibility, and approve → agent apply.
-        </p>
+    <!-- Step 1: Resume -->
+    <section class="card mt-8 p-6">
+      <div class="flex items-center gap-3">
+        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/20 text-sm font-bold text-teal-300">1</span>
+        <div>
+          <h2 class="font-semibold text-slate-100">Your resume</h2>
+          <p class="text-sm text-slate-500">Upload and preview before applying</p>
+        </div>
       </div>
-      <span class="btn-secondary text-sm">Open →</span>
-    </RouterLink>
 
-    <p v-if="queueMessage" class="mt-4 rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ queueMessage }}</p>
-    <p v-if="queueError" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ queueError }}</p>
+      <div class="mt-5">
+        <ResumeUpload
+          v-model="resumeText"
+          :apply-to-profile="true"
+          :merge-skills="true"
+          :show-preview="false"
+          @parsed="onResumeParsed"
+        />
+      </div>
 
-    <!-- Profile incomplete empty state -->
-    <div
-      v-if="profileIncomplete"
-      class="mt-6 card border-amber-700/40 bg-amber-950/20 p-5"
-    >
-      <p class="font-medium text-amber-200">Complete your profile to unlock better matches.</p>
-      <p class="mt-1 text-sm text-slate-400">
-        Add your skills, target roles, and resume so we can score jobs to you.
+      <div class="mt-4">
+        <label class="mb-1 block text-sm text-slate-400">Or paste resume text</label>
+        <textarea
+          v-model="resumeText"
+          rows="6"
+          class="input text-sm"
+          placeholder="Paste your resume here…"
+          @blur="saveResumeText"
+        />
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" class="btn-secondary text-sm" :disabled="savingResume" @click="saveResumeText">
+            {{ savingResume ? 'Saving…' : 'Save resume' }}
+          </button>
+          <p v-if="saveMessage" class="text-sm text-teal-300">{{ saveMessage }}</p>
+        </div>
+      </div>
+
+      <ResumePreview
+        class="mt-5"
+        :resume-text="resumeText"
+        :score="profileStore.resumeScore"
+        :skills="extractedSkills"
+      />
+    </section>
+
+    <!-- Step 2: Tailoring + email -->
+    <section class="card mt-6 p-6">
+      <div class="flex items-center gap-3">
+        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/20 text-sm font-bold text-teal-300">2</span>
+        <div>
+          <h2 class="font-semibold text-slate-100">How to apply</h2>
+          <p class="text-sm text-slate-500">Resume mode, pages, JD matching, and your application email</p>
+        </div>
+      </div>
+
+      <TailorApplySettings
+        v-model:resume-mode="resumeMode"
+        v-model:supplement-pages="supplementPages"
+        v-model:tailor-mode="tailorMode"
+        v-model:digest-email="digestEmail"
+        v-model:contact-phone="contactPhone"
+        v-model:job-count="jobCount"
+        class="mt-5"
+        :show-job-count="true"
+      />
+    </section>
+
+    <!-- Step 3: Apply -->
+    <section class="card mt-6 p-6">
+      <div class="flex items-center gap-3">
+        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/20 text-sm font-bold text-teal-300">3</span>
+        <div>
+          <h2 class="font-semibold text-slate-100">Start applying</h2>
+          <p class="text-sm text-slate-500">Review your plan, then submit</p>
+        </div>
+      </div>
+
+      <div class="mt-5 rounded-xl border border-teal-900/40 bg-teal-950/20 p-4 text-sm">
+        <p class="font-medium text-teal-200">Your apply plan</p>
+        <p class="mt-2 text-slate-300">{{ applyPlanSummary }}</p>
+        <p class="mt-1 text-xs text-slate-500">{{ jobCount }} top-matching jobs · forms filled with the email above</p>
+      </div>
+
+      <div v-if="!hasResume" class="mt-5 rounded-xl border border-amber-700/40 bg-amber-950/20 p-4 text-sm text-amber-200">
+        Upload or paste your resume above before applying.
+      </div>
+      <div v-else-if="!hasEmail" class="mt-5 rounded-xl border border-amber-700/40 bg-amber-950/20 p-4 text-sm text-amber-200">
+        Add your personal email in step 2 — applications need your real address.
+      </div>
+      <div v-else-if="!profileStore.profile?.onboardingComplete" class="mt-5 rounded-xl border border-amber-700/40 bg-amber-950/20 p-4">
+        <p class="text-sm text-amber-200">Finish setting up your profile first.</p>
+        <RouterLink to="/onboarding" class="btn-secondary mt-3 inline-block text-sm">Complete setup →</RouterLink>
+      </div>
+
+      <button
+        class="btn-primary mt-5 w-full py-4 text-base font-semibold sm:w-auto sm:px-10"
+        :disabled="!canApply"
+        @click="startApplying"
+      >
+        {{ applying ? step || 'Applying…' : `Start applying to ${jobCount} jobs` }}
+      </button>
+
+      <p v-if="applyError" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ applyError }}</p>
+      <p v-if="message" class="mt-4 rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ message }}</p>
+
+      <p class="mt-4 text-xs text-slate-500">
+        Want to pick jobs yourself?
+        <RouterLink to="/jobs" class="text-teal-400 hover:underline">Browse jobs</RouterLink>
+        or
+        <RouterLink to="/approvals" class="text-teal-400 hover:underline">review queue</RouterLink>
       </p>
-      <RouterLink to="/onboarding" class="btn-secondary mt-4 inline-block text-sm">Complete profile →</RouterLink>
-    </div>
+    </section>
 
-    <div v-if="loading" class="mt-8 text-slate-400">Loading your dashboard…</div>
-
-    <template v-else>
-      <div class="mt-8 space-y-6">
-        <!-- 1. Recommended Jobs -->
-        <section class="card p-6">
-          <div class="flex items-center justify-between">
-            <h3 class="font-semibold text-slate-200">Recommended Jobs</h3>
-            <RouterLink to="/jobs" class="text-sm text-teal-400 hover:underline">Browse all →</RouterLink>
-          </div>
-          <div v-if="recommendedJobs.length" class="mt-4 space-y-3">
-            <div
-              v-for="job in recommendedJobs"
-              :key="job.jobId || job._id"
-              class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3 last:border-0"
-            >
-              <div class="min-w-0">
-                <p class="font-medium text-slate-200">{{ job.title }}</p>
-                <p class="text-sm text-slate-500">{{ job.company }}</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="badge badge-teal">{{ matchPct(job) }}%</span>
-                <button
-                  class="btn-primary px-2 py-1 text-xs"
-                  :disabled="queueing === job.jobId"
-                  @click="queueJob(job)"
-                >
-                  {{ queueing === job.jobId ? '…' : 'Queue' }}
-                </button>
-                <RouterLink to="/approvals" class="btn-secondary px-2 py-1 text-xs">Review</RouterLink>
-              </div>
-            </div>
-          </div>
-          <p v-else class="mt-4 text-sm text-slate-500">
-            No matches yet.
-            <RouterLink to="/agent" class="text-teal-400 hover:underline">Run the agent</RouterLink>
-            to discover jobs, or
-            <RouterLink to="/jobs" class="text-teal-400 hover:underline">browse the board</RouterLink>.
-          </p>
-        </section>
-
-        <!-- 2 & 3: Application Tracker + AI Resume Score -->
-        <div class="grid gap-6 lg:grid-cols-2">
-          <section class="card p-6">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-slate-200">Application Tracker</h3>
-              <RouterLink to="/applications" class="text-sm text-teal-400 hover:underline">See all →</RouterLink>
-            </div>
-            <div v-if="applications.length" class="mt-4 space-y-3">
-              <div
-                v-for="app in applications"
-                :key="app.jobId || app._id"
-                class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3 last:border-0"
-              >
-                <div class="min-w-0">
-                  <p class="truncate font-medium text-slate-200">{{ app.title }}</p>
-                  <p class="text-xs text-slate-500">{{ app.lastAttempted || 'No attempts yet' }}</p>
-                </div>
-                <span class="badge shrink-0" :class="statusClass(app.status)">
-                  <RouterLink to="/applications" class="hover:underline">{{ app.status }}</RouterLink>
-                </span>
-              </div>
-            </div>
-            <p v-else class="mt-4 text-sm text-slate-500">
-              No applications yet. Approve jobs from your
-              <RouterLink to="/approvals" class="text-teal-400 hover:underline">apply queue</RouterLink>
-              to get started.
-            </p>
-          </section>
-
-          <section class="card p-6">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-slate-200">AI Resume Score</h3>
-              <RouterLink to="/profile" class="text-sm text-teal-400 hover:underline">Improve →</RouterLink>
-            </div>
-            <div class="mt-4 flex items-end gap-4">
-              <p class="text-5xl font-bold" :class="resumeScoreColor">{{ profileStore.resumeScore }}</p>
-              <div>
-                <p class="font-medium text-slate-300">{{ resumeScoreLabel }}</p>
-                <p class="text-sm text-slate-500">Based on your profile &amp; resume</p>
-              </div>
-            </div>
-            <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
-              <div
-                class="h-full rounded-full bg-teal-500/80 transition-all"
-                :style="{ width: `${profileStore.resumeScore}%` }"
-              />
-            </div>
-            <div v-if="extractedSkills.length" class="mt-4 flex flex-wrap gap-2">
-              <span v-for="skill in extractedSkills" :key="skill" class="badge badge-teal">{{ skill }}</span>
-            </div>
-            <ResumeUpload
-              class="mt-4"
-              :model-value="profileStore.profile?.resumeText || ''"
-              :apply-to-profile="true"
-              :merge-skills="true"
-              :show-preview="false"
-              @parsed="load"
-            />
-            <p v-if="profileStore.resumeScore < 80" class="mt-4 text-sm text-slate-500">
-              Upload a PDF resume or add more skills to raise your score and improve job matches.
-            </p>
-            <p v-else class="mt-4 text-sm text-slate-500">
-              Your resume is in good shape. Use <strong class="text-slate-300">Application kit</strong> on Jobs or Apply Queue to add job-specific keywords without changing your base resume.
-            </p>
-          </section>
+    <!-- Status -->
+    <section v-if="!loading" class="card mt-6 p-6">
+      <h2 class="font-semibold text-slate-200">Your activity</h2>
+      <div class="mt-4 grid grid-cols-3 gap-3 text-center">
+        <div class="rounded-xl bg-slate-800/50 p-3">
+          <p class="text-2xl font-bold text-amber-300">{{ queueCounts.pending }}</p>
+          <p class="text-xs text-slate-500">waiting</p>
         </div>
-
-        <!-- 4 & 5: Saved Jobs + Upcoming Follow-ups -->
-        <div class="grid gap-6 lg:grid-cols-2">
-          <section class="card p-6">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-slate-200">Saved Jobs</h3>
-              <RouterLink to="/jobs" class="text-sm text-teal-400 hover:underline">Browse jobs →</RouterLink>
-            </div>
-            <div v-if="savedJobs.length" class="mt-4 space-y-3">
-              <div
-                v-for="job in savedJobs.slice(0, 5)"
-                :key="job.jobId"
-                class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3 last:border-0"
-              >
-                <div class="min-w-0">
-                  <p class="font-medium text-slate-200">{{ job.title }}</p>
-                  <p class="text-sm text-slate-500">{{ job.company }}</p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span v-if="job.matchPct" class="badge badge-teal">{{ job.matchPct }}%</span>
-                  <button
-                    class="btn-primary px-2 py-1 text-xs"
-                    :disabled="queueing === job.jobId"
-                    @click="queueJob(job)"
-                  >
-                    {{ queueing === job.jobId ? '…' : 'Queue' }}
-                  </button>
-                  <a
-                    v-if="job.url"
-                    :href="job.url"
-                    target="_blank"
-                    rel="noopener"
-                    class="btn-secondary px-2 py-1 text-xs"
-                  >
-                    Open
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div v-else class="mt-4 rounded-xl border border-dashed border-slate-700 bg-slate-800/30 p-6 text-center">
-              <p class="text-sm text-slate-400">No saved jobs yet.</p>
-              <p class="mt-1 text-xs text-slate-500">Save jobs from the board to revisit them here.</p>
-              <RouterLink to="/jobs" class="btn-secondary mt-4 inline-block text-sm">Find jobs to save</RouterLink>
-            </div>
-          </section>
-
-          <section class="card p-6">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-slate-200">Upcoming Follow-ups</h3>
-              <RouterLink to="/calendar" class="text-sm text-teal-400 hover:underline">Calendar →</RouterLink>
-            </div>
-            <div v-if="followUps.length" class="mt-4 space-y-3">
-              <div
-                v-for="event in followUps"
-                :key="event.id"
-                class="flex items-start gap-3 border-b border-slate-800/80 pb-3 last:border-0"
-              >
-                <span class="text-lg leading-none">{{ followUpIcon(event.type) }}</span>
-                <div class="min-w-0 flex-1">
-                  <p class="font-medium text-slate-200">{{ event.title }}</p>
-                  <p class="text-sm text-slate-500">{{ formatDate(event.startDate) }}</p>
-                </div>
-              </div>
-            </div>
-            <p v-else class="mt-4 text-sm text-slate-500">
-              No follow-ups scheduled.
-              <RouterLink to="/calendar" class="text-teal-400 hover:underline">Add one on the calendar</RouterLink>
-              to stay on top of applications.
-            </p>
-          </section>
+        <div class="rounded-xl bg-slate-800/50 p-3">
+          <p class="text-2xl font-bold text-teal-300">{{ queueCounts.approved }}</p>
+          <p class="text-xs text-slate-500">approved</p>
+        </div>
+        <div class="rounded-xl bg-slate-800/50 p-3">
+          <p class="text-2xl font-bold text-slate-200">{{ queueCounts.applied }}</p>
+          <p class="text-xs text-slate-500">applied</p>
         </div>
       </div>
-    </template>
+
+      <div v-if="recentApplied.length" class="mt-5 space-y-2">
+        <p class="text-sm font-medium text-slate-400">Recently applied</p>
+        <div
+          v-for="job in recentApplied"
+          :key="job.jobId"
+          class="flex items-center justify-between gap-2 rounded-lg bg-slate-800/40 px-3 py-2 text-sm"
+        >
+          <div class="min-w-0 truncate">
+            <span class="text-slate-200">{{ job.title }}</span>
+            <span class="text-slate-500"> · {{ job.company }}</span>
+          </div>
+          <span class="badge badge-teal shrink-0">applied</span>
+        </div>
+      </div>
+      <p v-else class="mt-4 text-sm text-slate-500">No applications yet — hit Start applying above.</p>
+    </section>
+
+    <p class="mt-6 text-center text-xs text-slate-600">
+      <RouterLink to="/profile" class="hover:text-teal-400">Edit profile</RouterLink>
+      <template v-if="auth.isAdmin">
+        · <RouterLink to="/agent" class="hover:text-teal-400">Admin: Run agent</RouterLink>
+      </template>
+    </p>
   </div>
 </template>

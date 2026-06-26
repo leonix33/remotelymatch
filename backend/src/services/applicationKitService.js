@@ -106,10 +106,10 @@ async function generateForJob(userId, jobId, options = {}) {
   return saved;
 }
 
-async function generateOnApprove(userId, jobId, tailorResume) {
+async function generateOnApprove(userId, jobId, tailorResume, options = {}) {
   if (!tailorResume) return null;
   try {
-    return await generateForJob(userId, jobId, { tailorResume: true });
+    return await generateForJob(userId, jobId, { tailorResume: true, ...options });
   } catch (err) {
     console.warn(`Application kit generation failed for ${jobId}:`, err.message);
     return null;

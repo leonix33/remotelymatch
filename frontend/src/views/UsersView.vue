@@ -243,8 +243,8 @@ onUnmounted(() => {
   <div>
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-bold text-slate-100">Team access</h2>
-        <p class="mt-1 max-w-xl text-slate-400">
+        <h2 class="page-title text-2xl font-bold text-slate-100">Team access</h2>
+        <p class="page-subtitle mt-1 max-w-xl text-slate-400">
           You are the admin. Invite users who can log in, browse jobs, track applications, and use the AI tools.
         </p>
       </div>
@@ -384,7 +384,7 @@ onUnmounted(() => {
     </div>
 
     <div v-if="loading" class="mt-8 text-slate-400">Loading team…</div>
-    <div v-else class="mt-8 card overflow-hidden">
+    <div v-else class="mt-8 card overflow-hidden mobile-table-wrap">
       <table class="w-full text-left text-sm">
         <thead class="bg-slate-950/50">
           <tr class="border-b border-slate-800 text-slate-400">

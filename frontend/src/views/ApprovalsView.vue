@@ -6,9 +6,12 @@ import ApplyWorkflowBanner from '../components/ApplyWorkflowBanner.vue';
 import ApplicationKitPanel from '../components/ApplicationKitPanel.vue';
 import JobScoreBadges from '../components/JobScoreBadges.vue';
 import { useProfileStore } from '../stores/profile';
+import { useAuthStore } from '../stores/auth';
 import { buildLinkedInSearchFromJob, isLinkedInJob, isLinkedInUrl, openLinkedIn } from '../utils/linkedin';
 
 const profileStore = useProfileStore();
+const auth = useAuthStore();
+const isAdmin = computed(() => auth.isAdmin);
 const route = useRoute();
 
 const items = ref([]);
@@ -307,9 +310,11 @@ onMounted(async () => {
   <div>
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-bold text-slate-100">Apply queue</h2>
+        <h2 class="text-2xl font-bold text-slate-100">{{ isAdmin ? 'Apply queue' : 'My queue' }}</h2>
         <p class="mt-1 max-w-xl text-slate-400">
-          Triage by <strong class="text-slate-300">interview likelihood</strong> — approve roles with the best chance of a human reply, not just skill match.
+          {{ isAdmin
+            ? 'Triage by interview likelihood — approve roles with the best chance of a human reply.'
+            : 'Review jobs, approve the ones you want, then apply.' }}
         </p>
       </div>
       <div class="flex flex-wrap gap-3">
@@ -321,18 +326,25 @@ onMounted(async () => {
           <p class="text-2xl font-bold text-teal-300">{{ counts.approved }}</p>
           <p class="text-xs text-slate-500">approved</p>
         </div>
-        <div v-if="counts.approved > 0" class="card flex flex-col gap-3 self-center px-4 py-3">
-          <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Auto-apply resume mode</p>
+        <div v-if="counts.approved > 0" class="card flex flex-col gap-3 self-center px-4 py-3 min-w-[240px]">
+          <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Apply settings</p>
           <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
             <input v-model="applyResumeMode" type="radio" value="base" class="accent-teal-500" />
             Base resume only
           </label>
           <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
             <input v-model="applyResumeMode" type="radio" value="tailored" class="accent-teal-500" />
-            Tailored application kit
+            Tailored ({{ profileStore.profile?.defaultSupplementPages || 3 }} pages)
           </label>
-          <p class="max-w-[220px] text-xs text-slate-500">
-            Tailored uses per-job kits you can preview under Tailored. Per-job “use on apply” overrides are respected.
+          <p v-if="applyResumeMode === 'tailored'" class="text-xs text-slate-500">
+            {{
+              profileStore.profile?.defaultTailorMode === 'high_match'
+                ? 'High match — word-for-word JD alignment'
+                : 'Balanced tailoring'
+            }}
+          </p>
+          <p class="text-xs text-teal-300/90">
+            Email on forms: {{ profileStore.profile?.digestEmail || auth.user?.email || 'add in Profile' }}
           </p>
           <button
             class="btn-primary px-4 py-2 text-sm"
@@ -345,9 +357,9 @@ onMounted(async () => {
       </div>
     </div>
 
-    <ApplyWorkflowBanner class="mt-6" />
+    <ApplyWorkflowBanner v-if="isAdmin" class="mt-6" />
 
-    <div v-if="status === 'pending' && counts.pending > 0" class="mt-6 card flex flex-wrap items-center gap-3 p-4">
+    <div v-if="status === 'pending' && counts.pending > 0 && isAdmin" class="mt-6 card flex flex-wrap items-center gap-3 p-4">
       <span class="text-sm text-slate-400">Quick triage:</span>
       <label class="flex items-center gap-2 text-xs text-slate-400">
         <input v-model="tailorOnApprove" type="checkbox" class="accent-teal-500" />
@@ -387,7 +399,7 @@ onMounted(async () => {
         <option value="65">65%+ match</option>
         <option value="0">All matches</option>
       </select>
-      <select v-model="ats" class="input w-auto text-sm">
+      <select v-if="isAdmin" v-model="ats" class="input w-auto text-sm">
         <option value="all">All ATS</option>
         <option value="greenhouse">Greenhouse</option>
         <option value="lever">Lever</option>
@@ -400,7 +412,7 @@ onMounted(async () => {
     <p v-if="applyMessage" class="mt-4 rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ applyMessage }}</p>
     <p v-if="queueBanner" class="mt-4 rounded-lg bg-sky-500/10 px-3 py-2 text-sm text-sky-200">{{ queueBanner }}</p>
 
-    <div v-if="whisper.length && status === 'pending'" class="mt-6 card p-4">
+    <div v-if="whisper.length && status === 'pending' && isAdmin" class="mt-6 card p-4">
       <div class="flex items-center justify-between">
         <h3 class="font-semibold text-slate-200">Agent whisper</h3>
         <button class="btn-secondary px-2 py-1 text-xs" :disabled="whisperLoading" @click="loadWhisper">Refresh</button>

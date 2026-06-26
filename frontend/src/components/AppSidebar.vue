@@ -13,121 +13,44 @@ defineProps({
 const route = useRoute();
 const auth = useAuthStore();
 
-const expanded = ref({
-  monitor: true,
-  workflow: true,
-  intelligence: false,
-  automation: false,
-  social: false,
-});
+const showAdvanced = ref(false);
 
-const monitorItems = [
-  { to: '/monitor', label: 'Command Center', icon: '◈', exact: true },
-  { to: '/monitor/pipeline', label: 'Job Pipeline', icon: '⬡' },
-  { to: '/monitor/agent', label: 'Agent Runs', icon: '▶' },
-  { to: '/monitor/swarm', label: 'Swarm Stages', icon: '⚡' },
-  { to: '/monitor/applications', label: 'Applications', icon: '▣' },
+const simpleNav = [
+  { to: '/', label: 'Apply', icon: '▶', exact: true },
+  { to: '/jobs', label: 'Jobs', icon: '◎' },
+  { to: '/approvals', label: 'My Queue', icon: '✓' },
+  { to: '/profile', label: 'Profile', icon: '◆' },
 ];
 
-const navGroups = computed(() => {
-  const groups = [
-    {
-      id: 'overview',
-      label: 'Overview',
-      collapsible: false,
-      items: [
-        { to: '/', label: 'Home', icon: '◉', exact: true },
-        { to: '/concierge', label: 'Ask AI', icon: '✦' },
-      ],
-    },
-    {
-      id: 'monitor',
-      label: 'Monitor',
-      collapsible: true,
-      badge: 'Live',
-      items: monitorItems,
-    },
-    {
-      id: 'workflow',
-      label: 'Workflow',
-      collapsible: true,
-      items: [
-        { to: '/jobs', label: 'Jobs', icon: '◎' },
-        { to: '/linkedin', label: 'LinkedIn', icon: 'in' },
-        { to: '/approvals', label: 'Apply Queue', icon: '✓' },
-        { to: '/tailored-resumes', label: 'Tailored', icon: '📋' },
-        { to: '/follow-ups', label: 'Follow-ups', icon: '↗' },
-        { to: '/applications', label: 'Applications', icon: '▣' },
-        { to: '/calendar', label: 'Calendar', icon: '📆' },
-      ],
-    },
-    {
-      id: 'intelligence',
-      label: 'Intelligence',
-      collapsible: true,
-      items: [
-        { to: '/chat', label: 'Connect', icon: '💬' },
-        { to: '/intelligence', label: 'AI Intel', icon: '🧠' },
-        { to: '/interview', label: 'Interview', icon: '🎙' },
-        { to: '/resumes', label: 'Resumes', icon: '📄' },
-        { to: '/generator', label: 'Cover Letter', icon: '✦' },
-      ],
-    },
-    {
-      id: 'automation',
-      label: 'Automation',
-      collapsible: true,
-      items: [
-        { to: '/agent', label: 'Run Agent', icon: '▶' },
-        { to: '/swarm', label: 'Swarm', icon: '⚡' },
-        { to: '/analytics', label: 'Analytics', icon: '◈' },
-      ],
-    },
-    {
-      id: 'social',
-      label: 'Growth',
-      collapsible: true,
-      items: [
-        { to: '/conferences', label: 'Events', icon: '📅' },
-        { to: '/social', label: 'Social', icon: '🤝' },
-        { to: '/outcomes', label: 'Outcomes', icon: '📈' },
-      ],
-    },
-    {
-      id: 'account',
-      label: 'Account',
-      collapsible: false,
-      items: [{ to: '/profile', label: 'Profile', icon: '◆' }],
-    },
-  ];
+const advancedNav = [
+  { to: '/concierge', label: 'Ask AI', icon: '✦' },
+  { to: '/monitor', label: 'Monitor', icon: '◈' },
+  { to: '/linkedin', label: 'LinkedIn', icon: 'in' },
+  { to: '/tailored-resumes', label: 'Tailored', icon: '📋' },
+  { to: '/applications', label: 'Applications', icon: '▣' },
+  { to: '/calendar', label: 'Calendar', icon: '📆' },
+  { to: '/agent', label: 'Run Agent', icon: '⚡' },
+  { to: '/analytics', label: 'Analytics', icon: '◈' },
+  { to: '/intelligence', label: 'AI Intel', icon: '🧠' },
+  { to: '/interview', label: 'Interview', icon: '🎙' },
+  { to: '/generator', label: 'Cover Letter', icon: '✦' },
+  { to: '/users', label: 'Team', icon: '◇', adminOnly: true },
+];
 
-  if (auth.isAdmin) {
-    groups.find((g) => g.id === 'account').items.push({ to: '/users', label: 'Team', icon: '◇' });
-  }
-
-  return groups;
-});
+const visibleAdvanced = computed(() =>
+  advancedNav.filter((item) => !item.adminOnly || auth.isAdmin)
+);
 
 function isActive(item) {
   if (item.exact) return route.path === item.to;
-  if (item.to === '/monitor') return route.path === '/monitor';
   return route.path === item.to || route.path.startsWith(`${item.to}/`);
-}
-
-function groupHasActive(group) {
-  return group.items.some((item) => isActive(item));
-}
-
-function toggleGroup(id) {
-  expanded.value[id] = !expanded.value[id];
 }
 
 watch(
   () => route.path,
   (path) => {
-    if (path.startsWith('/monitor')) expanded.value.monitor = true;
-    if (['/jobs', '/linkedin', '/approvals', '/tailored-resumes', '/follow-ups', '/applications', '/calendar'].includes(path)) {
-      expanded.value.workflow = true;
+    if (visibleAdvanced.value.some((item) => isActive(item))) {
+      showAdvanced.value = true;
     }
   },
   { immediate: true }
@@ -145,26 +68,37 @@ watch(
     </div>
 
     <nav class="sidebar-nav custom-scrollbar flex-1 space-y-5 overflow-y-auto pr-1">
-      <section v-for="group in navGroups" :key="group.id" class="sidebar-section">
-        <button
-          v-if="group.collapsible"
-          type="button"
-          class="sidebar-section-header"
-          :class="groupHasActive(group) ? 'text-teal-300' : ''"
-          @click="toggleGroup(group.id)"
-        >
-          <span class="sidebar-section-label">{{ group.label }}</span>
-          <span v-if="group.badge" class="sidebar-badge">{{ group.badge }}</span>
-          <span class="sidebar-chevron" :class="expanded[group.id] ? 'rotate-180' : ''">▾</span>
-        </button>
-        <p v-else class="sidebar-section-label px-3">{{ group.label }}</p>
-
-        <div v-show="!group.collapsible || expanded[group.id]" class="mt-1 space-y-0.5">
+      <section class="sidebar-section">
+        <p class="sidebar-section-label px-3">Get started</p>
+        <div class="mt-1 space-y-0.5">
           <RouterLink
-            v-for="item in group.items"
+            v-for="item in simpleNav"
             :key="item.to"
             :to="item.to"
             class="sidebar-link"
+            :class="isActive(item) ? 'sidebar-link-active' : ''"
+          >
+            <span class="sidebar-link-icon">{{ item.icon }}</span>
+            <span class="truncate">{{ item.label }}</span>
+          </RouterLink>
+        </div>
+      </section>
+
+      <section class="sidebar-section">
+        <button
+          type="button"
+          class="sidebar-section-header w-full"
+          @click="showAdvanced = !showAdvanced"
+        >
+          <span class="sidebar-section-label">More tools</span>
+          <span class="sidebar-chevron" :class="showAdvanced ? 'rotate-180' : ''">▾</span>
+        </button>
+        <div v-show="showAdvanced" class="mt-1 space-y-0.5">
+          <RouterLink
+            v-for="item in visibleAdvanced"
+            :key="item.to"
+            :to="item.to"
+            class="sidebar-link text-sm"
             :class="isActive(item) ? 'sidebar-link-active' : ''"
           >
             <span class="sidebar-link-icon">{{ item.icon }}</span>

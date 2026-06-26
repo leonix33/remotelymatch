@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const profileService = require('../services/profileService');
 const openaiService = require('../services/openaiService');
+const applicantContactService = require('../services/applicantContactService');
 const {
   parseResumeFile,
   mergeSkillLists,
@@ -198,4 +199,43 @@ async function testOpenAiKey(req, res, next) {
   }
 }
 
-module.exports = { getMe, updateMe, parseResume, saveOpenAiKey, clearOpenAiKey, testOpenAiKey };
+async function getApplyPreview(req, res, next) {
+  try {
+    const profile = await profileService.getOrCreate(req.user.sub);
+    const raw = await profileService.getRaw(req.user.sub);
+    const contact = await applicantContactService.resolveApplicantContact(
+      req.user.sub,
+      raw || profile,
+      req.user.email
+    );
+    const email = contact.email || '';
+    let emailWarning = null;
+    if (!email) {
+      emailWarning = 'Add your personal email — applications need a real address, not a system account.';
+    } else if (applicantContactService.isAppOrSystemEmail(email)) {
+      emailWarning = 'This looks like a system email. Add your personal Gmail or work email below.';
+    }
+    res.json({
+      contact,
+      tailoring: {
+        defaultApplyResumeMode: profile.defaultApplyResumeMode || 'base',
+        defaultSupplementPages: profile.defaultSupplementPages || 3,
+        defaultTailorMode: profile.defaultTailorMode || 'balanced',
+        highMatchTarget: profile.highMatchTarget || 90,
+      },
+      emailWarning,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  getMe,
+  updateMe,
+  parseResume,
+  getApplyPreview,
+  saveOpenAiKey,
+  clearOpenAiKey,
+  testOpenAiKey,
+};

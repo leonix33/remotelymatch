@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useProfileStore } from '../stores/profile';
+import ResumePreview from './ResumePreview.vue';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -71,6 +72,13 @@ async function handleFile(event) {
     event.target.value = '';
   }
 }
+
+const previewSkills = computed(() => {
+  if (parseSummary.value?.mustHave?.length) {
+    return [...parseSummary.value.mustHave, ...(parseSummary.value.niceToHave || [])];
+  }
+  return profileStore.extractedSkills;
+});
 </script>
 
 <template>
@@ -95,26 +103,12 @@ async function handleFile(event) {
 
     <p v-if="localError" class="text-sm text-red-300">{{ localError }}</p>
 
-    <div
-      v-if="showPreview && parseSummary"
-      class="rounded-xl border border-teal-900/40 bg-teal-950/20 p-4 text-sm"
-    >
-      <p class="font-medium text-teal-200">
-        Resume parsed — {{ parseSummary.skills }} skills found · score {{ parseSummary.score }}
-      </p>
-      <p class="mt-1 text-slate-400">{{ parseSummary.words }} words extracted</p>
-      <div v-if="parseSummary.mustHave.length" class="mt-3 flex flex-wrap gap-2">
-        <span
-          v-for="skill in parseSummary.mustHave.slice(0, 8)"
-          :key="skill"
-          class="badge badge-teal"
-        >
-          {{ skill }}
-        </span>
-        <span v-if="parseSummary.mustHave.length > 8" class="text-xs text-slate-500">
-          +{{ parseSummary.mustHave.length - 8 }} more
-        </span>
-      </div>
-    </div>
+    <ResumePreview
+      v-if="showPreview"
+      :resume-text="modelValue || profileStore.profile?.resumeText || ''"
+      :score="parseSummary?.score ?? profileStore.resumeScore"
+      :skills="previewSkills"
+      :file-name="fileName"
+    />
   </div>
 </template>

@@ -202,7 +202,9 @@ async function setStatus(userId, jobId, status, notes = '', options = {}) {
       const profile = await profileService.getOrCreate(userId);
       const tailor =
         typeof options.tailorResume === 'boolean' ? options.tailorResume : Boolean(profile.tailorResumeOnApply);
-      await applicationKitService.generateOnApprove(userId, jobId, tailor);
+      await applicationKitService.generateOnApprove(userId, jobId, tailor, {
+        authEmail: options.authEmail,
+      });
     }
     return row;
   }
@@ -236,7 +238,9 @@ async function setStatus(userId, jobId, status, notes = '', options = {}) {
     const profile = await profileService.getOrCreate(userId);
     const tailor =
       typeof options.tailorResume === 'boolean' ? options.tailorResume : Boolean(profile.tailorResumeOnApply);
-    await applicationKitService.generateOnApprove(userId, jobId, tailor);
+    await applicationKitService.generateOnApprove(userId, jobId, tailor, {
+      authEmail: options.authEmail,
+    });
   }
   return approval;
 }
@@ -259,6 +263,7 @@ async function counts(userId) {
     pending: items.filter((i) => i.status === 'pending').length,
     approved: items.filter((i) => i.status === 'approved').length,
     rejected: items.filter((i) => i.status === 'rejected').length,
+    applied: items.filter((i) => i.status === 'applied').length,
   };
 }
 

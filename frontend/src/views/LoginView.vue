@@ -36,8 +36,8 @@ async function submit() {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center p-4">
-    <div class="card w-full max-w-md p-8">
+  <div class="flex min-h-screen min-h-dvh items-center justify-center safe-top safe-bottom safe-x p-4">
+    <div class="card w-full max-w-md p-6 sm:p-8">
       <AppLogo size="lg" />
       <p class="mt-4 text-sm text-slate-400">{{ brand.tagline }}</p>
 

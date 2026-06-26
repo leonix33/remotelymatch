@@ -6,6 +6,8 @@ import { useProfileStore } from '../stores/profile';
 import { useAuthStore } from '../stores/auth';
 import { appUrl } from '../config';
 import ResumeUpload from '../components/ResumeUpload.vue';
+import ResumePreview from '../components/ResumePreview.vue';
+import TailorApplySettings from '../components/TailorApplySettings.vue';
 
 const router = useRouter();
 const profileStore = useProfileStore();
@@ -280,8 +282,8 @@ async function removeOpenAiKey() {
 
 <template>
   <div>
-    <h2 class="text-2xl font-bold text-slate-100">My profile</h2>
-    <p class="mt-1 text-slate-400">Your personal match targets, skills, and resume context</p>
+    <h2 class="page-title text-2xl font-bold text-slate-100">My profile</h2>
+    <p class="page-subtitle mt-1 text-slate-400">Your name, resume, and how you want to apply</p>
 
     <form class="card mt-8 space-y-6 p-6" @submit.prevent="save">
       <div class="grid gap-4 md:grid-cols-2">
@@ -328,12 +330,16 @@ async function removeOpenAiKey() {
           v-model="form.resumeText"
           :apply-to-profile="true"
           :merge-skills="true"
+          :show-preview="false"
           @parsed="() => profileStore.profile && loadForm(profileStore.profile)"
         />
         <textarea v-model="form.resumeText" rows="6" class="input mt-3 text-sm" placeholder="Or paste resume text…" />
-        <p v-if="profileStore.extractedSkills.length" class="mt-2 text-xs text-slate-500">
-          {{ profileStore.extractedSkills.length }} skills detected from your resume
-        </p>
+        <ResumePreview
+          class="mt-4"
+          :resume-text="form.resumeText"
+          :score="profileStore.resumeScore"
+          :skills="profileStore.extractedSkills"
+        />
       </div>
 
       <div>
@@ -409,19 +415,17 @@ async function removeOpenAiKey() {
 
       <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
         <h3 class="font-semibold text-slate-200">Default tailoring</h3>
-        <p class="mt-1 text-sm text-slate-500">Defaults for new application kits — you can override per job.</p>
-        <div class="mt-4">
-          <label class="mb-1 block text-sm text-slate-400">Default supplement pages: {{ form.defaultSupplementPages }}</label>
-          <input v-model.number="form.defaultSupplementPages" type="range" min="1" max="6" class="w-full accent-teal-500" />
-        </div>
-        <label class="mt-4 flex cursor-pointer items-center gap-2 text-sm text-slate-300">
-          <input v-model="form.defaultTailorMode" type="radio" value="balanced" class="accent-teal-500" />
-          Balanced tailoring
-        </label>
-        <label class="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-300">
-          <input v-model="form.defaultTailorMode" type="radio" value="high_match" class="accent-teal-500" />
-          High match (~90%) — word-for-word JD alignment in supplement
-        </label>
+        <p class="mt-1 text-sm text-slate-500">Defaults for new application kits — override per job in My Queue.</p>
+        <TailorApplySettings
+          v-model:resume-mode="form.defaultApplyResumeMode"
+          v-model:supplement-pages="form.defaultSupplementPages"
+          v-model:tailor-mode="form.defaultTailorMode"
+          v-model:digest-email="form.digestEmail"
+          v-model:contact-phone="form.contactPhone"
+          class="mt-4"
+          :show-resume-mode="false"
+          :show-applicant-contact="false"
+        />
         <router-link to="/tailored-resumes" class="mt-4 inline-block text-sm text-teal-400 hover:underline">
           View all tailored resumes →
         </router-link>
