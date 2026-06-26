@@ -32,6 +32,27 @@ async function handleFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
+  const lowerName = file.name.toLowerCase();
+  const allowed =
+    lowerName.endsWith('.pdf') ||
+    lowerName.endsWith('.docx') ||
+    lowerName.endsWith('.txt') ||
+    lowerName.endsWith('.md') ||
+    lowerName.endsWith('.text');
+  if (!allowed) {
+    localError.value = 'Use PDF, .docx, .txt, or .md — or paste your resume text below.';
+    emit('error', localError.value);
+    event.target.value = '';
+    return;
+  }
+
+  if (lowerName.endsWith('.doc')) {
+    localError.value = 'Legacy .doc is not supported. Save as .docx or PDF and try again.';
+    emit('error', localError.value);
+    event.target.value = '';
+    return;
+  }
+
   if (file.size > MAX_RESUME_BYTES) {
     localError.value = 'Resume must be 8 MB or smaller. Try a shorter PDF or paste text instead.';
     emit('error', localError.value);
@@ -89,12 +110,12 @@ const previewSkills = computed(() => {
     >
       <span class="text-2xl">{{ parsing ? '⏳' : '📄' }}</span>
       <span class="mt-2 text-sm font-medium text-slate-300">
-        {{ parsing ? 'Parsing resume…' : fileName || 'Upload resume (PDF, .txt, .md)' }}
+        {{ parsing ? 'Parsing resume…' : fileName || 'Upload resume (PDF, .docx, .txt, .md)' }}
       </span>
-      <span class="mt-1 text-xs text-slate-500">PDF, .txt, or .md · max 8 MB</span>
+      <span class="mt-1 text-xs text-slate-500">PDF, Word (.docx), .txt, or .md · max 8 MB</span>
       <input
         type="file"
-        accept=".pdf,.txt,.md,.text,application/pdf"
+        accept=".pdf,.docx,.txt,.md,.text,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         class="hidden"
         :disabled="parsing"
         @change="handleFile"
@@ -102,6 +123,12 @@ const previewSkills = computed(() => {
     </label>
 
     <p v-if="localError" class="text-sm text-red-300">{{ localError }}</p>
+    <p
+      v-else-if="profileStore.profile?.resumeUnreadable"
+      class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"
+    >
+      Your saved resume looks like a broken file upload (not readable text). Re-upload as PDF or .docx.
+    </p>
 
     <ResumePreview
       v-if="showPreview"

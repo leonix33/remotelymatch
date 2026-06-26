@@ -6,6 +6,7 @@ const {
   mergeSkillLists,
   profileResumeAlignment,
   isDefaultOnboardingCriteria,
+  isUnreadableResumeText,
 } = require('../services/resumeParseService');
 
 describe('resumeParseService', () => {
@@ -68,5 +69,11 @@ describe('resumeParseService', () => {
     };
     const alignment = profileResumeAlignment(profile);
     assert.equal(alignment.aligned, true);
+  });
+
+  it('flags raw docx binary as unreadable resume text', () => {
+    const corrupt = 'PK\x03\x04 ! [Content_Types].xml \x00\x01\x02 broken';
+    assert.equal(isUnreadableResumeText(corrupt), true);
+    assert.equal(isUnreadableResumeText('Platform Engineer with AWS, Kubernetes, and Terraform.'), false);
   });
 });

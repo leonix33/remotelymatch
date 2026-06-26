@@ -1,4 +1,5 @@
 const pdf = require('pdf-parse');
+const mammoth = require('mammoth');
 
 const MUST_HAVE_CATALOG = [
   'kubernetes',
@@ -214,13 +215,59 @@ function computeResumeScore(profile) {
   return Math.min(100, score);
 }
 
+function isUnreadableResumeText(text = '') {
+  const trimmed = String(text).trim();
+  if (trimmed.length < 20) return true;
+
+  const head = trimmed.slice(0, 1000);
+  if (
+    head.includes('[Content_Types].xml') ||
+    head.includes('word/_rels/document.xml.rels') ||
+    head.startsWith('PK')
+  ) {
+    return true;
+  }
+
+  let controlChars = 0;
+  const sampleLen = Math.min(head.length, 500);
+  for (let i = 0; i < sampleLen; i += 1) {
+    const code = head.charCodeAt(i);
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) controlChars += 1;
+  }
+  if (controlChars > 10) return true;
+
+  const letters = (head.match(/[A-Za-z]/g) || []).length;
+  return letters < sampleLen * 0.12;
+}
+
 async function extractTextFromBuffer(buffer, filename = '') {
   const name = filename.toLowerCase();
   if (name.endsWith('.pdf')) {
     const data = await pdf(buffer);
     return (data.text || '').replace(/\s+/g, ' ').trim();
   }
-  return buffer.toString('utf8').trim();
+  if (name.endsWith('.docx')) {
+    const { value } = await mammoth.extractRawText({ buffer });
+    return (value || '').replace(/\s+/g, ' ').trim();
+  }
+  if (name.endsWith('.doc')) {
+    const err = new Error('Legacy .doc files are not supported. Save as .docx or PDF and upload again.');
+    err.status = 400;
+    throw err;
+  }
+  if (name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.text')) {
+    return buffer.toString('utf8').trim();
+  }
+
+  const asText = buffer.toString('utf8').trim();
+  if (isUnreadableResumeText(asText)) {
+    const err = new Error(
+      'Unsupported file type. Upload PDF, .docx, .txt, or .md — or paste your resume text below.'
+    );
+    err.status = 400;
+    throw err;
+  }
+  return asText;
 }
 
 function mergeSkillLists(existing, incoming) {
@@ -341,8 +388,10 @@ function shouldReplaceCriteriaFromResume(profile = {}, parsed = {}) {
 
 async function parseResumeFile(buffer, filename = 'resume.pdf') {
   const resumeText = await extractTextFromBuffer(buffer, filename);
-  if (!resumeText || resumeText.length < 20) {
-    const err = new Error('Could not extract readable text from this file. Try a text-based PDF or paste your resume.');
+  if (!resumeText || resumeText.length < 20 || isUnreadableResumeText(resumeText)) {
+    const err = new Error(
+      'Could not extract readable text from this file. Upload PDF or .docx, or paste your resume text.'
+    );
     err.status = 400;
     throw err;
   }
@@ -370,7 +419,10 @@ function enrichProfileResponse(profile) {
   const enriched = {
     ...profile,
     extractedSkills,
-    resumeScore: computeResumeScore({ ...profile, extractedSkills }),
+    resumeScore: isUnreadableResumeText(profile.resumeText || '')
+      ? 0
+      : computeResumeScore({ ...profile, extractedSkills }),
+    resumeUnreadable: isUnreadableResumeText(profile.resumeText || ''),
   };
   return enriched;
 }
@@ -385,4 +437,5 @@ module.exports = {
   profileResumeAlignment,
   shouldReplaceCriteriaFromResume,
   isDefaultOnboardingCriteria,
+  isUnreadableResumeText,
 };

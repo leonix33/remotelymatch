@@ -8,6 +8,7 @@ const {
   extractSkillsFromText,
   criteriaFromResumeText,
   shouldReplaceCriteriaFromResume,
+  isUnreadableResumeText,
 } = require('../services/resumeParseService');
 
 const updateSchema = z.object({
@@ -95,6 +96,12 @@ async function updateMe(req, res, next) {
     if (body.mustHaveSkills) payload.mustHaveSkills = parseListField(body.mustHaveSkills);
     if (body.niceToHaveSkills) payload.niceToHaveSkills = parseListField(body.niceToHaveSkills);
     if (body.targetCompanies) payload.targetCompanies = parseListField(body.targetCompanies);
+    if (body.resumeText && isUnreadableResumeText(body.resumeText)) {
+      return res.status(400).json({
+        message:
+          'Resume text looks like a raw file upload, not readable text. Upload PDF or .docx, or paste plain text.',
+      });
+    }
     if (body.resumeText && !body.extractedSkills) {
       payload.extractedSkills = extractSkillsFromText(body.resumeText).all;
       payload.resumeParsedAt = new Date();
