@@ -29,9 +29,9 @@ const isTailored = computed(() => resumeMode.value === 'tailored');
 
 const tailorModeLabel = computed(() => {
   if (tailorMode.value === 'high_match') {
-    return 'High match — word-for-word job description alignment (~90% keyword fit)';
+    return 'Close match — uses the same terms from the job posting where your experience supports it';
   }
-  return 'Balanced — strong match without copying every JD phrase';
+  return 'Balanced — strong match without copying every phrase from the posting';
 });
 
 const applySummary = computed(() => {
@@ -159,25 +159,25 @@ onMounted(loadApplyPreview);
         >
           <input v-model="resumeMode" type="radio" value="tailored" class="accent-teal-500" />
           <p class="mt-2 font-medium text-slate-200">Tailored resume</p>
-          <p class="mt-1 text-xs text-slate-500">AI adds a supplement per job — your base file stays unchanged.</p>
+          <p class="mt-1 text-xs text-slate-500">A version of your resume aligned to each job — same format, all credentials kept.</p>
         </label>
       </div>
     </div>
 
     <!-- Tailoring options (only when tailored) -->
     <div v-if="isTailored" class="rounded-xl border border-violet-900/30 bg-violet-950/10 p-4">
-      <p class="text-sm font-medium text-violet-200">Tailoring settings</p>
+      <p class="text-sm font-medium text-violet-200">Tailoring options</p>
       <p class="mt-1 text-xs text-slate-500">
-        Your base resume is never rewritten. AI generates extra pages mapped to each job description.
+        Your resume is reformatted for each job — same sections and credentials, wording matched to the posting.
       </p>
 
       <div class="mt-4">
         <label class="mb-1 flex items-center justify-between text-sm text-slate-400">
-          <span>Supplement pages per job</span>
+          <span>Target length (pages)</span>
           <span class="font-semibold text-teal-300">{{ supplementPages }} page{{ supplementPages === 1 ? '' : 's' }}</span>
         </label>
         <input v-model.number="supplementPages" type="range" min="1" max="6" step="1" class="w-full accent-teal-500" />
-        <p class="mt-1 text-xs text-slate-600">1 = brief addendum · 3 = standard · 6 = detailed JD mapping</p>
+        <p class="mt-1 text-xs text-slate-600">Matches your original resume length when longer — never drops certifications or credentials.</p>
       </div>
 
       <div class="mt-5 space-y-2">
@@ -198,17 +198,15 @@ onMounted(loadApplyPreview);
         >
           <input v-model="tailorMode" type="radio" value="high_match" class="mt-1 accent-teal-500" />
           <span>
-            <strong class="text-slate-200">High match (~90%)</strong>
-            <span class="mt-0.5 block text-xs text-slate-500">
-              Word-for-word JD phrases mapped to your experience — requirement-by-requirement ATS alignment.
-            </span>
+            <strong class="text-slate-200">High match</strong>
+            <span class="mt-0.5 block text-xs text-slate-500">Uses the employer's wording where it fits your real experience.</span>
           </span>
         </label>
       </div>
 
       <p class="mt-4 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-400">
         <strong class="text-slate-300">Active mode:</strong> {{ tailorModeLabel }}
-        <span v-if="supplementPages"> · {{ supplementPages }} supplement page{{ supplementPages === 1 ? '' : 's' }}</span>
+        <span v-if="supplementPages"> · {{ supplementPages }} page{{ supplementPages === 1 ? '' : 's' }}</span>
       </p>
     </div>
 

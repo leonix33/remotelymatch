@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import http from '../api/http';
+import TailoredResumePreview from './TailoredResumePreview.vue';
 
 const props = defineProps({
   job: { type: Object, required: true },
@@ -193,7 +194,7 @@ watch(
         </div>
 
         <div>
-          <label class="mb-1 block text-sm text-slate-400">Supplement pages (1–6)</label>
+          <label class="mb-1 block text-sm text-slate-400">Target length (pages)</label>
           <div class="flex items-center gap-3">
             <input v-model.number="supplementPages" type="range" min="1" max="6" class="flex-1 accent-teal-500" />
             <span class="w-16 text-sm text-slate-300">{{ supplementPages }} page{{ supplementPages > 1 ? 's' : '' }}</span>
@@ -201,19 +202,19 @@ watch(
         </div>
 
         <div>
-          <p class="mb-2 text-sm text-slate-400">Tailoring intensity</p>
+          <p class="mb-2 text-sm text-slate-400">How closely to match the job description</p>
           <label class="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
             <input v-model="tailorMode" type="radio" value="balanced" class="mt-0.5 accent-teal-500" name="tailor-mode" />
             <span>
               <strong class="text-slate-100">Balanced</strong>
-              <span class="mt-0.5 block text-xs text-slate-500">Human-readable additive supplement</span>
+              <span class="mt-0.5 block text-xs text-slate-500">Natural wording with strong skill alignment.</span>
             </span>
           </label>
           <label class="mt-2 flex cursor-pointer items-start gap-2 text-sm text-slate-300">
             <input v-model="tailorMode" type="radio" value="high_match" class="mt-0.5 accent-teal-500" name="tailor-mode" />
             <span>
-              <strong class="text-slate-100">High match (~90%)</strong>
-              <span class="mt-0.5 block text-xs text-slate-500">Word-for-word JD phrase mapping in supplement (base resume unchanged)</span>
+              <strong class="text-slate-100">High match</strong>
+              <span class="mt-0.5 block text-xs text-slate-500">Uses the employer's wording where it fits your real experience.</span>
             </span>
           </label>
         </div>
@@ -231,7 +232,7 @@ watch(
 
         <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
           <input v-model="tailor" type="checkbox" class="accent-teal-500" />
-          Generate additive supplement (never rewrites base resume)
+          Tailor resume for this job
         </label>
 
         <button class="btn-primary text-sm" :disabled="generating" @click="generate">
@@ -243,8 +244,8 @@ watch(
         <button v-if="kit.coverLetterParagraph" class="btn-secondary text-sm" @click="copyText(kit.coverLetterParagraph)">
           Copy cover letter
         </button>
-        <button v-if="kit.fullSupplementText" class="btn-secondary text-sm" @click="copyText(kit.fullSupplementText)">
-          Copy full supplement
+        <button v-if="kit.tailoredResumeText || kit.fullSupplementText" class="btn-secondary text-sm" @click="copyText(kit.tailoredResumeText || kit.fullSupplementText)">
+          Copy tailored resume
         </button>
         <button v-if="kit.formatted" class="btn-secondary text-sm" @click="copyText(kit.formatted)">
           Copy full kit
@@ -258,49 +259,8 @@ watch(
         {{ kit.message || 'No kit yet — switch to Use / re-tailor to generate.' }}
       </div>
 
-      <div v-else-if="kit?.tailored && viewTab === 'preview'" class="mt-5 space-y-5 text-sm">
-        <div class="flex flex-wrap items-center gap-2">
-          <span
-            class="rounded-full px-2 py-0.5 text-xs font-medium"
-            :class="kit.useForApply !== false ? 'bg-teal-500/15 text-teal-300' : 'bg-slate-800 text-slate-400'"
-          >
-            {{ kit.useForApply !== false ? 'Will use on apply' : 'Base resume only' }}
-          </span>
-          <p v-if="kit.demo" class="text-xs text-amber-300">Demo mode — connect OpenAI in Profile → AI Integration for live tailoring.</p>
-        </div>
-
-        <p v-if="kit.contactEmail" class="text-xs text-teal-300/90">Contact: {{ kit.contactName }} · {{ kit.contactEmail }}</p>
-        <p v-if="kit.pageCount" class="text-xs text-slate-500">
-          {{ kit.pageCount }}-page supplement
-          <span v-if="kit.tailorMode === 'high_match'"> · high-match mode</span>
-          <span v-if="kit.estimatedMatchPct"> · est. {{ kit.estimatedMatchPct }}% fit</span>
-        </p>
-        <p v-if="kit.tailorFocus" class="text-xs text-slate-500">Focus: {{ kit.tailorFocus }}</p>
-
-        <div v-if="kit.supplementPages?.length" class="space-y-4">
-          <h4 class="font-medium text-slate-200">Tailored resume supplement</h4>
-          <div
-            v-for="page in kit.supplementPages"
-            :key="page.page"
-            class="rounded-lg border border-slate-700/80 bg-slate-950/50 p-4"
-          >
-            <p class="text-xs font-medium uppercase text-slate-500">Page {{ page.page }} — {{ page.title }}</p>
-            <pre class="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{{ page.content }}</pre>
-            <button type="button" class="btn-secondary mt-2 px-2 py-1 text-xs" @click="copyText(page.content)">
-              Copy page {{ page.page }}
-            </button>
-          </div>
-        </div>
-
-        <div v-if="kit.missingKeywords?.length">
-          <h4 class="font-medium text-slate-200">Keywords mirrored</h4>
-          <p class="mt-1 text-slate-400">{{ kit.missingKeywords.join(' · ') }}</p>
-        </div>
-
-        <div v-if="kit.coverLetterParagraph">
-          <h4 class="font-medium text-slate-200">Cover letter</h4>
-          <p class="mt-1 whitespace-pre-wrap text-slate-300">{{ kit.coverLetterParagraph }}</p>
-        </div>
+      <div v-else-if="kit?.tailored && viewTab === 'preview'" class="mt-5">
+        <TailoredResumePreview :kit="kit" />
       </div>
     </div>
   </div>

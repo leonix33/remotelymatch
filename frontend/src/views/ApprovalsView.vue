@@ -363,7 +363,7 @@ onMounted(async () => {
       <span class="text-sm text-slate-400">Quick triage:</span>
       <label class="flex items-center gap-2 text-xs text-slate-400">
         <input v-model="tailorOnApprove" type="checkbox" class="accent-teal-500" />
-        Tailor resume on approve (additive only)
+        Tailor resume on approve
       </label>
       <span class="text-slate-600">|</span>
       <button class="btn-primary text-xs" :disabled="bulkActing" @click="bulkApprove(5)">Approve top 5</button>

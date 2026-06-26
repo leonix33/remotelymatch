@@ -144,7 +144,7 @@ defineExpose({ refresh: loadKits });
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h3 class="font-semibold text-slate-100">Tailored resume preview</h3>
-        <p class="mt-1 text-sm text-slate-500">Review the AI supplement generated for each job before you submit.</p>
+        <p class="mt-1 text-sm text-slate-500">Review the resume version for each job before you submit.</p>
       </div>
       <button type="button" class="btn-secondary text-sm" :disabled="listLoading" @click="loadKits">
         {{ listLoading ? 'Loading…' : 'Refresh' }}
@@ -158,7 +158,7 @@ defineExpose({ refresh: loadKits });
     <div v-else-if="!kits.length" class="mt-5 rounded-xl border border-dashed border-slate-700 bg-slate-900/40 p-6 text-center">
       <p class="text-sm text-slate-400">No tailored resumes yet.</p>
       <p class="mt-2 text-xs text-slate-500">
-        Apply with <strong class="text-slate-400">Tailored resume</strong> selected — supplements appear here right after apply finishes.
+        Apply with <strong class="text-slate-400">Tailored resume</strong> selected — your resume for each job appears here after apply finishes.
       </p>
     </div>
 

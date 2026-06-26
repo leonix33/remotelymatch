@@ -66,7 +66,7 @@ const applyPlanSummary = computed(() => {
   }
   const mode =
     tailorMode.value === 'high_match'
-      ? 'high-match (word-for-word JD alignment)'
+      ? 'close match to job posting'
       : 'balanced tailoring';
   return `Tailored · ${supplementPages.value} supplement page${supplementPages.value === 1 ? '' : 's'} · ${mode} · ${digestEmail.value || 'your email'}`;
 });

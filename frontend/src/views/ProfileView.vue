@@ -380,8 +380,8 @@ async function removeOpenAiKey() {
       <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
         <h3 class="font-semibold text-slate-200">Application quality</h3>
         <p class="mt-1 text-sm text-slate-500">
-          When enabled, approving a job generates a <strong class="text-slate-400">3+ page additive supplement</strong>
-          mapped to the full job description. Your base resume file and structure stay unchanged.
+          When enabled, approving a job creates a <strong class="text-slate-400">tailored resume</strong>
+          for that role — same layout as your original, with all credentials kept and wording matched to the posting.
         </p>
         <label class="mt-3 flex cursor-pointer items-start gap-3 text-sm text-slate-300">
           <input v-model="form.tailorResumeOnApply" type="checkbox" class="mt-0.5 accent-teal-500" />
@@ -400,7 +400,7 @@ async function removeOpenAiKey() {
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input v-model="form.defaultApplyResumeMode" type="radio" value="tailored" class="accent-teal-500" />
-            Tailored application kit
+            Tailored resume per job
           </label>
         </div>
       </div>

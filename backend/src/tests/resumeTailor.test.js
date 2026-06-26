@@ -24,24 +24,29 @@ describe('resumeTailorService', () => {
     assert.ok(!missing.includes('terraform'));
   });
 
-  it('builds additive demo kit without rewriting resume', () => {
-    const kit = buildDemoKit(profile, job, jd, contact, { supplementPages: 4, tailorMode: 'high_match' });
-    assert.equal(kit.mode, 'additive');
+  it('builds full tailored resume demo preserving structure', () => {
+    const profileWithCerts = {
+      ...profile,
+      resumeText: `Alex Rivera\nalex@email.com\n\nEXPERIENCE\nSenior DevOps Engineer — Acme\n\nCERTIFICATIONS\nAWS Solutions Architect Associate\nTerraform Associate`,
+    };
+    const kit = buildDemoKit(profileWithCerts, job, jd, contact, { supplementPages: 3, tailorMode: 'high_match' });
+    assert.equal(kit.mode, 'full_resume');
     assert.equal(kit.contactEmail, 'alex@personal.com');
-    assert.ok(kit.pageCount >= 4);
-    assert.equal(kit.tailorMode, 'high_match');
-    assert.ok(kit.guardrails.toLowerCase().includes('unchanged') || kit.guardrails.length > 0);
-    assert.ok(Array.isArray(kit.additiveBullets));
+    assert.ok(kit.pageCount >= 2);
+    assert.ok(kit.tailoredResumeText.includes('AWS Solutions Architect'));
+    assert.ok(kit.tailoredResumeText.includes('Terraform Associate'));
+    assert.ok(!kit.tailoredResumeText.toLowerCase().includes('addendum'));
+    assert.ok(!kit.tailoredResumeText.toLowerCase().includes('ats keyword'));
     assert.ok(kit.coverLetterParagraph.includes('Platform Engineer'));
     assert.ok(!kit.coverLetterParagraph.toLowerCase().includes('excited to'));
-    assert.ok(kit.fullSupplementText.includes('alex@personal.com'));
   });
 
-  it('formats kit as readable text', () => {
+  it('formats kit as clean resume text', () => {
     const kit = buildDemoKit(profile, job, jd, contact);
     const text = formatKitAsText(kit);
-    assert.ok(text.includes('APPLICATION KIT'));
-    assert.ok(text.includes('additive'));
+    assert.ok(!text.includes('APPLICATION KIT'));
+    assert.ok(!text.includes('ADDENDUM'));
+    assert.ok(text.length > 50);
   });
 });
 

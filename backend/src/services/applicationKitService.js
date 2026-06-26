@@ -167,7 +167,7 @@ async function attachKitToApplyItem(userId, job, options = {}) {
   return {
     ...base,
     cover_letter: kit.coverLetterParagraph || '',
-    resume_addendum: kit.fullSupplementText || kit.resumeAddendum || '',
+    resume_addendum: kit.tailoredResumeText || kit.fullSupplementText || kit.resumeAddendum || '',
     applicant_email: kit.contactEmail || base.applicant_email,
     applicant_name: kit.contactName || base.applicant_name,
     application_kit: {
@@ -293,6 +293,7 @@ function kitListItem(kit) {
     hasCoverLetter: Boolean(kit.coverLetterParagraph),
     missingKeywords: (kit.missingKeywords || []).slice(0, 8),
     tailored: Boolean(kit.tailored),
+    tailoredResumeText: kit.tailoredResumeText || kit.fullSupplementText || '',
     supplementPages: kit.supplementPages || [],
     fullSupplementText: kit.fullSupplementText || '',
     coverLetterParagraph: kit.coverLetterParagraph || '',

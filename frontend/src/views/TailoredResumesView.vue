@@ -87,8 +87,8 @@ onMounted(load);
   <div>
     <h2 class="text-2xl font-bold text-slate-100">Tailored resumes</h2>
     <p class="mt-1 max-w-2xl text-slate-400">
-      Every job you approved with tailoring gets an additive supplement here. Review what was generated, choose whether to
-      use it when applying, or re-tailor for a specific role.
+      Tailored resumes for jobs you approved with tailoring enabled. Review each version, choose whether to use it when
+      applying, or re-tailor for a specific role.
     </p>
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
@@ -136,14 +136,7 @@ onMounted(load);
             <p class="text-sm text-slate-400">{{ kit.company }}</p>
             <p class="mt-2 text-xs text-slate-500">
               {{ kit.pageCount }} pages
-              <span v-if="kit.tailorMode === 'high_match'"> · high-match</span>
-              <span v-if="kit.estimatedMatchPct"> · ~{{ kit.estimatedMatchPct }}% est.</span>
               · Generated {{ formatDate(kit.generatedAt) }}
-              <span v-if="kit.demo" class="text-amber-400"> · demo</span>
-            </p>
-            <p v-if="kit.tailorFocus" class="mt-1 text-xs text-slate-600">Focus: {{ kit.tailorFocus }}</p>
-            <p v-if="kit.missingKeywords?.length" class="mt-2 text-xs text-teal-400/80">
-              Keywords: {{ kit.missingKeywords.join(' · ') }}
             </p>
           </div>
           <div class="flex flex-col items-end gap-2">
