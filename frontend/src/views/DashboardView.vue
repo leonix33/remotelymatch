@@ -118,7 +118,7 @@ async function startApplying() {
     await quickApply({
       count: jobCount.value,
       useTailoredResume: resumeMode.value === 'tailored',
-      minMatch: profileStore.profile?.minMatchScore || 70,
+      minMatch: profileStore.profile?.minMatchScore || 40,
       runSearch: false,
     });
     await loadStatus();

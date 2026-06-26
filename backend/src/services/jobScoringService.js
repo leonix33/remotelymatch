@@ -10,6 +10,36 @@ function normalize(text = '') {
   return String(text).toLowerCase();
 }
 
+const RESUME_STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'your', 'have', 'will', 'were',
+  'been', 'their', 'they', 'them', 'than', 'into', 'over', 'such', 'through', 'while',
+  'where', 'which', 'about', 'after', 'before', 'between', 'during', 'including', 'using',
+  'years', 'year', 'experience', 'skills', 'skill', 'work', 'worked', 'working', 'team',
+  'role', 'roles', 'responsible', 'management', 'manager', 'project', 'projects',
+]);
+
+function extractResumeKeywords(resumeBlob = '') {
+  const words = normalize(resumeBlob).split(/\W+/).filter(Boolean);
+  const seen = new Set();
+  const keywords = [];
+  for (const word of words) {
+    if (word.length < 4 || RESUME_STOP_WORDS.has(word) || seen.has(word)) continue;
+    seen.add(word);
+    keywords.push(word);
+    if (keywords.length >= 40) break;
+  }
+  return keywords;
+}
+
+function scoreResumeJobOverlap(resumeBlob, title, blob) {
+  const keywords = extractResumeKeywords(resumeBlob);
+  let overlap = 0;
+  for (const kw of keywords) {
+    if (title.includes(kw) || blob.includes(kw)) overlap += 1;
+  }
+  return { overlap, keywords };
+}
+
 function scoreJobForProfile(job, profile, scoringContext = {}) {
   const title = normalize(job.title);
   const company = normalize(job.company);
@@ -30,13 +60,48 @@ function scoreJobForProfile(job, profile, scoringContext = {}) {
   let mustSkills = (profile?.mustHaveSkills || []).map(normalize).filter(Boolean);
   const niceSkills = (profile?.niceToHaveSkills || []).map(normalize).filter(Boolean);
   const targetCompanies = (profile?.targetCompanies || []).map(normalize).filter(Boolean);
+  const noSearchCriteria = !targetTitles.length && !mustSkills.length;
 
   if (!alignment.aligned && resumeSkills.length) {
     mustSkills = resumeSkills.slice(0, 12);
     if (!targetTitles.length) {
-      const resumeTitles = ['devops', 'sre', 'platform', 'cloud', 'infrastructure', 'software', 'data', 'product'];
-      targetTitles = resumeTitles.filter((t) => resumeBlob.includes(t));
+      targetTitles = extractResumeKeywords(resumeBlob).slice(0, 8);
     }
+  }
+
+  if (noSearchCriteria && resumeBlob.length >= 50) {
+    const { overlap } = scoreResumeJobOverlap(resumeBlob, title, blob);
+    let openScore = 35 + Math.min(40, overlap * 4);
+    const openStrengths = [];
+    if (overlap >= 3) openStrengths.push(`${overlap} resume keywords match`);
+    if (/remote|anywhere|distributed/.test(location) || /remote/.test(blob)) {
+      openScore += 15;
+      openStrengths.push('Remote');
+    }
+    if (job.description) openScore += Math.min(10, Math.floor(job.description.length / 200));
+    let personalMatchPct = Math.min(100, Math.round(openScore));
+    const agentScore = job.matchPct || job.agentMatchPct || 0;
+    personalMatchPct = Math.min(100, Math.round(personalMatchPct * 0.55 + agentScore * 0.45));
+    const minMatch = profile?.minMatchScore || 40;
+    let emailSection = 'manual_browse';
+    if (personalMatchPct >= 80) emailSection = 'apply_today';
+    else if (personalMatchPct >= minMatch) emailSection = 'strong_review';
+
+    return enrichJobWithLikelihood(
+      {
+        ...job,
+        freshnessScore: freshness,
+        agentMatchPct: job.matchPct || 0,
+        personalMatchPct,
+        matchPct: personalMatchPct,
+        emailSection,
+        strengths: openStrengths.slice(0, 5),
+        gaps: [],
+      },
+      profile,
+      scoringContext.conversionContext,
+      scoringContext.companyCounts
+    );
   }
 
   let score = 0;
@@ -48,11 +113,11 @@ function scoreJobForProfile(job, profile, scoringContext = {}) {
     strengths.push('Title match');
   } else if (targetTitles.length) {
     gaps.push('Title stretch');
-  } else if (resumeBlob && targetTitles.length === 0) {
-    const resumeTitles = ['devops', 'sre', 'platform', 'cloud', 'infrastructure'];
-    if (resumeTitles.some((t) => title.includes(t) && resumeBlob.includes(t))) {
-      score += 20;
-      strengths.push('Resume role fit');
+  } else if (resumeBlob) {
+    const { overlap } = scoreResumeJobOverlap(resumeBlob, title, blob);
+    if (overlap >= 2) {
+      score += Math.min(25, overlap * 3);
+      strengths.push('Resume keyword fit');
     }
   }
 
@@ -104,7 +169,7 @@ function scoreJobForProfile(job, profile, scoringContext = {}) {
     personalMatchPct = Math.min(100, Math.round(personalMatchPct * 0.35 + agentScore * 0.65));
   }
 
-  const minMatch = profile?.minMatchScore || 60;
+  const minMatch = profile?.minMatchScore || 40;
   let emailSection = 'manual_browse';
   if (personalMatchPct >= 80) emailSection = 'apply_today';
   else if (personalMatchPct >= minMatch) emailSection = 'strong_review';

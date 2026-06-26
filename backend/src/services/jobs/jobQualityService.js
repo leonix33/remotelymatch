@@ -46,12 +46,13 @@ function qualityScore(job) {
 function enrichJobScores(job) {
   const freshness = freshnessScore(job.postedAt);
   const quality = qualityScore(job);
+  const baselineMatch = job.matchPct || Math.max(45, Math.min(80, quality + 12));
   return {
     ...job,
     freshnessScore: freshness,
     freshnessLabel: freshnessLabel(job.postedAt),
     qualityScore: quality,
-    matchPct: job.matchPct || 0,
+    matchPct: baselineMatch,
     emailSection:
       job.emailSection ||
       (quality >= 70 && freshness >= 75

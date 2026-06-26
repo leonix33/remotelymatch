@@ -10,7 +10,7 @@ export function buildLinkedInJobSearchUrl(keywords, options = {}) {
 }
 
 export function buildLinkedInSearchFromJob(job) {
-  const title = (job?.title || 'devops engineer').split('|')[0].trim();
+  const title = (job?.title || 'remote').split('|')[0].trim();
   return buildLinkedInJobSearchUrl(title);
 }
 
@@ -27,10 +27,10 @@ export function isLinkedInJob(job) {
 export function defaultSearchesFromProfile(profile) {
   const titles = profile?.targetTitles?.length
     ? profile.targetTitles
-    : ['devops engineer', 'site reliability engineer', 'cloud engineer', 'platform engineer'];
+    : ['remote'];
   return titles.slice(0, 10).map((title, index) => ({
     id: `builtin-${index}`,
-    label: `${title} · remote US`,
+    label: `${title} · remote`,
     url: buildLinkedInJobSearchUrl(title),
     builtin: true,
   }));

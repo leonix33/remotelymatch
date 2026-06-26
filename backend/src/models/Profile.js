@@ -14,7 +14,7 @@ const profileSchema = new mongoose.Schema(
     niceToHaveSkills: { type: [String], default: [] },
     targetCompanies: { type: [String], default: [] },
     resumeText: { type: String, default: '' },
-    minMatchScore: { type: Number, default: 60 },
+    minMatchScore: { type: Number, default: 40 },
     onboardingComplete: { type: Boolean, default: false },
     extractedSkills: { type: [String], default: [] },
     resumeFileName: { type: String, default: '' },

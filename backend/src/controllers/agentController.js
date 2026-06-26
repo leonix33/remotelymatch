@@ -4,6 +4,7 @@ const approvalService = require('../services/approvalService');
 const profileService = require('../services/profileService');
 const teamService = require('../services/teamService');
 const { scoreJobsForProfile } = require('../services/jobScoringService');
+const jobIngestService = require('../services/jobs/jobIngestService');
 const env = require('../config/env');
 
 async function runAgent(req, res, next) {
@@ -16,16 +17,25 @@ async function runAgent(req, res, next) {
     const output = await jobService.runAgentScript({ autoApply: false });
     await jobService.syncJobsToMongo();
     await jobService.syncApplicationsToMongo();
+    let ingestNote = '';
+    if (env.mongoUri && env.openJobMarket !== false) {
+      try {
+        const ingest = await jobIngestService.ingestJobs({ persist: true });
+        ingestNote = ` Broad ingest saved ${ingest.totals?.saved || 0} jobs.`;
+      } catch (ingestErr) {
+        ingestNote = ` Broad ingest skipped: ${ingestErr.message}`;
+      }
+    }
     if (run) {
       run.status = 'completed';
-      run.output = output.slice(-4000);
+      run.output = (output + ingestNote).slice(-4000);
       run.finishedAt = new Date();
       await run.save();
     }
     await teamService.incrementUsage(req.user.sub, 'agent');
     res.json({
-      message: 'Agent search completed (no auto-apply). Review jobs in Apply Queue, then click Apply Approved.',
-      output: output.slice(-2000),
+      message: `Agent search completed (no auto-apply).${ingestNote} Review jobs in Apply Queue, then click Apply Approved.`,
+      output: (output + ingestNote).slice(-2000),
     });
   } catch (err) {
     if (env.mongoUri) {

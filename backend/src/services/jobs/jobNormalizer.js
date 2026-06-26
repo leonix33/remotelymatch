@@ -35,32 +35,12 @@ function parseSalaryNumbers(text = '') {
 
 function extractSkills(text = '') {
   const catalog = [
-    'kubernetes',
-    'k8s',
-    'terraform',
-    'aws',
-    'azure',
-    'gcp',
-    'docker',
-    'python',
-    'go',
-    'golang',
-    'java',
-    'react',
-    'node',
-    'typescript',
-    'linux',
-    'devops',
-    'sre',
-    'platform',
-    'databricks',
-    'spark',
-    'kafka',
-    'ci/cd',
-    'cicd',
-    'observability',
-    'prometheus',
-    'grafana',
+    'kubernetes', 'k8s', 'terraform', 'aws', 'azure', 'gcp', 'docker', 'python', 'go', 'golang',
+    'java', 'react', 'node', 'typescript', 'javascript', 'linux', 'devops', 'sre', 'platform',
+    'databricks', 'spark', 'kafka', 'ci/cd', 'cicd', 'observability', 'prometheus', 'grafana',
+    'marketing', 'seo', 'sales', 'crm', 'hubspot', 'salesforce', 'design', 'figma', 'ux', 'ui',
+    'product', 'analytics', 'sql', 'excel', 'finance', 'accounting', 'writing', 'content',
+    'customer success', 'support', 'project management', 'agile', 'scrum', 'hr', 'recruiting',
   ];
   const hay = text.toLowerCase();
   return catalog.filter((skill) => hay.includes(skill));

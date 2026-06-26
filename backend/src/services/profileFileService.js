@@ -14,7 +14,7 @@ const DEFAULT = {
   niceToHaveSkills: [],
   targetCompanies: [],
   resumeText: '',
-  minMatchScore: 60,
+  minMatchScore: 40,
   onboardingComplete: false,
   extractedSkills: [],
   resumeFileName: '',

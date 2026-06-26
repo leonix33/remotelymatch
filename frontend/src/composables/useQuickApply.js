@@ -29,7 +29,7 @@ export function useQuickApply() {
           status: 'pending',
           sort: 'match',
           limit: count,
-          minMatch: minMatch || 70,
+          minMatch: minMatch || 40,
           offset: 0,
         },
       });
