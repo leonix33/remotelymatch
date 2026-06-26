@@ -248,6 +248,7 @@ onMounted(loadApplyPreview);
       <p class="mt-1 text-xs text-slate-600">
         {{ autoApply ? 'More jobs = more applications. Kits are built when you submit.' : 'Jobs are approved and resumes prepared — submit later from the queue or turn Auto apply on.' }}
       </p>
+      </div>
     </div>
   </div>
 </template>
