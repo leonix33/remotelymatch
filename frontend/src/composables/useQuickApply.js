@@ -104,11 +104,23 @@ export function useQuickApply() {
           error.value = message.value;
           throw new Error(message.value);
         }
-        return { count: data.count || jobs.length, jobs, output: data.output, queued: true };
+        return {
+          count: data.count || jobs.length,
+          jobs,
+          kits: data.kits || [],
+          output: data.output,
+          queued: true,
+        };
       }
 
       message.value = data.message || `Applied to ${data.count || jobs.length} job(s)`;
-      return { count: data.count || jobs.length, jobs, output: data.output };
+      return {
+        count: data.count || jobs.length,
+        jobs,
+        kits: data.kits || [],
+        output: data.output,
+        queued: Boolean(data.queued),
+      };
     } catch (e) {
       const d = e.response?.data;
       error.value = d?.message || d?.hint || e.message || 'Apply failed';

@@ -6,10 +6,30 @@ const applicationKitStore = require('./applicationKitStore');
 const jobDescriptionService = require('./jobDescriptionService');
 const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
+const env = require('../config/env');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
   if (fromFeed) return fromFeed;
+
+  if (env.mongoUri) {
+    const Job = require('../models/Job');
+    const JobApproval = require('../models/JobApproval');
+    const mongoJob = await Job.findOne({ jobId }).lean();
+    if (mongoJob) return mongoJob;
+    const approval = await JobApproval.findOne({ userId, jobId }).lean();
+    if (approval) {
+      return {
+        jobId: approval.jobId,
+        title: approval.title,
+        company: approval.company,
+        url: approval.url,
+        matchPct: approval.matchPct || 0,
+        source: approval.source,
+        atsType: approval.atsType,
+      };
+    }
+  }
 
   const approval = localApprovalService.get(userId, jobId);
   if (approval) {
@@ -63,7 +83,7 @@ async function generateForJob(userId, jobId, options = {}) {
     throw err;
   }
 
-  const job = await findJob(userId, jobId);
+  const job = options.job || (await findJob(userId, jobId));
   if (!job) {
     const err = new Error('Job not found');
     err.status = 404;
@@ -188,8 +208,16 @@ async function prepareApplyItems(userId, jobs, options = {}) {
     let kit = applicationKitStore.get(userId, jobId);
     if (!kit?.tailored) {
       try {
-        kit = await generateForJob(userId, jobId, { tailorResume: true, authEmail });
-      } catch {
+        kit = await generateForJob(userId, jobId, {
+          tailorResume: true,
+          authEmail,
+          job,
+          supplementPages: profile?.defaultSupplementPages,
+          tailorMode: profile?.defaultTailorMode,
+          highMatchTarget: profile?.highMatchTarget,
+        });
+      } catch (err) {
+        console.warn(`Kit generation failed for ${jobId}:`, err.message);
         missingKitCount += 1;
       }
     }
@@ -298,6 +326,12 @@ async function kitSummary(userId, jobId) {
   };
 }
 
+function getKitsForJobIds(userId, jobIds = []) {
+  return jobIds
+    .map((jobId) => applicationKitStore.get(userId, jobId))
+    .filter((kit) => kit?.tailored);
+}
+
 module.exports = {
   getKit,
   generateForJob,
@@ -309,4 +343,5 @@ module.exports = {
   setKitPreference,
   kitSummary,
   applicationMetaForJob,
+  getKitsForJobIds,
 };

@@ -33,6 +33,9 @@ const activityCompanies = ref([]);
 const totalApplications = ref(0);
 const loading = ref(true);
 const tailoredRefreshKey = ref(0);
+const tailoredSeedKits = ref([]);
+const tailoredPreferredJobId = ref('');
+const showTailoredPreview = ref(false);
 const autosaveEnabled = ref(false);
 
 const firstName = computed(() => {
@@ -140,13 +143,23 @@ function onResumeParsed() {
 async function startApplying() {
   await saveResumeText();
   await saveApplySettings();
+  tailoredSeedKits.value = [];
+  tailoredPreferredJobId.value = '';
+  showTailoredPreview.value = resumeMode.value === 'tailored';
   try {
-    await quickApply({
+    const result = await quickApply({
       count: jobCount.value,
       useTailoredResume: resumeMode.value === 'tailored',
       minMatch: profileStore.profile?.minMatchScore || 40,
       runSearch: true,
     });
+    if (result?.kits?.length) {
+      tailoredSeedKits.value = result.kits;
+      tailoredPreferredJobId.value = result.kits[0]?.jobId || result.jobs?.[0]?.jobId || '';
+      showTailoredPreview.value = true;
+    } else if (resumeMode.value === 'tailored') {
+      showTailoredPreview.value = true;
+    }
     await loadStatus();
     tailoredRefreshKey.value += 1;
   } catch {
@@ -268,11 +281,6 @@ onMounted(async () => {
       />
     </section>
 
-    <!-- Tailored resume preview -->
-    <section class="card mt-6 p-6">
-      <TailoredResumeDashboard :refresh-key="tailoredRefreshKey" />
-    </section>
-
     <!-- Step 3: Apply -->
     <section class="card mt-6 p-6">
       <div class="flex items-center gap-3">
@@ -323,6 +331,15 @@ onMounted(async () => {
         or
         <RouterLink to="/approvals" class="text-teal-400 hover:underline">review queue</RouterLink>
       </p>
+    </section>
+
+    <!-- Tailored resume preview (after apply) -->
+    <section v-if="showTailoredPreview || resumeMode === 'tailored'" class="card mt-6 p-6">
+      <TailoredResumeDashboard
+        :refresh-key="tailoredRefreshKey"
+        :preferred-job-id="tailoredPreferredJobId"
+        :seed-kits="tailoredSeedKits"
+      />
     </section>
 
     <!-- Status -->

@@ -1,3 +1,4 @@
+const applicationKitService = require('../services/applicationKitService');
 const applicationService = require('../services/applicationService');
 const AgentRun = require('../models/AgentRun');
 const jobService = require('../services/jobService');
@@ -103,6 +104,9 @@ async function applyApproved(req, res, next) {
     if (contact.github) applicantEnv.GITHUB_URL = contact.github;
     if (contact.portfolio) applicantEnv.PORTFOLIO_URL = contact.portfolio;
 
+    const jobIds = scored.map((j) => j.jobId);
+    const kits = applicationKitService.getKitsForJobIds(req.user.sub, jobIds);
+
     let output;
     const agentAvailable = jobService.isAgentApplyAvailable();
     try {
@@ -138,6 +142,8 @@ async function applyApproved(req, res, next) {
         useTailoredResume,
         tailoredCount,
         missingKitCount,
+        kits,
+        jobIds,
         output: output.slice(-2000),
       });
     } catch (applyErr) {
@@ -167,6 +173,8 @@ async function applyApproved(req, res, next) {
           missingKitCount,
           queued: true,
           recorded: true,
+          kits,
+          jobIds,
           itemsFile,
           hint: 'Install the Chrome extension from Team access, open a job posting, and click Apply with RemoteMatch.',
         });
@@ -182,6 +190,10 @@ async function applyApproved(req, res, next) {
         message: applyErr.message,
         count: scored.length,
         useTailoredResume,
+        tailoredCount,
+        missingKitCount,
+        kits,
+        jobIds,
         itemsFile,
         hint: 'On Mac: cd job-event-agent && bash apply_approved.sh ' + itemsFile,
       });
