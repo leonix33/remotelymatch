@@ -97,6 +97,7 @@ async function adminRemoveUser(userId) {
     require('../models/CommunityResume'),
     require('../models/Outcome'),
     require('../models/Application'),
+    require('../models/ApplicationKit'),
     require('../models/InterviewSession'),
     require('../models/SwarmRun'),
     require('../models/Victory'),

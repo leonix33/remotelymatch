@@ -10,7 +10,7 @@ async function listKits(req, res, next) {
 
 async function getKit(req, res, next) {
   try {
-    const kit = applicationKitService.getKit(req.user.sub, req.params.jobId);
+    const kit = await applicationKitService.getKit(req.user.sub, req.params.jobId);
     if (!kit) {
       return res.status(404).json({ message: 'No application kit yet. Generate one from the apply queue or jobs page.' });
     }
@@ -25,7 +25,7 @@ async function getKit(req, res, next) {
 
 async function updatePreference(req, res, next) {
   try {
-    const kit = applicationKitService.setKitPreference(req.user.sub, req.params.jobId, {
+    const kit = await applicationKitService.setKitPreference(req.user.sub, req.params.jobId, {
       useForApply: req.body?.useForApply,
       tailorFocus: req.body?.tailorFocus,
       supplementPages: req.body?.supplementPages,

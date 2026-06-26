@@ -49,22 +49,22 @@ describe('applicationKitService attachKitToApplyItem', () => {
   const applicationKitStore = require('../services/applicationKitStore');
   const { attachKitToApplyItem } = require('../services/applicationKitService');
 
-  it('skips kit fields when useTailoredResume is false', () => {
+  it('skips kit fields when useTailoredResume is false', async () => {
     const job = { id: 'job-1', title: 'SRE', company: 'Acme' };
-    const result = attachKitToApplyItem('user-1', job, { useTailoredResume: false });
+    const result = await attachKitToApplyItem('user-1', job, { useTailoredResume: false });
     assert.equal(result.use_tailored_resume, false);
     assert.equal(result.cover_letter, undefined);
   });
 
-  it('skips kit when user opted out of using it on apply', () => {
-    applicationKitStore.set('user-opt', 'job-opt', {
+  it('skips kit when user opted out of using it on apply', async () => {
+    await applicationKitStore.set('user-opt', 'job-opt', {
       tailored: true,
       useForApply: false,
       coverLetterParagraph: 'Should not attach',
       fullSupplementText: 'Hidden',
       pageCount: 3,
     });
-    const result = attachKitToApplyItem('user-opt', { id: 'job-opt', title: 'DevOps' }, { useTailoredResume: true });
+    const result = await attachKitToApplyItem('user-opt', { id: 'job-opt', title: 'DevOps' }, { useTailoredResume: true });
     assert.equal(result.use_tailored_resume, false);
     assert.equal(result.cover_letter, undefined);
   });

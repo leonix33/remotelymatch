@@ -46,7 +46,7 @@ async function findJob(userId, jobId) {
   return null;
 }
 
-function getKit(userId, jobId) {
+async function getKit(userId, jobId) {
   return applicationKitStore.get(userId, jobId);
 }
 
@@ -62,7 +62,7 @@ async function generateForJob(userId, jobId, options = {}) {
     };
   }
 
-  const existing = applicationKitStore.get(userId, jobId);
+  const existing = await applicationKitStore.get(userId, jobId);
   if (existing?.tailored && !force) {
     return existing;
   }
@@ -109,7 +109,7 @@ async function generateForJob(userId, jobId, options = {}) {
     highMatchTarget,
   });
 
-  const saved = applicationKitStore.set(userId, jobId, {
+  return applicationKitStore.set(userId, jobId, {
     ...kit,
     jobId,
     jobTitle: job.title,
@@ -123,8 +123,6 @@ async function generateForJob(userId, jobId, options = {}) {
     tailorMode,
     highMatchTarget,
   });
-
-  return saved;
 }
 
 async function generateOnApprove(userId, jobId, tailorResume, options = {}) {
@@ -150,8 +148,8 @@ function attachApplicantFields(base, contact) {
   };
 }
 
-function attachKitToApplyItem(userId, job, options = {}) {
-  const { useTailoredResume = false, contact } = options;
+async function attachKitToApplyItem(userId, job, options = {}) {
+  const { useTailoredResume = false, contact, kit: kitOverride } = options;
   const base = attachApplicantFields(
     {
       ...job,
@@ -161,7 +159,7 @@ function attachKitToApplyItem(userId, job, options = {}) {
   );
   if (!useTailoredResume) return base;
 
-  const kit = applicationKitStore.get(userId, job.id || job.jobId);
+  const kit = kitOverride || (await applicationKitStore.get(userId, job.id || job.jobId));
   if (!kit?.tailored || kit.useForApply === false) {
     return { ...base, use_tailored_resume: false };
   }
@@ -189,13 +187,11 @@ async function prepareApplyItems(userId, jobs, options = {}) {
     : null;
 
   if (!useTailoredResume) {
-    return {
-      items: jobs.map((job) =>
-        attachKitToApplyItem(userId, job, { useTailoredResume: false, contact })
-      ),
-      tailoredCount: 0,
-      missingKitCount: 0,
-    };
+    const items = [];
+    for (const job of jobs) {
+      items.push(await attachKitToApplyItem(userId, job, { useTailoredResume: false, contact }));
+    }
+    return { items, tailoredCount: 0, missingKitCount: 0 };
   }
 
   let tailoredCount = 0;
@@ -205,7 +201,7 @@ async function prepareApplyItems(userId, jobs, options = {}) {
   const items = [];
   for (const job of jobs) {
     const jobId = job.jobId || job.id;
-    let kit = applicationKitStore.get(userId, jobId);
+    let kit = await applicationKitStore.get(userId, jobId);
     if (!kit?.tailored) {
       try {
         kit = await generateForJob(userId, jobId, {
@@ -240,7 +236,13 @@ async function prepareApplyItems(userId, jobs, options = {}) {
       ats_type: job.atsType || job.ats_type,
       email_section: job.emailSection || job.email_section || 'strong_review',
     };
-    items.push(attachKitToApplyItem(userId, applyBase, { useTailoredResume: useThisKit, contact }));
+    items.push(
+      await attachKitToApplyItem(userId, applyBase, {
+        useTailoredResume: useThisKit,
+        contact,
+        kit,
+      })
+    );
   }
 
   return { items, tailoredCount, missingKitCount, optedOutCount };
@@ -248,11 +250,18 @@ async function prepareApplyItems(userId, jobs, options = {}) {
 
 async function applicationMetaForJob(userId, jobId) {
   const app = await applicationService.getForUserAndJob(userId, jobId);
-  const approval = localApprovalService.get(userId, jobId);
+  let approvalStatus = null;
+  if (env.mongoUri) {
+    const JobApproval = require('../models/JobApproval');
+    const approval = await JobApproval.findOne({ userId, jobId }).select('status').lean();
+    approvalStatus = approval?.status || null;
+  } else {
+    approvalStatus = localApprovalService.get(userId, jobId)?.status || null;
+  }
   const applicationStatus = app?.status || null;
-  const approvalStatus = approval?.status || null;
   const applied =
     applicationStatus === 'submitted' ||
+    applicationStatus === 'queued' ||
     approvalStatus === 'applied' ||
     Boolean(app?.submittedAt);
   return {
@@ -264,34 +273,41 @@ async function applicationMetaForJob(userId, jobId) {
   };
 }
 
-async function listKits(userId) {
-  const kits = applicationKitStore.listForUser(userId);
-  return Promise.all(
-    kits.map(async (kit) => ({
-      jobId: kit.jobId,
-      jobTitle: kit.jobTitle,
-      company: kit.company,
-      jobUrl: kit.jobUrl,
-      pageCount: kit.pageCount || 0,
-      supplementPagesTarget: kit.supplementPagesTarget || kit.pageCount || 3,
-      tailorMode: kit.tailorMode || 'balanced',
-      highMatchTarget: kit.highMatchTarget || 90,
-      estimatedMatchPct: kit.estimatedMatchPct || null,
-      generatedAt: kit.generatedAt,
-      updatedAt: kit.updatedAt,
-      useForApply: kit.useForApply !== false,
-      tailorFocus: kit.tailorFocus || '',
-      contactEmail: kit.contactEmail || '',
-      demo: Boolean(kit.demo),
-      hasCoverLetter: Boolean(kit.coverLetterParagraph),
-      missingKeywords: (kit.missingKeywords || []).slice(0, 8),
-      ...(await applicationMetaForJob(userId, kit.jobId)),
-    }))
-  );
+function kitListItem(kit) {
+  return {
+    jobId: kit.jobId,
+    jobTitle: kit.jobTitle,
+    company: kit.company,
+    jobUrl: kit.jobUrl,
+    pageCount: kit.pageCount || kit.supplementPages?.length || 0,
+    supplementPagesTarget: kit.supplementPagesTarget || kit.pageCount || 3,
+    tailorMode: kit.tailorMode || 'balanced',
+    highMatchTarget: kit.highMatchTarget || 90,
+    estimatedMatchPct: kit.estimatedMatchPct || null,
+    generatedAt: kit.generatedAt,
+    updatedAt: kit.updatedAt,
+    useForApply: kit.useForApply !== false,
+    tailorFocus: kit.tailorFocus || '',
+    contactEmail: kit.contactEmail || '',
+    demo: Boolean(kit.demo),
+    hasCoverLetter: Boolean(kit.coverLetterParagraph),
+    missingKeywords: (kit.missingKeywords || []).slice(0, 8),
+    tailored: Boolean(kit.tailored),
+    supplementPages: kit.supplementPages || [],
+    fullSupplementText: kit.fullSupplementText || '',
+    coverLetterParagraph: kit.coverLetterParagraph || '',
+    formatted: kit.formatted || '',
+    contactName: kit.contactName || '',
+  };
 }
 
-function setKitPreference(userId, jobId, { useForApply, tailorFocus, supplementPages, tailorMode, highMatchTarget }) {
-  const existing = applicationKitStore.get(userId, jobId);
+async function listKits(userId) {
+  const kits = await applicationKitStore.listForUser(userId);
+  return kits.map((kit) => kitListItem(kit));
+}
+
+async function setKitPreference(userId, jobId, { useForApply, tailorFocus, supplementPages, tailorMode, highMatchTarget }) {
+  const existing = await applicationKitStore.get(userId, jobId);
   if (!existing?.tailored) {
     const err = new Error('No tailored kit for this job yet. Generate one first.');
     err.status = 404;
@@ -309,7 +325,7 @@ function setKitPreference(userId, jobId, { useForApply, tailorFocus, supplementP
 }
 
 async function kitSummary(userId, jobId) {
-  const kit = applicationKitStore.get(userId, jobId);
+  const kit = await applicationKitStore.get(userId, jobId);
   if (!kit?.tailored) {
     return { hasKit: false, useForApply: null, pageCount: 0, applied: false };
   }
@@ -326,10 +342,13 @@ async function kitSummary(userId, jobId) {
   };
 }
 
-function getKitsForJobIds(userId, jobIds = []) {
-  return jobIds
-    .map((jobId) => applicationKitStore.get(userId, jobId))
-    .filter((kit) => kit?.tailored);
+async function getKitsForJobIds(userId, jobIds = []) {
+  const kits = [];
+  for (const jobId of jobIds) {
+    const kit = await applicationKitStore.get(userId, jobId);
+    if (kit?.tailored) kits.push(kit);
+  }
+  return kits;
 }
 
 module.exports = {
@@ -344,4 +363,5 @@ module.exports = {
   kitSummary,
   applicationMetaForJob,
   getKitsForJobIds,
+  kitListItem,
 };

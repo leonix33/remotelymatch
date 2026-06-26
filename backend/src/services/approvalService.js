@@ -211,12 +211,70 @@ async function listForUser(userId, options = {}) {
   return { items: slice, total, hint };
 }
 
+async function loadJobSnapshots(jobIds) {
+  const map = new Map();
+  if (!jobIds?.length) return map;
+
+  if (env.mongoUri) {
+    const jobs = await Job.find({ jobId: { $in: jobIds } }).lean();
+    for (const job of jobs) map.set(job.jobId, job);
+    const missing = jobIds.filter((id) => !map.has(id));
+    if (missing.length) {
+      const approvals = await JobApproval.find({ jobId: { $in: missing } }).lean();
+      for (const approval of approvals) {
+        if (!map.has(approval.jobId)) {
+          map.set(approval.jobId, {
+            jobId: approval.jobId,
+            title: approval.title,
+            company: approval.company,
+            url: approval.url,
+            matchPct: approval.matchPct || 0,
+            atsType: approval.atsType,
+            source: approval.source,
+          });
+        }
+      }
+    }
+  }
+
+  for (const job of jobService.readJobsFromSqlite(5000)) {
+    if (jobIds.includes(job.jobId) && !map.has(job.jobId)) {
+      map.set(job.jobId, job);
+    }
+  }
+
+  return map;
+}
+
+async function resolveJobSnapshot(userId, jobId, jobSnapshot) {
+  if (jobSnapshot) return jobSnapshot;
+
+  if (env.mongoUri) {
+    const mongoJob = await Job.findOne({ jobId }).lean();
+    if (mongoJob) return mongoJob;
+    const approval = await JobApproval.findOne({ userId, jobId }).lean();
+    if (approval) {
+      return {
+        jobId: approval.jobId,
+        title: approval.title,
+        company: approval.company,
+        url: approval.url,
+        matchPct: approval.matchPct || 0,
+        atsType: approval.atsType,
+        source: approval.source,
+      };
+    }
+  }
+
+  return jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId) || null;
+}
+
 async function setStatus(userId, jobId, status, notes = '', options = {}) {
   if (status === 'approved' && env.mongoUri) {
     await teamService.checkLimit(userId, 'approval');
   }
 
-  let job = (await loadJobs(0)).find((j) => j.jobId === jobId);
+  const job = await resolveJobSnapshot(userId, jobId, options.jobSnapshot);
 
   if (!env.mongoUri) {
     const existing = localApprovalService.get(userId, jobId);
@@ -285,18 +343,33 @@ async function setStatus(userId, jobId, status, notes = '', options = {}) {
 }
 
 async function bulkSetStatus(userId, jobIds, status, options = {}) {
+  const jobMap = await loadJobSnapshots(jobIds);
   const results = [];
   for (const jobId of jobIds) {
     try {
-      results.push(await setStatus(userId, jobId, status, '', options));
-    } catch {
-      /* skip failures */
+      results.push(
+        await setStatus(userId, jobId, status, '', {
+          ...options,
+          jobSnapshot: jobMap.get(jobId),
+        })
+      );
+    } catch (err) {
+      console.warn(`bulkSetStatus skip ${jobId}:`, err.message);
     }
   }
   return results;
 }
 
 async function counts(userId) {
+  if (env.mongoUri) {
+    const rows = await JobApproval.find({ userId }).lean();
+    return {
+      pending: rows.filter((r) => r.status === 'pending').length,
+      approved: rows.filter((r) => r.status === 'approved').length,
+      rejected: rows.filter((r) => r.status === 'rejected').length,
+      applied: rows.filter((r) => r.status === 'applied').length,
+    };
+  }
   const items = await buildJobList(userId);
   return {
     pending: items.filter((i) => i.status === 'pending').length,

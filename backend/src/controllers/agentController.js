@@ -105,7 +105,7 @@ async function applyApproved(req, res, next) {
     if (contact.portfolio) applicantEnv.PORTFOLIO_URL = contact.portfolio;
 
     const jobIds = scored.map((j) => j.jobId);
-    const kits = applicationKitService.getKitsForJobIds(req.user.sub, jobIds);
+    const kits = await applicationKitService.getKitsForJobIds(req.user.sub, jobIds);
 
     let output;
     const agentAvailable = jobService.isAgentApplyAvailable();

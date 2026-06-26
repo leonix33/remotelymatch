@@ -145,7 +145,7 @@ async function startApplying() {
   await saveApplySettings();
   tailoredSeedKits.value = [];
   tailoredPreferredJobId.value = '';
-  showTailoredPreview.value = resumeMode.value === 'tailored';
+  showTailoredPreview.value = false;
   try {
     const result = await quickApply({
       count: jobCount.value,
@@ -157,7 +157,8 @@ async function startApplying() {
       tailoredSeedKits.value = result.kits;
       tailoredPreferredJobId.value = result.kits[0]?.jobId || result.jobs?.[0]?.jobId || '';
       showTailoredPreview.value = true;
-    } else if (resumeMode.value === 'tailored') {
+    } else if (resumeMode.value === 'tailored' && result?.count) {
+      tailoredRefreshKey.value += 1;
       showTailoredPreview.value = true;
     }
     await loadStatus();
@@ -334,7 +335,7 @@ onMounted(async () => {
     </section>
 
     <!-- Tailored resume preview (after apply) -->
-    <section v-if="showTailoredPreview || resumeMode === 'tailored'" class="card mt-6 p-6">
+    <section v-if="showTailoredPreview" class="card mt-6 p-6">
       <TailoredResumeDashboard
         :refresh-key="tailoredRefreshKey"
         :preferred-job-id="tailoredPreferredJobId"

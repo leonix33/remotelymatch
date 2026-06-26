@@ -140,7 +140,8 @@ async function activityForUser(userId) {
 
   return {
     totalApplications: apps.length,
-    submitted: byStatus.submitted || 0,
+    submitted: (byStatus.submitted || 0) + (byStatus.queued || 0),
+    queued: byStatus.queued || 0,
     recentApplied,
     companies,
     byStatus,

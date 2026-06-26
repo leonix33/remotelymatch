@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const env = require('../config/env');
+const ApplicationKit = require('../models/ApplicationKit');
 
 function storePath() {
   const dir = path.join(env.agentHome, 'items');
@@ -19,14 +20,18 @@ function readAll() {
 }
 
 function writeAll(data) {
-  fs.writeFileSync(storePath(), JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(storePath(), JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.warn('applicationKitStore file write failed:', err.message);
+  }
 }
 
-function get(userId, jobId) {
+function fileGet(userId, jobId) {
   return readAll()[userId.toString()]?.[jobId] || null;
 }
 
-function set(userId, jobId, kit) {
+function fileSet(userId, jobId, kit) {
   const key = userId.toString();
   const all = readAll();
   if (!all[key]) all[key] = {};
@@ -42,15 +47,72 @@ function set(userId, jobId, kit) {
   return all[key][jobId];
 }
 
-function listForUser(userId) {
+function fileListForUser(userId) {
   const rows = readAll()[userId.toString()] || {};
   return Object.values(rows)
     .filter((k) => k?.tailored)
     .sort((a, b) => new Date(b.generatedAt || b.updatedAt || 0) - new Date(a.generatedAt || a.updatedAt || 0));
 }
 
-function patchMeta(userId, jobId, meta) {
-  const existing = get(userId, jobId);
+function docToKit(doc) {
+  if (!doc) return null;
+  const data = doc.data && typeof doc.data === 'object' ? doc.data : {};
+  return {
+    ...data,
+    jobId: doc.jobId || data.jobId,
+    tailored: doc.tailored !== false && Boolean(data.tailored ?? doc.tailored),
+  };
+}
+
+async function get(userId, jobId) {
+  if (env.mongoUri) {
+    const doc = await ApplicationKit.findOne({ userId, jobId }).lean();
+    const kit = docToKit(doc);
+    if (kit) return kit;
+  }
+  return fileGet(userId, jobId);
+}
+
+async function set(userId, jobId, kit) {
+  const key = userId.toString();
+  const prev = (await get(userId, jobId)) || {};
+  const row = {
+    ...prev,
+    ...kit,
+    jobId,
+    useForApply: kit.useForApply !== undefined ? Boolean(kit.useForApply) : prev.useForApply !== false,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (env.mongoUri) {
+    await ApplicationKit.findOneAndUpdate(
+      { userId, jobId },
+      {
+        userId,
+        jobId,
+        tailored: Boolean(row.tailored),
+        data: row,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
+
+  return fileSet(key, jobId, row);
+}
+
+async function listForUser(userId) {
+  if (env.mongoUri) {
+    const docs = await ApplicationKit.find({ userId, tailored: true })
+      .sort({ updatedAt: -1 })
+      .lean();
+    const kits = docs.map(docToKit).filter(Boolean);
+    if (kits.length) return kits;
+  }
+  return fileListForUser(userId);
+}
+
+async function patchMeta(userId, jobId, meta) {
+  const existing = await get(userId, jobId);
   if (!existing) return null;
   return set(userId, jobId, { ...existing, ...meta });
 }
