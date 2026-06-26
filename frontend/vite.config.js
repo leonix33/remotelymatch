@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
         workbox: {
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api/],
-          globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
+          globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
           importScripts: ['push-listener.js'],
           runtimeCaching: [
             {

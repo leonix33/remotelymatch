@@ -231,23 +231,27 @@ onMounted(loadApplyPreview);
             <span
               class="absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform"
               :class="autoApply ? 'translate-x-5' : 'translate-x-0'"
-            />
+            ></span>
           </button>
         </div>
       </div>
 
       <div>
         <label class="mb-1 block text-sm text-slate-400">How many jobs to apply to</label>
-      <select v-model.number="jobCount" class="input w-auto min-w-[12rem]">
-        <option :value="10">Top 10 matches</option>
-        <option :value="15">Top 15 matches</option>
-        <option :value="20">Top 20 matches</option>
-        <option :value="25">Top 25 matches</option>
-        <option :value="50">Top 50 matches</option>
-      </select>
-      <p class="mt-1 text-xs text-slate-600">
-        {{ autoApply ? 'More jobs = more applications. Kits are built when you submit.' : 'Jobs are approved and resumes prepared — submit later from the queue or turn Auto apply on.' }}
-      </p>
+        <select v-model.number="jobCount" class="input w-auto min-w-[12rem]">
+          <option :value="10">Top 10 matches</option>
+          <option :value="15">Top 15 matches</option>
+          <option :value="20">Top 20 matches</option>
+          <option :value="25">Top 25 matches</option>
+          <option :value="50">Top 50 matches</option>
+        </select>
+        <p class="mt-1 text-xs text-slate-600">
+          {{
+            autoApply
+              ? 'More jobs = more applications. Kits are built when you submit.'
+              : 'Jobs are approved and resumes prepared — submit later from the queue or turn Auto apply on.'
+          }}
+        </p>
       </div>
     </div>
   </div>
