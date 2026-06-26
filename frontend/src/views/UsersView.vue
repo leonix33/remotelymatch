@@ -10,6 +10,8 @@ const saving = ref(false);
 const error = ref('');
 const success = ref('');
 const form = ref({ name: '', email: '', password: '', role: 'user' });
+const manualInvite = ref(null);
+const copied = ref('');
 const resetTarget = ref(null);
 const resetPassword = ref('');
 const resetSaving = ref(false);
@@ -54,21 +56,47 @@ async function upgradePlan(plan) {
 async function createUser() {
   error.value = '';
   success.value = '';
+  manualInvite.value = null;
+  const tempPassword = form.value.password;
   saving.value = true;
   try {
     const { data } = await http.post('/users', form.value);
     form.value = { name: '', email: '', password: '', role: 'user' };
-    success.value = data.inviteEmailSent
-      ? `Invite email sent to ${data.email}. They can log in at ${loginUrl}.`
-      : data.inviteEmailError
-        ? `Account created for ${data.email}, but the invite email failed: ${data.inviteEmailError}. Share the login URL and password manually.`
-        : `Account created for ${data.email}. Email is not configured — share the login URL and password manually.`;
+    if (data.inviteEmailSent) {
+      success.value = `Invite email sent to ${data.email}. They can log in at ${loginUrl}.`;
+    } else if (data.inviteEmailError) {
+      manualInvite.value = {
+        name: data.name,
+        email: data.email,
+        password: tempPassword,
+        loginUrl: data.loginUrl || loginUrl,
+      };
+      success.value = `Account created for ${data.email}. Email could not be sent — copy the invite below and send it manually (text, WhatsApp, etc.).`;
+    } else {
+      manualInvite.value = {
+        name: data.name,
+        email: data.email,
+        password: tempPassword,
+        loginUrl: data.loginUrl || loginUrl,
+      };
+      success.value = `Account created for ${data.email}. Share the login details below manually.`;
+    }
     await load();
   } catch (e) {
     error.value = e.response?.data?.message || 'Could not create user';
   } finally {
     saving.value = false;
   }
+}
+
+async function copyText(value, label) {
+  await navigator.clipboard.writeText(value);
+  copied.value = label;
+  setTimeout(() => { copied.value = ''; }, 2000);
+}
+
+function inviteMessage(inv) {
+  return `You're invited to RemoteMatch!\n\nLog in: ${inv.loginUrl}\nEmail: ${inv.email}\nTemporary password: ${inv.password}\n\nChange your password after first login.`;
 }
 
 async function toggleActive(user) {
@@ -257,6 +285,44 @@ onUnmounted(() => {
 
     <p v-if="error && !resetTarget && !deleteTarget" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
     <p v-if="success && !resetTarget && !deleteTarget" class="mt-4 rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ success }}</p>
+
+    <div v-if="manualInvite" class="mt-4 card border border-amber-800/40 bg-amber-950/20 p-5">
+      <h3 class="font-semibold text-amber-200">Manual invite — send to {{ manualInvite.name }}</h3>
+      <p class="mt-1 text-sm text-slate-400">
+        Resend is in test mode until you verify <strong class="text-slate-300">remotelymatch.app</strong> at
+        <a href="https://resend.com/domains" target="_blank" rel="noopener" class="text-teal-400 hover:underline">resend.com/domains</a>.
+      </p>
+      <div class="mt-4 space-y-3 rounded-xl bg-slate-950/60 p-4 text-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="text-slate-500">Login URL</span>
+          <button type="button" class="btn-secondary px-2 py-1 text-xs" @click="copyText(manualInvite.loginUrl, 'url')">
+            {{ copied === 'url' ? 'Copied' : 'Copy' }}
+          </button>
+        </div>
+        <code class="block break-all text-teal-300">{{ manualInvite.loginUrl }}</code>
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+          <span class="text-slate-500">Email</span>
+          <button type="button" class="btn-secondary px-2 py-1 text-xs" @click="copyText(manualInvite.email, 'email')">
+            {{ copied === 'email' ? 'Copied' : 'Copy' }}
+          </button>
+        </div>
+        <code class="block text-slate-200">{{ manualInvite.email }}</code>
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+          <span class="text-slate-500">Temporary password</span>
+          <button type="button" class="btn-secondary px-2 py-1 text-xs" @click="copyText(manualInvite.password, 'pass')">
+            {{ copied === 'pass' ? 'Copied' : 'Copy' }}
+          </button>
+        </div>
+        <code class="block text-amber-200">{{ manualInvite.password }}</code>
+      </div>
+      <button
+        type="button"
+        class="btn-primary mt-4"
+        @click="copyText(inviteMessage(manualInvite), 'all')"
+      >
+        {{ copied === 'all' ? 'Copied full message' : 'Copy full invite message' }}
+      </button>
+    </div>
 
     <div class="mt-8 grid gap-8 xl:grid-cols-2">
       <form class="card p-6" @submit.prevent="createUser">

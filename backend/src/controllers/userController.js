@@ -5,6 +5,7 @@ const teamService = require('../services/teamService');
 const Team = require('../models/Team');
 const emailService = require('../services/emailService');
 const userDataService = require('../services/userDataService');
+const env = require('../config/env');
 
 const createUserSchema = z.object({
   name: z.string().min(2),
@@ -73,6 +74,7 @@ async function createUser(req, res, next) {
       role: user.role,
       inviteEmailSent,
       inviteEmailError,
+      loginUrl: `${env.appUrl.replace(/\/$/, '')}/login`,
     });
   } catch (err) {
     next(err);
