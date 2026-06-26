@@ -27,14 +27,15 @@ Vue View → Axios → Express route → Controller → Service → MongoDB / SQ
 
 ## Your live app URL
 
-**Production:** [https://remotematch.onrender.com](https://remotematch.onrender.com)
+**Production:** [https://remotelymatch.app](https://remotelymatch.app)  
+**Render host:** [https://remotematch.onrender.com](https://remotematch.onrender.com) (legacy; custom domain is canonical)
 
-Local dev still uses `localhost`. Production uses the URL above — set in `render.yaml` and `frontend/.env.production`.
+Local dev still uses `localhost`. Production canonical domain is `remotelymatch.app` — set in `render.yaml` and `frontend/.env.production`.
 
 | Environment | URL |
 |-------------|-----|
 | Local dev | http://localhost:5173 |
-| Production | https://remotematch.onrender.com |
+| Production | https://remotelymatch.app |
 
 ## Keep production in sync with your Mac
 

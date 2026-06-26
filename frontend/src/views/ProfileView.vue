@@ -21,7 +21,7 @@ const pwdError = ref('');
 const pwdSuccess = ref('');
 const pwdForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '' });
 const extLoading = ref(false);
-const extApiUrl = ref(appUrl || 'https://remotematch.onrender.com');
+const extApiUrl = ref(appUrl || 'https://remotelymatch.app');
 const extToken = ref('');
 const extCopied = ref('');
 const extConnected = ref(false);
@@ -226,6 +226,7 @@ async function loadExtensionToken() {
     const origin = typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : '';
     const onApp =
       /^https:\/\/(www\.)?(remotelymatch|remotematch)\.app$/i.test(origin) ||
+      origin.includes('remotelymatch.app') ||
       origin.includes('remotematch.onrender.com') ||
       /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
     extApiUrl.value = onApp ? origin : (data.apiUrl || origin);

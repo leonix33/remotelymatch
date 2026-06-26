@@ -170,6 +170,10 @@ defineExpose({ refresh: load });
         <strong>Personal email stays separate:</strong> keep <code>leonix23@gmail.com</code> in Profile for job forms.
         <code>noreply@remotelymatch.app</code> is only the sender for RemoteMatch digests.
       </p>
+      <p class="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2 text-xs text-slate-500">
+        <strong class="text-slate-400">One domain only:</strong> use <code class="text-violet-300">remotelymatch.app</code> in Cloudflare.
+        If you also own <code class="text-slate-600">remotematch.app</code> (without “ly”), remove it or redirect it to remotelymatch.app — the app redirects automatically.
+      </p>
       <p>
         Adzuna keys:
         <a href="https://developer.adzuna.com/" target="_blank" rel="noopener" class="text-teal-400 hover:underline">developer.adzuna.com</a>

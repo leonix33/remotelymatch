@@ -9,7 +9,7 @@ async function fetchJson(url, options = {}) {
       ...options,
       signal: controller.signal,
       headers: {
-        'User-Agent': 'RemoteMatch/1.0 (+https://remotematch.app)',
+        'User-Agent': 'RemoteMatch/1.0 (+https://remotelymatch.app)',
         Accept: 'application/json',
         ...(options.headers || {}),
       },
@@ -292,7 +292,7 @@ async function fetchHimalayas() {
 async function fetchWeWorkRemotely() {
   try {
     const res = await fetch('https://weworkremotely.com/remote-jobs.rss', {
-      headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotematch.app)' },
+      headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotelymatch.app)' },
     });
     const rss = await res.text();
     return parseRssJobs(rss, 'We Work Remotely', 'weworkremotely');
@@ -414,7 +414,7 @@ async function fetchDevItJobs() {
   ]) {
     try {
       const res = await fetch(feedUrl, {
-        headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotematch.app)' },
+        headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotelymatch.app)' },
       });
       const xml = await res.text();
       const jobRegex = /<job>([\s\S]*?)<\/job>/gi;
@@ -451,7 +451,7 @@ async function fetchDevItJobs() {
 async function fetchAijobs() {
   try {
     const res = await fetch('https://aijobs.net/jobs/search?remote=1', {
-      headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotematch.app)' },
+      headers: { 'User-Agent': 'RemoteMatch/1.0 (+https://remotelymatch.app)' },
     });
     const html = await res.text();
     const links = new Set();

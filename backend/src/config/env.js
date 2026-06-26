@@ -16,6 +16,8 @@ function parseOrigins() {
   if (appUrl) origins.add(appUrl);
   origins.add('http://localhost:5173');
   origins.add('https://remotematch.onrender.com');
+  origins.add('https://remotelymatch.app');
+  origins.add('https://www.remotelymatch.app');
   return [...origins];
 }
 
@@ -31,8 +33,8 @@ module.exports = {
   openaiModel: trim(process.env.OPENAI_MODEL) || 'gpt-4o-mini',
   clientOrigin: trim(process.env.CLIENT_ORIGIN) || 'http://localhost:5173',
   clientOrigins: parseOrigins(),
-  appUrl: trim(process.env.APP_URL) || trim(process.env.CLIENT_ORIGIN) || 'https://remotematch.onrender.com',
-  customDomain: trim(process.env.CUSTOM_DOMAIN) || '',
+  appUrl: trim(process.env.APP_URL) || trim(process.env.CLIENT_ORIGIN) || 'https://remotelymatch.app',
+  customDomain: trim(process.env.CUSTOM_DOMAIN) || 'remotelymatch.app',
   agentHome: process.env.AGENT_HOME || require('path').resolve(__dirname, '../../../..'),
   appName: trim(process.env.APP_NAME) || 'RemoteMatch',
   deployTag: 'sync-v6',

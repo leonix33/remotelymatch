@@ -8,7 +8,7 @@ import AppLogo from './components/AppLogo.vue';
 import AppSidebar from './components/AppSidebar.vue';
 import AppConcierge from './components/AppConcierge.vue';
 import NotificationBell from './components/NotificationBell.vue';
-import { isProduction } from './config';
+import { isProduction, canonicalDomain } from './config';
 
 const route = useRoute();
 const router = useRouter();
@@ -81,7 +81,8 @@ onUnmounted(() => {
       <main :class="mainClass">
         <RouterView />
         <p v-if="!isProduction" class="mt-8 text-center text-xs text-slate-600">
-          Local dev — production: <span class="text-teal-500">remotematch.onrender.com</span>
+          Local dev — production:
+          <a href="https://remotelymatch.app" class="text-teal-500 hover:underline">{{ canonicalDomain }}</a>
         </p>
       </main>
 

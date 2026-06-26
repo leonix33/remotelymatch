@@ -32,9 +32,20 @@ const pushRoutes = require('./routes/pushRoutes');
 const linkedinVisibilityRoutes = require('./routes/linkedinVisibilityRoutes');
 const tractionRoutes = require('./routes/tractionRoutes');
 const conciergeRoutes = require('./routes/conciergeRoutes');
+const { CANONICAL_DOMAIN, LEGACY_REDIRECT_HOSTS } = require('./config/domains');
 
 function createApp() {
   const app = express();
+
+  const canonicalHost = (env.customDomain || CANONICAL_DOMAIN).replace(/^https?:\/\//, '').toLowerCase();
+
+  app.use((req, res, next) => {
+    const host = (req.headers.host || '').split(':')[0].toLowerCase();
+    if (LEGACY_REDIRECT_HOSTS.has(host) && canonicalHost) {
+      return res.redirect(301, `https://${canonicalHost}${req.originalUrl}`);
+    }
+    next();
+  });
 
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(

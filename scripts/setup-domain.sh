@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Custom domain setup for RemoteMatch on Render
-# Target domain: remotematch.app (remotematch.com is taken)
+# Target domain: remotelymatch.app (canonical — not remotematch.app)
 set -e
 
-DOMAIN="${1:-remotematch.app}"
+DOMAIN="${1:-remotelymatch.app}"
 WWW="www.${DOMAIN}"
 RENDER_CNAME="remotematch.onrender.com"
 

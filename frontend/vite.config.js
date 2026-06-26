@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const appUrl = env.VITE_APP_URL || 'https://remotematch.app';
+  const appUrl = env.VITE_APP_URL || 'https://remotelymatch.app';
   const appName = env.VITE_APP_NAME || 'RemoteMatch';
 
   return {
