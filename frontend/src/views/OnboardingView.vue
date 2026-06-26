@@ -35,35 +35,23 @@ const tailorMode = ref('balanced');
 const digestEmail = ref('');
 const contactPhone = ref('');
 
-function mergeLines(existing, incoming) {
-  const lines = String(existing || '')
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const seen = new Set(lines.map((s) => s.toLowerCase()));
-  for (const skill of incoming || []) {
-    const key = skill.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      lines.push(skill);
-    }
-  }
-  return lines.join('\n');
-}
-
 function onResumeParsed(result) {
   form.value.resumeText = result.resumeText;
-  if (result.extractedSkills?.mustHave?.length) {
-    form.value.mustHaveSkills = mergeLines(form.value.mustHaveSkills, result.extractedSkills.mustHave);
+  const mustHave = result.extractedSkills?.mustHave || [];
+  const niceToHave = result.extractedSkills?.niceToHave || [];
+  const suggestedTitles = result.suggestedTitles || [];
+
+  if (mustHave.length) {
+    form.value.mustHaveSkills = mustHave.join('\n');
   }
-  if (result.extractedSkills?.niceToHave?.length) {
-    form.value.niceToHaveSkills = mergeLines(form.value.niceToHaveSkills, result.extractedSkills.niceToHave);
+  if (niceToHave.length) {
+    form.value.niceToHaveSkills = niceToHave.join('\n');
   }
   if (!form.value.headline?.trim() && result.suggestedHeadline) {
     form.value.headline = result.suggestedHeadline;
   }
-  if (result.suggestedTitles?.length) {
-    form.value.targetTitles = mergeLines(form.value.targetTitles, result.suggestedTitles);
+  if (suggestedTitles.length) {
+    form.value.targetTitles = suggestedTitles.join('\n');
   }
 }
 
@@ -71,9 +59,9 @@ const form = ref({
   displayName: auth.user?.name || '',
   headline: '',
   linkedin: '',
-  targetTitles: 'devops engineer\nsite reliability engineer\nplatform engineer\ncloud engineer',
-  mustHaveSkills: 'kubernetes\nterraform\naws\nazure\ndocker\nlinux\npython\nci/cd',
-  niceToHaveSkills: 'databricks\nobservability\nprometheus\ngrafana',
+  targetTitles: '',
+  mustHaveSkills: '',
+  niceToHaveSkills: '',
   resumeText: '',
 });
 

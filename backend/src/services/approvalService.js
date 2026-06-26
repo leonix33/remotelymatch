@@ -9,6 +9,7 @@ const teamService = require('./teamService');
 const localApprovalService = require('./localApprovalService');
 const queueNotifyService = require('./queueNotifyService');
 const applicationKitService = require('./applicationKitService');
+const { profileResumeAlignment } = require('./resumeParseService');
 
 function requireMongo() {
   if (!env.mongoUri) throw new Error('MongoDB is required');
@@ -28,17 +29,30 @@ async function loadJobs(minMatch = 60) {
 
 async function buildJobList(userId) {
   const profile = await profileService.getOrCreate(userId);
-  const minMatch = profile.minMatchScore || 60;
+  const openMarket = env.openJobMarket !== false;
+  const minMatch = profile.minMatchScore || (openMarket ? 40 : 60);
   let jobs = await loadJobs(0);
 
-  const profileEmpty = !(profile?.targetTitles?.length || profile?.mustHaveSkills?.length);
-  if (profileEmpty) {
-    jobs = jobs.map((j) => ({
-      ...j,
-      personalMatchPct: j.matchPct || 0,
-      matchPct: j.matchPct || 0,
-      agentMatchPct: j.matchPct || 0,
-    }));
+  const hasSearchCriteria = Boolean(profile?.targetTitles?.length || profile?.mustHaveSkills?.length);
+  const hasResume = Boolean((profile?.resumeText || '').trim().length >= 50);
+
+  if (!hasSearchCriteria) {
+    jobs = jobs.map((j) => {
+      const agentMatch = j.matchPct || 0;
+      const qualityBoost = j.qualityScore || j.score || 0;
+      const baseline = openMarket
+        ? Math.max(agentMatch, Math.min(80, 42 + Math.floor(qualityBoost / 4)))
+        : agentMatch;
+      return {
+        ...j,
+        personalMatchPct: baseline,
+        matchPct: baseline,
+        agentMatchPct: agentMatch,
+      };
+    });
+    if (hasResume) {
+      jobs = scoreJobsForProfile(jobs, profile, userId);
+    }
   } else {
     jobs = scoreJobsForProfile(jobs, profile, userId);
   }
@@ -173,7 +187,24 @@ async function listForUser(userId, options = {}) {
   const all = applyFilters(await buildJobList(userId), { statusFilter, search, minMatch, ats, sort });
   const total = all.length;
   const slice = limit > 0 ? all.slice(Number(offset), Number(offset) + Number(limit)) : all;
-  return { items: slice, total };
+
+  let hint = null;
+  if (total === 0 && statusFilter === 'pending') {
+    const profile = await profileService.getOrCreate(userId);
+    const alignment = profileResumeAlignment(profile);
+    const rawJobs = await loadJobs(0);
+    if (!rawJobs.length) {
+      hint = 'No jobs in the system yet. Ask an admin to run a job search first.';
+    } else if (!alignment.aligned && alignment.reason) {
+      hint = alignment.reason;
+    } else if (Number(minMatch) > (profile.minMatchScore || 60)) {
+      hint = `No jobs meet ${minMatch}% match. Try lowering your match threshold in Profile.`;
+    } else {
+      hint = 'No jobs meet your match threshold. Lower it in Profile or update your target roles and skills.';
+    }
+  }
+
+  return { items: slice, total, hint };
 }
 
 async function setStatus(userId, jobId, status, notes = '', options = {}) {

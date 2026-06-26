@@ -178,7 +178,7 @@ onMounted(async () => {
         <ResumeUpload
           v-model="resumeText"
           :apply-to-profile="true"
-          :merge-skills="true"
+          :merge-skills="false"
           :show-preview="false"
           @parsed="onResumeParsed"
         />

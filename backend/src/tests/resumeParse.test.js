@@ -4,6 +4,8 @@ const {
   extractSkillsFromText,
   computeResumeScore,
   mergeSkillLists,
+  profileResumeAlignment,
+  isDefaultOnboardingCriteria,
 } = require('../services/resumeParseService');
 
 describe('resumeParseService', () => {
@@ -40,5 +42,31 @@ describe('resumeParseService', () => {
   it('merges skill lists without duplicates', () => {
     const merged = mergeSkillLists('kubernetes\naws', ['AWS', 'terraform']);
     assert.equal(merged, 'kubernetes\naws\nterraform');
+  });
+
+  it('detects when default DevOps criteria do not match a non-technical resume', () => {
+    const profile = {
+      resumeText:
+        'Marketing Manager with 8 years in brand strategy, content marketing, SEO, and social media campaigns.',
+      targetTitles: ['devops engineer', 'platform engineer', 'cloud engineer'],
+      mustHaveSkills: ['kubernetes', 'terraform', 'aws', 'docker'],
+      extractedSkills: [],
+    };
+    assert.ok(isDefaultOnboardingCriteria(profile));
+    const alignment = profileResumeAlignment(profile);
+    assert.equal(alignment.aligned, false);
+    assert.ok(alignment.reason?.includes('resume'));
+  });
+
+  it('treats aligned DevOps resume and criteria as a match', () => {
+    const profile = {
+      resumeText:
+        'Platform Engineer with Kubernetes, Terraform, AWS, Docker, Python, and CI/CD experience.',
+      targetTitles: ['platform engineer', 'devops engineer'],
+      mustHaveSkills: ['kubernetes', 'terraform', 'aws'],
+      extractedSkills: ['kubernetes', 'terraform', 'aws', 'docker', 'python'],
+    };
+    const alignment = profileResumeAlignment(profile);
+    assert.equal(alignment.aligned, true);
   });
 });

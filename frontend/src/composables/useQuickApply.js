@@ -35,7 +35,11 @@ export function useQuickApply() {
       });
       const jobs = listData?.items || [];
       if (!jobs.length) {
-        throw new Error('No matching jobs found. Try lowering your match threshold or run a job search first.');
+        const hint = listData?.hint;
+        throw new Error(
+          hint ||
+            'No matching jobs found. Your resume may not match the current job search — update target roles and skills in Profile, or lower your match threshold.'
+        );
       }
 
       step.value = `Approving ${jobs.length} job(s)…`;

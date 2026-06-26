@@ -207,6 +207,113 @@ function mergeSkillLists(existing, incoming) {
   return merged.join('\n');
 }
 
+const DEFAULT_ONBOARDING_TITLES = [
+  'devops engineer',
+  'site reliability engineer',
+  'platform engineer',
+  'cloud engineer',
+];
+
+const DEFAULT_ONBOARDING_SKILLS = [
+  'kubernetes',
+  'terraform',
+  'aws',
+  'azure',
+  'docker',
+  'linux',
+  'python',
+  'ci/cd',
+];
+
+function isDefaultOnboardingCriteria(profile = {}) {
+  const titles = (profile.targetTitles || []).map(normalize);
+  const skills = (profile.mustHaveSkills || []).map(normalize);
+  const titleSet = new Set(titles);
+  const skillSet = new Set(skills);
+  const defaultTitleHits = DEFAULT_ONBOARDING_TITLES.filter((t) => titleSet.has(t)).length;
+  const defaultSkillHits = DEFAULT_ONBOARDING_SKILLS.filter((s) => skillSet.has(s)).length;
+  return (
+    (titles.length > 0 && defaultTitleHits >= Math.min(3, titles.length)) ||
+    (skills.length > 0 && defaultSkillHits >= Math.min(5, skills.length))
+  );
+}
+
+function criteriaFromResumeText(text = '') {
+  const extracted = extractSkillsFromText(text);
+  const suggestedTitles = suggestTitles(text);
+  return {
+    targetTitles: suggestedTitles.length ? suggestedTitles : [],
+    mustHaveSkills: extracted.mustHave,
+    niceToHaveSkills: extracted.niceToHave,
+    extractedSkills: extracted.all,
+  };
+}
+
+function profileResumeAlignment(profile = {}) {
+  const resumeBlob = normalize(profile.resumeText || '');
+  if (!resumeBlob || resumeBlob.length < 50) {
+    return { aligned: true, overlap: 1, reason: null, mustHits: 0, titleHits: 0 };
+  }
+
+  const mustSkills = (profile.mustHaveSkills || []).map(normalize).filter(Boolean);
+  const targetTitles = (profile.targetTitles || []).map(normalize).filter(Boolean);
+  const resumeSkills = (
+    profile.extractedSkills?.length
+      ? profile.extractedSkills
+      : extractSkillsFromText(resumeBlob).all
+  ).map(normalize);
+
+  const mustHits = mustSkills.filter((skill) => resumeBlob.includes(skill)).length;
+  const titleHits = targetTitles.filter((title) => {
+    if (resumeBlob.includes(title)) return true;
+    const words = title.split(/\s+/).filter((w) => w.length > 3);
+    return words.length > 0 && words.some((w) => resumeBlob.includes(w));
+  }).length;
+
+  const usesDefaults = isDefaultOnboardingCriteria(profile);
+  const mustOverlap = mustSkills.length ? mustHits / mustSkills.length : 1;
+  const titleOverlap = targetTitles.length ? titleHits / targetTitles.length : 1;
+  const resumeSkillHits = resumeSkills.filter((skill) =>
+    mustSkills.some((must) => must === skill || resumeBlob.includes(must))
+  ).length;
+
+  const aligned =
+    mustHits >= 2 || mustOverlap >= 0.35 || (titleHits >= 1 && mustHits >= 1) || resumeSkillHits >= 3;
+
+  let reason = null;
+  if (!aligned) {
+    if (usesDefaults && mustHits < 2) {
+      reason =
+        'Your profile still has default DevOps search settings that do not match your resume. Re-upload your resume or update target roles and skills in Profile.';
+    } else if (mustHits === 0 && titleHits === 0) {
+      reason =
+        'Your resume does not match your target roles and skills. Update Profile to match your resume, or upload a resume that fits this job search.';
+    } else {
+      reason =
+        'Your resume only partially matches your search criteria. Lower your match threshold or align your target roles and skills with your resume.';
+    }
+  }
+
+  return {
+    aligned,
+    overlap: Math.max(mustOverlap, titleOverlap),
+    mustHits,
+    titleHits,
+    usesDefaults,
+    reason,
+  };
+}
+
+function shouldReplaceCriteriaFromResume(profile = {}, parsed = {}) {
+  if (!parsed.resumeText || parsed.resumeText.length < 50) return false;
+  const alignment = profileResumeAlignment({
+    ...profile,
+    resumeText: parsed.resumeText,
+    extractedSkills: parsed.extractedSkills?.all || [],
+  });
+  return !alignment.aligned || isDefaultOnboardingCriteria(profile);
+}
+
 async function parseResumeFile(buffer, filename = 'resume.pdf') {
   const resumeText = await extractTextFromBuffer(buffer, filename);
   if (!resumeText || resumeText.length < 20) {
@@ -249,4 +356,8 @@ module.exports = {
   parseResumeFile,
   enrichProfileResponse,
   mergeSkillLists,
+  criteriaFromResumeText,
+  profileResumeAlignment,
+  shouldReplaceCriteriaFromResume,
+  isDefaultOnboardingCriteria,
 };

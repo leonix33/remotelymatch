@@ -41,4 +41,5 @@ module.exports = {
   vapidPublicKey: trim(process.env.VAPID_PUBLIC_KEY) || '',
   vapidPrivateKey: trim(process.env.VAPID_PRIVATE_KEY) || '',
   vapidSubject: trim(process.env.VAPID_SUBJECT) || 'mailto:leonix23@gmail.com',
+  openJobMarket: process.env.OPEN_JOB_MARKET !== '0',
 };

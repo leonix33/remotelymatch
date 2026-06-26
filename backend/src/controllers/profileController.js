@@ -6,6 +6,8 @@ const {
   parseResumeFile,
   mergeSkillLists,
   extractSkillsFromText,
+  criteriaFromResumeText,
+  shouldReplaceCriteriaFromResume,
 } = require('../services/resumeParseService');
 
 const updateSchema = z.object({
@@ -96,6 +98,14 @@ async function updateMe(req, res, next) {
     if (body.resumeText && !body.extractedSkills) {
       payload.extractedSkills = extractSkillsFromText(body.resumeText).all;
       payload.resumeParsedAt = new Date();
+      const existing = await profileService.getOrCreate(req.user.sub);
+      const parsed = { resumeText: body.resumeText, extractedSkills: { all: payload.extractedSkills } };
+      if (shouldReplaceCriteriaFromResume(existing, parsed)) {
+        const derived = criteriaFromResumeText(body.resumeText);
+        if (derived.targetTitles.length) payload.targetTitles = derived.targetTitles;
+        if (derived.mustHaveSkills.length) payload.mustHaveSkills = derived.mustHaveSkills;
+        if (derived.niceToHaveSkills.length) payload.niceToHaveSkills = derived.niceToHaveSkills;
+      }
     }
     const profile = await profileService.update(req.user.sub, payload);
     res.json(profile);
@@ -123,7 +133,13 @@ async function parseResume(req, res, next) {
         resumeParsedAt: new Date(),
       };
 
-      if (body.mergeSkills) {
+      const replaceCriteria = shouldReplaceCriteriaFromResume(profile, parsed) || !body.mergeSkills;
+      if (replaceCriteria) {
+        const derived = criteriaFromResumeText(parsed.resumeText);
+        if (derived.targetTitles.length) patch.targetTitles = derived.targetTitles;
+        if (derived.mustHaveSkills.length) patch.mustHaveSkills = derived.mustHaveSkills;
+        if (derived.niceToHaveSkills.length) patch.niceToHaveSkills = derived.niceToHaveSkills;
+      } else if (body.mergeSkills) {
         patch.mustHaveSkills = parseListField(
           mergeSkillLists((profile.mustHaveSkills || []).join('\n'), parsed.extractedSkills.mustHave)
         );
@@ -136,7 +152,7 @@ async function parseResume(req, res, next) {
         patch.headline = parsed.suggestedHeadline;
       }
 
-      if (!(profile.targetTitles || []).length && parsed.suggestedTitles.length) {
+      if (!(patch.targetTitles || profile.targetTitles || []).length && parsed.suggestedTitles.length) {
         patch.targetTitles = parsed.suggestedTitles;
       }
 

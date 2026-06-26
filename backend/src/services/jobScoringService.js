@@ -1,7 +1,7 @@
 /**
  * Per-user job scoring — mirrors Python profile scoring at a high level.
  */
-const { extractSkillsFromText } = require('./resumeParseService');
+const { extractSkillsFromText, profileResumeAlignment } = require('./resumeParseService');
 const { freshnessScore } = require('./jobs/jobQualityService');
 const { enrichJobWithLikelihood } = require('./interviewLikelihoodService');
 const { getConversionContext, companyJobCounts } = require('./conversionStatsService');
@@ -19,15 +19,25 @@ function scoreJobForProfile(job, profile, scoringContext = {}) {
   const freshness =
     job.freshnessScore ?? freshnessScore(job.postedAt || job.firstSeen);
 
-  const targetTitles = (profile?.targetTitles || []).map(normalize).filter(Boolean);
-  const mustSkills = (profile?.mustHaveSkills || []).map(normalize).filter(Boolean);
-  const niceSkills = (profile?.niceToHaveSkills || []).map(normalize).filter(Boolean);
-  const targetCompanies = (profile?.targetCompanies || []).map(normalize).filter(Boolean);
+  const alignment = profileResumeAlignment(profile);
   const resumeSkills = (
     profile?.extractedSkills?.length
       ? profile.extractedSkills
       : extractSkillsFromText(profile?.resumeText || '').all
   ).map(normalize);
+
+  let targetTitles = (profile?.targetTitles || []).map(normalize).filter(Boolean);
+  let mustSkills = (profile?.mustHaveSkills || []).map(normalize).filter(Boolean);
+  const niceSkills = (profile?.niceToHaveSkills || []).map(normalize).filter(Boolean);
+  const targetCompanies = (profile?.targetCompanies || []).map(normalize).filter(Boolean);
+
+  if (!alignment.aligned && resumeSkills.length) {
+    mustSkills = resumeSkills.slice(0, 12);
+    if (!targetTitles.length) {
+      const resumeTitles = ['devops', 'sre', 'platform', 'cloud', 'infrastructure', 'software', 'data', 'product'];
+      targetTitles = resumeTitles.filter((t) => resumeBlob.includes(t));
+    }
+  }
 
   let score = 0;
   const strengths = [];
@@ -88,7 +98,12 @@ function scoreJobForProfile(job, profile, scoringContext = {}) {
   if (job.description) score += Math.min(10, Math.floor(job.description.length / 200));
   if ((job.qualityScore || 0) >= 60) score += 5;
 
-  const personalMatchPct = Math.min(100, Math.round(score));
+  let personalMatchPct = Math.min(100, Math.round(score));
+  if (!alignment.aligned && (job.matchPct || job.agentMatchPct)) {
+    const agentScore = job.matchPct || job.agentMatchPct || 0;
+    personalMatchPct = Math.min(100, Math.round(personalMatchPct * 0.35 + agentScore * 0.65));
+  }
+
   const minMatch = profile?.minMatchScore || 60;
   let emailSection = 'manual_browse';
   if (personalMatchPct >= 80) emailSection = 'apply_today';

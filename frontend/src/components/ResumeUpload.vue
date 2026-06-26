@@ -7,7 +7,7 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   showPreview: { type: Boolean, default: true },
   applyToProfile: { type: Boolean, default: false },
-  mergeSkills: { type: Boolean, default: true },
+  mergeSkills: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue', 'parsed', 'error']);
