@@ -198,15 +198,26 @@ async function submitReset() {
   resetSaving.value = true;
   error.value = '';
   success.value = '';
+  manualInvite.value = null;
+  const tempPassword = resetPassword.value.trim();
+  const target = resetTarget.value;
   try {
-    const id = resetTarget.value._id || resetTarget.value.id;
-    const email = resetTarget.value.email;
-    const { data } = await http.post(`/users/${id}/reset-password`, { password: resetPassword.value });
-    success.value = data.resetEmailSent
-      ? `Password reset email sent to ${email}.`
-      : `Password reset for ${email}. Email is not configured — share the new password manually.`;
+    const id = target._id || target.id;
+    const { data } = await http.post(`/users/${id}/reset-password`, { password: tempPassword });
     resetTarget.value = null;
     resetPassword.value = '';
+    if (data.resetEmailSent) {
+      success.value = `Password reset email sent to ${data.email}.`;
+    } else {
+      manualInvite.value = {
+        name: data.name || target.name,
+        email: data.email,
+        password: tempPassword,
+        loginUrl: data.loginUrl || loginUrl,
+      };
+      success.value = `Password reset for ${data.email}. Copy the new login details below and send to them.`;
+    }
+    await load();
   } catch (e) {
     error.value = e.response?.data?.message || 'Reset failed';
   } finally {
@@ -469,6 +480,7 @@ onUnmounted(() => {
       <form class="card w-full max-w-md p-6" @submit.prevent="submitReset">
         <h3 class="font-semibold text-slate-200">Reset password</h3>
         <p class="mt-1 text-sm text-slate-500">{{ resetTarget.name }} · {{ resetTarget.email }}</p>
+        <p class="mt-2 text-xs text-amber-300/90">Sets a new password immediately. User must be <strong>Active</strong> to log in.</p>
         <input
           v-model="resetPassword"
           type="password"

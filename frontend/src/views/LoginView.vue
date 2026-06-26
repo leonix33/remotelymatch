@@ -16,12 +16,14 @@ async function submit() {
   error.value = '';
   loading.value = true;
   try {
-    await auth.login(email.value, password.value);
+    await auth.login(email.value.trim(), password.value.trim());
     router.push('/');
   } catch (e) {
     const status = e.response?.status;
     if (status === 404) {
       error.value = 'API not reachable. Wait for deploy to finish, then hard-refresh.';
+    } else if (status === 403) {
+      error.value = e.response?.data?.message || 'This account is disabled. Contact your admin.';
     } else if (status === 400) {
       error.value = 'Wrong email or password. Contact your admin for access.';
     } else {

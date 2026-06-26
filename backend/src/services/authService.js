@@ -23,6 +23,12 @@ async function login(email, password) {
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedPassword = password.trim();
 
+  if (!normalizedPassword) {
+    const err = new Error('Password is required');
+    err.status = 400;
+    throw err;
+  }
+
   // Always honor ADMIN_EMAIL / ADMIN_PASSWORD from environment (Render dashboard)
   if (
     env.adminEmail &&
@@ -61,8 +67,13 @@ async function login(email, password) {
     throw new Error('Invalid login');
   }
 
-  const user = await User.findOne({ email: normalizedEmail, active: true });
+  const user = await User.findOne({ email: normalizedEmail });
   if (!user) throw new Error('Invalid login');
+  if (!user.active) {
+    const err = new Error('This account is disabled. Ask your admin to re-enable it under Team access.');
+    err.status = 403;
+    throw err;
+  }
   const ok = await bcrypt.compare(normalizedPassword, user.passwordHash);
   if (!ok) throw new Error('Invalid login');
   return { user, accessToken: signAccessToken(user) };
@@ -98,11 +109,18 @@ async function changePassword(userId, currentPassword, newPassword) {
 
 async function resetPassword(targetUserId, newPassword) {
   if (!env.mongoUri) throw new Error('MongoDB is required to reset password');
+  const clean = String(newPassword || '').trim();
+  if (clean.length < 8) {
+    const err = new Error('Password must be at least 8 characters');
+    err.status = 400;
+    throw err;
+  }
   const user = await User.findById(targetUserId);
   if (!user) throw new Error('User not found');
-  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  user.passwordHash = await bcrypt.hash(clean, 10);
+  user.active = true;
   await user.save();
-  return { id: user._id, email: user.email };
+  return { id: user._id, email: user.email, name: user.name };
 }
 
 module.exports = { login, signAccessToken, signExtensionToken, getMe, changePassword, resetPassword };

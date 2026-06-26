@@ -5,6 +5,7 @@ const teamService = require('../services/teamService');
 const Team = require('../models/Team');
 const emailService = require('../services/emailService');
 const userDataService = require('../services/userDataService');
+const authService = require('../services/authService');
 const env = require('../config/env');
 
 const createUserSchema = z.object({
@@ -26,7 +27,13 @@ async function listUsers(req, res, next) {
 async function createUser(req, res, next) {
   try {
     const body = createUserSchema.parse(req.body);
-    const exists = await User.findOne({ email: body.email.toLowerCase() });
+    const email = body.email.trim().toLowerCase();
+    const password = body.password.trim();
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    }
+
+    const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: 'Email already exists' });
 
     const adminTeam = await teamService.getTeamForUser(req.user.sub);
@@ -40,13 +47,14 @@ async function createUser(req, res, next) {
       }
     }
 
-    const passwordHash = await bcrypt.hash(body.password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({
-      name: body.name,
-      email: body.email,
+      name: body.name.trim(),
+      email,
       role: body.role,
       passwordHash,
       teamId: adminTeam?._id,
+      active: true,
     });
 
     let inviteEmailSent = false;
@@ -57,7 +65,7 @@ async function createUser(req, res, next) {
         to: user.email,
         name: user.name,
         email: user.email,
-        password: body.password,
+        password,
         invitedByName: inviter?.name,
       });
       inviteEmailSent = Boolean(result.sent);
@@ -144,25 +152,39 @@ const resetPasswordSchema = z.object({
 async function resetPassword(req, res, next) {
   try {
     const body = resetPasswordSchema.parse(req.body);
-    const authService = require('../services/authService');
-    const user = await User.findById(req.params.id).select('name email');
+    const password = body.password.trim();
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    }
+    const user = await User.findById(req.params.id).select('name email active');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    const result = await authService.resetPassword(req.params.id, body.password);
+
+    const result = await authService.resetPassword(req.params.id, password);
 
     let resetEmailSent = false;
+    let resetEmailError = null;
     try {
       const emailResult = await emailService.notifyPasswordReset({
         to: user.email,
         name: user.name,
         email: user.email,
-        password: body.password,
+        password,
       });
       resetEmailSent = Boolean(emailResult.sent);
+      if (!resetEmailSent) resetEmailError = emailResult.reason || 'Email not configured';
     } catch (err) {
       console.warn('Password reset email failed:', err.message);
+      resetEmailError = err.message;
     }
 
-    res.json({ message: 'Password reset', email: result.email, resetEmailSent });
+    res.json({
+      message: 'Password reset',
+      email: result.email,
+      name: result.name,
+      resetEmailSent,
+      resetEmailError,
+      loginUrl: `${env.appUrl.replace(/\/$/, '')}/login`,
+    });
   } catch (err) {
     next(err);
   }
