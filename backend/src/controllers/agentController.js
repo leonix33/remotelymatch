@@ -1,4 +1,5 @@
 const applicationKitService = require('../services/applicationKitService');
+const tractionService = require('../services/tractionService');
 const applicationService = require('../services/applicationService');
 const AgentRun = require('../models/AgentRun');
 const jobService = require('../services/jobService');
@@ -152,6 +153,18 @@ async function applyApproved(req, res, next) {
       });
     }
 
+    function scheduleApplyFeedback(queued) {
+      setImmediate(() => {
+        tractionService
+          .sendPostApplyFeedback(req.user.sub, scored, { useTailoredResume, queued })
+          .then((r) => {
+            if (r.sent) console.log(`Post-apply email sent to ${r.to}`);
+            else console.warn(`Post-apply email skipped: ${r.reason}`);
+          })
+          .catch((err) => console.warn('Post-apply email failed:', err.message));
+      });
+    }
+
     let output;
     try {
       if (agentAvailable && !shouldDeferKits) {
@@ -180,6 +193,7 @@ async function applyApproved(req, res, next) {
       if (useTailoredResume && missingKitCount > 0) {
         message += ` (${tailoredCount} with kits, ${missingKitCount} fell back to base resume)`;
       }
+      scheduleApplyFeedback(false);
       res.json({
         message,
         count: scored.length,
@@ -210,6 +224,7 @@ async function applyApproved(req, res, next) {
           await run.save();
         }
         const modeLabel = useTailoredResume ? 'tailored kits' : 'base resume';
+        scheduleApplyFeedback(true);
         return res.json({
           message: `Queued ${scored.length} application(s) with ${modeLabel}.${shouldDeferKits ? ' Tailored resumes are generating — refresh the preview in a moment.' : ''} Open each job in Chrome and use the RemoteMatch extension to submit forms.`,
           count: scored.length,

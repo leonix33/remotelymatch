@@ -204,6 +204,85 @@ async function sendFollowUpReminder({ to, item }) {
   });
 }
 
+function followUpSnippet(company, title) {
+  const co = company || 'the team';
+  const role = title || 'the role';
+  return `Hi — I applied for ${role} at ${co} recently and wanted to confirm my application was received. I'm very interested in the role and happy to share more on my background. Thank you for your time.`;
+}
+
+async function sendPostApplyBatchEmail({ to, jobs = [], profile, useTailoredResume, queued = false }) {
+  const name = profile?.applicantName || profile?.displayName || 'there';
+  const count = jobs.length;
+  const headline = queued
+    ? `${count} application${count === 1 ? '' : 's'} queued — finish forms, then follow up`
+    : `${count} application${count === 1 ? '' : 's'} submitted — here's your follow-up plan`;
+
+  const rows =
+    jobs.length > 0
+      ? jobs
+          .map((j) => {
+            const url = j.url || j.applyUrl || j.jobUrl || '';
+            const link = url
+              ? `<a href="${escapeHtml(url)}" style="color:#2dd4bf;text-decoration:none">View posting</a>`
+              : '';
+            const snippet = followUpSnippet(j.company, j.title);
+            return `<tr>
+              <td style="padding:12px 8px;border-bottom:1px solid #334155;vertical-align:top">
+                <strong style="color:#e2e8f0">${escapeHtml(j.title || 'Role')}</strong><br>
+                <span style="color:#94a3b8">${escapeHtml(j.company || 'Company')}</span>
+              </td>
+              <td style="padding:12px 8px;border-bottom:1px solid #334155;vertical-align:top;color:#94a3b8;font-size:13px">
+                ${j.matchPct != null ? `${j.matchPct}% match` : ''}
+                ${link ? `<br>${link}` : ''}
+              </td>
+              <td style="padding:12px 8px;border-bottom:1px solid #334155;vertical-align:top;color:#cbd5e1;font-size:12px;line-height:1.5">
+                <em>${escapeHtml(snippet)}</em>
+              </td>
+            </tr>`;
+          })
+          .join('')
+      : `<tr><td colspan="3" style="padding:12px;color:#94a3b8">No jobs in this batch.</td></tr>`;
+
+  const html = `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:0 auto;color:#e2e8f0;background:#0f172a;padding:28px;border-radius:12px">
+    <h2 style="color:#5eead4;margin:0 0 8px;font-size:22px">${escapeHtml(headline)}</h2>
+    <p style="color:#94a3b8;line-height:1.6;margin:0">
+      Hi ${escapeHtml(name)}, your RemoteMatch batch is complete.
+      ${useTailoredResume ? ' Tailored resumes were prepared for each role.' : ''}
+      ${queued ? ' Open each posting in Chrome and submit with the RemoteMatch extension, then use the follow-up notes below.' : ' Consider a short follow-up in 3–5 business days if you have not heard back.'}
+    </p>
+    <h3 style="color:#5eead4;margin:28px 0 12px;font-size:16px">Companies to follow up with</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <thead>
+        <tr style="color:#64748b;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.04em">
+          <th style="padding:8px">Role</th>
+          <th style="padding:8px">Details</th>
+          <th style="padding:8px">Suggested message</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="margin:28px 0 0;color:#94a3b8;font-size:14px;line-height:1.6">
+      <strong style="color:#e2e8f0">Next steps:</strong> bookmark these companies, set a calendar reminder for 3–5 days out,
+      and send a polite note to the recruiter or hiring manager on LinkedIn or email.
+    </p>
+    <p style="margin:20px 0 0">
+      <a href="${env.appUrl.replace(/\/$/, '')}/follow-ups" style="display:inline-block;background:#14b8a6;color:#0f172a;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600">Open follow-up tracker →</a>
+      &nbsp;
+      <a href="${env.appUrl.replace(/\/$/, '')}/tailored-resumes" style="display:inline-block;border:1px solid #334155;color:#e2e8f0;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:500">Review tailored resumes →</a>
+    </p>
+    <p style="color:#475569;font-size:12px;margin-top:28px;line-height:1.5">
+      ${escapeHtml(env.appName)} · Applications use your personal email (${escapeHtml(profile?.digestEmail || 'set in Profile')}) ·
+      This message was sent from ${escapeHtml(env.emailFrom)}
+    </p>
+  </div>`;
+
+  return sendEmail({
+    to,
+    subject: `${env.appName}: ${headline}`,
+    html,
+  });
+}
+
 module.exports = {
   sendEmail,
   sendToUser,
@@ -214,5 +293,6 @@ module.exports = {
   notifyPasswordReset,
   sendAppliedJobsDigest,
   sendFollowUpReminder,
+  sendPostApplyBatchEmail,
   wrapHtml,
 };

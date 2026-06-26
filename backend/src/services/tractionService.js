@@ -174,7 +174,7 @@ async function buildAppliedJobsDigest(userId, profile) {
   const jobById = new Map(allJobs.map((j) => [j.jobId, j]));
 
   const submitted = applications
-    .filter((a) => a.status === 'submitted' || a.submittedAt)
+    .filter((a) => ['submitted', 'queued'].includes(a.status) || a.submittedAt)
     .map((app) => {
       const job = jobById.get(app.jobId) || {};
       return {
@@ -270,6 +270,32 @@ async function markFollowUpDone(userId, jobId, notes = '') {
   return { jobId, completed: true };
 }
 
+async function sendPostApplyFeedback(userId, jobs = [], options = {}) {
+  const profile = await profileService.getOrCreate(userId);
+  if (profile.emailDigestEnabled === false) {
+    return { sent: false, reason: 'Email digest disabled in Profile' };
+  }
+  const to = resolveDigestEmail(profile);
+  if (!to) return { sent: false, reason: 'No digest email configured in Profile' };
+  if (!env.resendApiKey) return { sent: false, reason: 'Resend not configured (add RESEND_API_KEY on Render)' };
+
+  const list = (jobs || []).map((j) => ({
+    title: j.title,
+    company: j.company,
+    url: j.url || j.applyUrl,
+    matchPct: j.personalMatchPct ?? j.matchPct ?? null,
+  }));
+
+  const result = await emailService.sendPostApplyBatchEmail({
+    to,
+    jobs: list,
+    profile,
+    useTailoredResume: Boolean(options.useTailoredResume),
+    queued: Boolean(options.queued),
+  });
+  return { ...result, to };
+}
+
 async function previewDigest(userId) {
   const profile = await profileService.getOrCreate(userId);
   const applied = await buildAppliedJobsDigest(userId, profile);
@@ -288,6 +314,7 @@ module.exports = {
   buildTractionTrace,
   buildAppliedJobsDigest,
   sendAppliedDigestEmail,
+  sendPostApplyFeedback,
   scanAndNotifyTraction,
   markFollowUpDone,
   previewDigest,

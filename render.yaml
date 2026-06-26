@@ -36,8 +36,20 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
+      # Adzuna job feed — https://developer.adzuna.com
+      - key: ADZUNA_APP_ID
+        sync: false
+      - key: ADZUNA_APP_KEY
+        sync: false
+      - key: ADZUNA_WHAT
+        value: devops engineer remote
+      - key: ADZUNA_WHERE
+        value: remote
+      - key: ADZUNA_MAX_DAYS_OLD
+        value: "7"
       - key: RESEND_API_KEY
         sync: false
+      # After verifying remotelymatch.app in Resend, use: RemoteMatch <noreply@remotelymatch.app>
       - key: EMAIL_FROM
         value: RemoteMatch <onboarding@resend.dev>
       - key: VAPID_PUBLIC_KEY
