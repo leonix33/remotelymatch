@@ -16,18 +16,19 @@ async function submit() {
   error.value = '';
   loading.value = true;
   try {
-    await auth.login(email.value.trim(), password.value.trim());
+    await auth.login(email.value.trim(), password.value);
     router.push('/');
   } catch (e) {
     const status = e.response?.status;
+    const msg = e.response?.data?.message || e.message || 'Login failed';
     if (status === 404) {
       error.value = 'API not reachable. Wait for deploy to finish, then hard-refresh.';
     } else if (status === 403) {
-      error.value = e.response?.data?.message || 'This account is disabled. Contact your admin.';
-    } else if (status === 400) {
-      error.value = 'Wrong email or password. Contact your admin for access.';
+      error.value = msg;
+    } else if (status === 401 || status === 400) {
+      error.value = msg;
     } else {
-      error.value = e.response?.data?.message || e.message || 'Login failed';
+      error.value = msg;
     }
   } finally {
     loading.value = false;
@@ -44,11 +45,28 @@ async function submit() {
       <form class="mt-8 space-y-4" @submit.prevent="submit">
         <div>
           <label class="mb-1 block text-sm text-slate-400">Email</label>
-          <input v-model="email" type="email" required class="input" placeholder="you@example.com" />
+          <input
+            v-model="email"
+            type="email"
+            required
+            class="input"
+            placeholder="you@example.com"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+          />
         </div>
         <div>
           <label class="mb-1 block text-sm text-slate-400">Password</label>
-          <input v-model="password" type="password" required minlength="8" class="input" placeholder="8+ characters" />
+          <input
+            v-model="password"
+            type="password"
+            required
+            minlength="8"
+            class="input"
+            placeholder="8+ characters"
+            autocomplete="current-password"
+          />
         </div>
         <p v-if="error" class="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
         <button type="submit" class="btn-primary w-full" :disabled="loading">

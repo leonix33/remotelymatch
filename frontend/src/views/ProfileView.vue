@@ -207,11 +207,12 @@ async function changePassword() {
   pwdSaving.value = true;
   try {
     await http.post('/auth/change-password', {
-      currentPassword: pwdForm.value.currentPassword,
-      newPassword: pwdForm.value.newPassword,
+      currentPassword: pwdForm.value.currentPassword.trim(),
+      newPassword: pwdForm.value.newPassword.trim(),
     });
     pwdForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' };
-    pwdSuccess.value = 'Password updated.';
+    pwdSuccess.value =
+      'Password updated. Sign in on your phone with the new password — clear autofill or type it manually.';
   } catch (e) {
     pwdError.value = e.response?.data?.message || 'Could not change password';
   } finally {

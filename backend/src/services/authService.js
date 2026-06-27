@@ -29,7 +29,7 @@ async function login(email, password) {
     throw err;
   }
 
-  // Always honor ADMIN_EMAIL / ADMIN_PASSWORD from environment (Render dashboard)
+  // Break-glass admin login from Render env — never overwrites a user-changed MongoDB password.
   if (
     env.adminEmail &&
     env.adminPassword &&
@@ -38,8 +38,8 @@ async function login(email, password) {
   ) {
     if (env.mongoUri) {
       let user = await User.findOne({ email: normalizedEmail });
-      const passwordHash = await bcrypt.hash(env.adminPassword, 10);
       if (!user) {
+        const passwordHash = await bcrypt.hash(env.adminPassword, 10);
         user = await User.create({
           name: 'Admin',
           email: normalizedEmail,
@@ -47,7 +47,6 @@ async function login(email, password) {
           passwordHash,
         });
       } else {
-        user.passwordHash = passwordHash;
         user.role = 'admin';
         user.active = true;
         await user.save();
@@ -75,7 +74,13 @@ async function login(email, password) {
     throw err;
   }
   const ok = await bcrypt.compare(normalizedPassword, user.passwordHash);
-  if (!ok) throw new Error('Invalid login');
+  if (!ok) {
+    const err = new Error(
+      'Invalid login. If you changed your password recently, type it manually — phone autofill may still have the old one.'
+    );
+    err.status = 401;
+    throw err;
+  }
   return { user, accessToken: signAccessToken(user) };
 }
 
@@ -101,9 +106,16 @@ async function changePassword(userId, currentPassword, newPassword) {
   if (!env.mongoUri) throw new Error('MongoDB is required to change password');
   const user = await User.findById(userId);
   if (!user) throw new Error('User not found');
-  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+  const current = String(currentPassword || '').trim();
+  const next = String(newPassword || '').trim();
+  if (next.length < 8) {
+    const err = new Error('Password must be at least 8 characters');
+    err.status = 400;
+    throw err;
+  }
+  const ok = await bcrypt.compare(current, user.passwordHash);
   if (!ok) throw new Error('Current password is incorrect');
-  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  user.passwordHash = await bcrypt.hash(next, 10);
   await user.save();
 }
 

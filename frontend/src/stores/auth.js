@@ -13,7 +13,10 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     async login(email, password) {
-      const { data } = await http.post('/auth/login', { email, password });
+      const { data } = await http.post('/auth/login', {
+        email: String(email || '').trim(),
+        password: String(password || ''),
+      });
       this.user = data.user;
       this.accessToken = data.accessToken;
       localStorage.setItem('user', JSON.stringify(data.user));
