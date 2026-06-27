@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icon.svg', 'offline.html'],
+        includeAssets: ['icon.svg', 'logo.svg', 'offline.html'],
         manifest: {
           id: appUrl,
           name: appName,
@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
           start_url: '/',
           categories: ['business', 'productivity'],
         icons: [
-          { src: '/logo.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/logo.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any' },
           { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
         ],
         },

@@ -4,7 +4,6 @@ import { useRoute, RouterLink } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import AppLogo from './AppLogo.vue';
 import { isProduction, canonicalDomain } from '../config';
-import { brand } from '../brand';
 
 defineProps({
   onLogout: { type: Function, required: true },
@@ -60,9 +59,8 @@ watch(
 <template>
   <aside class="sidebar-shell hidden w-72 shrink-0 lg:flex lg:flex-col">
     <div class="sidebar-brand">
-      <AppLogo size="md" />
-      <p class="mt-3 text-xs leading-relaxed text-slate-400">{{ brand.tagline }}</p>
-      <p v-if="isProduction" class="mt-2 truncate text-[10px] tracking-wide text-slate-500">
+      <AppLogo size="md" variant="sidebar" />
+      <p v-if="isProduction" class="mt-3 truncate text-[10px] tracking-wide text-slate-500">
         {{ canonicalDomain }}
       </p>
     </div>
