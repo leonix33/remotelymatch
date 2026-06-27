@@ -70,6 +70,21 @@ function stripRecruiterMetaLabels(text = '') {
     .join('\n');
 }
 
+function humanizeResumeBody(text = '') {
+  return String(text)
+    .split('\n')
+    .map((line) => {
+      let out = stripEmojis(line);
+      for (const [pattern, replacement] of BANNED_PHRASES) {
+        out = out.replace(pattern, replacement);
+      }
+      return out.replace(/  +/g, ' ').trimEnd();
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function humanizeText(text = '') {
   let out = stripEmojis(String(text));
   for (const [pattern, replacement] of BANNED_PHRASES) {
@@ -87,20 +102,20 @@ function humanizeKit(kit) {
     next.coverLetterParagraph = humanizeText(next.coverLetterParagraph);
   }
   if (next.resumeAddendum) {
-    next.resumeAddendum = humanizeText(next.resumeAddendum);
+    next.resumeAddendum = humanizeResumeBody(next.resumeAddendum);
   }
   if (next.tailoredResumeText) {
-    next.tailoredResumeText = humanizeText(next.tailoredResumeText);
+    next.tailoredResumeText = humanizeResumeBody(stripRecruiterMetaLabels(next.tailoredResumeText));
   }
   if (Array.isArray(next.supplementPages)) {
     next.supplementPages = next.supplementPages.map((page) => ({
       ...page,
       title: humanizeText(page.title).replace(/addendum|supplement|jd /gi, '').trim() || 'Resume',
-      content: humanizeText(page.content),
+      content: humanizeResumeBody(stripRecruiterMetaLabels(page.content)),
     }));
   }
   if (next.fullSupplementText) {
-    next.fullSupplementText = humanizeText(next.fullSupplementText);
+    next.fullSupplementText = humanizeResumeBody(stripRecruiterMetaLabels(next.fullSupplementText));
   }
   if (next.formatted) {
     next.formatted = humanizeText(next.formatted);

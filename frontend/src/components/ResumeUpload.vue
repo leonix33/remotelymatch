@@ -9,6 +9,7 @@ import {
   isZipDocxFile,
 } from '../utils/resumeText';
 import { normalizeResumeLayout } from '../utils/resumeLayout';
+import { prepareResumeTextForParsing } from '../utils/resumeRepair';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -40,7 +41,7 @@ async function extractDocxText(file) {
   }
   const arrayBuffer = await file.arrayBuffer();
   const { value, messages } = await mammoth.extractRawText({ arrayBuffer });
-  const text = normalizeResumeLayout(value || '');
+  const text = prepareResumeTextForParsing(value || '');
   if (!text && messages?.length) {
     throw new Error('Word file opened but no text was found. Try PDF or paste your resume.');
   }
@@ -174,7 +175,7 @@ async function handleFile(event) {
     }
 
     if (lowerName.endsWith('.txt') || lowerName.endsWith('.md') || lowerName.endsWith('.text')) {
-      const resumeText = (await file.text()).trim();
+      const resumeText = prepareResumeTextForParsing((await file.text()).trim());
       if (isUnreadableResumeText(resumeText)) {
         throw new Error('Could not read this file. Paste your resume text instead.');
       }

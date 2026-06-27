@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import ResumeDocumentPreview from './ResumeDocumentPreview.vue';
 
 const props = defineProps({
@@ -13,8 +13,6 @@ const props = defineProps({
     default: 'Upload or paste your resume to preview it here before applying.',
   },
 });
-
-const viewMode = ref('document');
 
 const hasContent = computed(() => !props.unreadable && (props.resumeText || '').trim().length >= 20);
 
@@ -44,32 +42,12 @@ const barColor = computed(() => {
       <div>
         <p class="text-sm font-medium text-slate-200">Resume preview</p>
         <p class="mt-0.5 text-xs text-slate-500">
-          {{ fileName ? fileName : 'Formatted like a Word document — this is what employers see' }}
+          {{ fileName ? fileName : 'Professional layout — same format for every candidate' }}
         </p>
       </div>
-      <div v-if="hasContent" class="flex items-center gap-3">
-        <div v-if="hasContent" class="flex rounded-lg border border-slate-700 bg-slate-900/60 p-0.5 text-xs">
-          <button
-            type="button"
-            class="rounded-md px-2.5 py-1 transition"
-            :class="viewMode === 'document' ? 'bg-teal-500/20 text-teal-200' : 'text-slate-500 hover:text-slate-300'"
-            @click="viewMode = 'document'"
-          >
-            Document
-          </button>
-          <button
-            type="button"
-            class="rounded-md px-2.5 py-1 transition"
-            :class="viewMode === 'plain' ? 'bg-teal-500/20 text-teal-200' : 'text-slate-500 hover:text-slate-300'"
-            @click="viewMode = 'plain'"
-          >
-            Plain text
-          </button>
-        </div>
-        <div class="text-right">
-          <p class="text-2xl font-bold" :class="scoreColor">{{ score }}</p>
-          <p class="text-xs text-slate-500">{{ scoreLabel }}</p>
-        </div>
+      <div v-if="hasContent" class="text-right">
+        <p class="text-2xl font-bold" :class="scoreColor">{{ score }}</p>
+        <p class="text-xs text-slate-500">{{ scoreLabel }}</p>
       </div>
     </div>
 
@@ -95,15 +73,7 @@ const barColor = computed(() => {
       </div>
 
       <div class="p-4">
-        <ResumeDocumentPreview
-          v-if="viewMode === 'document'"
-          :text="resumeText"
-          compact
-        />
-        <pre
-          v-else
-          class="custom-scrollbar max-h-[28rem] overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-700/80 bg-white/[0.03] p-5 font-sans text-sm leading-relaxed text-slate-200"
-        >{{ resumeText }}</pre>
+        <ResumeDocumentPreview :text="resumeText" compact />
       </div>
     </template>
   </div>

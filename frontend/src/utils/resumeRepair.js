@@ -2,6 +2,8 @@
  * Fix broken line breaks in pasted/extracted resumes before section parsing.
  */
 
+import { normalizeResumeLayout } from './resumeLayout';
+
 const FALSE_MID_SENTENCE_HEADERS = new Set(['EXPERIENCE', 'CERTIFICATION', 'SKILLS', 'TOOLS', 'EDUCATION']);
 const SECTION_HEADER_WORDS = new Set([
   'EXPERIENCE',
@@ -160,4 +162,9 @@ export function repairResumeLines(lines) {
 export function repairResumeText(text) {
   const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
   return repairResumeLines(lines).join('\n');
+}
+
+export function prepareResumeTextForParsing(text) {
+  const normalized = normalizeResumeLayout(repairResumeText(text));
+  return repairResumeText(normalized);
 }

@@ -1,5 +1,4 @@
-import { normalizeResumeLayout } from './resumeLayout';
-import { repairResumeText } from './resumeRepair';
+import { prepareResumeTextForParsing } from './resumeRepair';
 import {
   parseExperienceSectionLines,
   parseSkillsSectionLines,
@@ -162,8 +161,7 @@ function reconcileSpuriousToolsSections(sections) {
 }
 
 export function parseResumeForDisplay(resumeText = '') {
-  const normalized = normalizeResumeLayout(repairResumeText(resumeText));
-  const repaired = repairResumeText(normalized);
+  const repaired = prepareResumeTextForParsing(resumeText);
   const lines = repaired.split('\n');
   const sections = [];
   let headerLines = [];
@@ -207,7 +205,7 @@ export function parseResumeForDisplay(resumeText = '') {
     if (current) current.contentLines.push(line);
   }
 
-  if (!sections.length && normalized.trim()) {
+  if (!sections.length && repaired.trim()) {
     sections.push({ key: 'body', heading: '', contentLines: lines.filter((l) => l.trim()), immutable: false });
     headerLines = inferHeaderFromBody(lines);
   }

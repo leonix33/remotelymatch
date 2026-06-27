@@ -11,6 +11,7 @@ const {
   shouldReplaceCriteriaFromResume,
   isUnreadableResumeText,
 } = require('../services/resumeParseService');
+const { prepareResumeTextForParsing } = require('../services/resumeRepairService');
 
 const updateSchema = z.object({
   displayName: z.string().min(2).optional(),
@@ -118,13 +119,16 @@ async function updateMe(req, res, next) {
           'Resume text looks like a raw file upload, not readable text. Upload PDF or .docx, or paste plain text.',
       });
     }
-    if (body.resumeText && !body.extractedSkills) {
-      payload.extractedSkills = extractSkillsFromText(body.resumeText).all;
+    if (body.resumeText) {
+      payload.resumeText = prepareResumeTextForParsing(body.resumeText);
+    }
+    if (payload.resumeText && !body.extractedSkills) {
+      payload.extractedSkills = extractSkillsFromText(payload.resumeText).all;
       payload.resumeParsedAt = new Date();
       const existing = await profileService.getOrCreate(req.user.sub);
-      const parsed = { resumeText: body.resumeText, extractedSkills: { all: payload.extractedSkills } };
+      const parsed = { resumeText: payload.resumeText, extractedSkills: { all: payload.extractedSkills } };
       if (shouldReplaceCriteriaFromResume(existing, parsed)) {
-        const derived = criteriaFromResumeText(body.resumeText);
+        const derived = criteriaFromResumeText(payload.resumeText);
         if (derived.targetTitles.length) payload.targetTitles = derived.targetTitles;
         if (derived.mustHaveSkills.length) payload.mustHaveSkills = derived.mustHaveSkills;
         if (derived.niceToHaveSkills.length) payload.niceToHaveSkills = derived.niceToHaveSkills;

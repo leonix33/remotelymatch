@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import ResumeDocumentPreview from './ResumeDocumentPreview.vue';
 
 const props = defineProps({
@@ -8,8 +8,6 @@ const props = defineProps({
   compact: { type: Boolean, default: false },
   prominent: { type: Boolean, default: false },
 });
-
-const viewMode = ref('document');
 
 const resumeText = computed(() => {
   const k = props.kit;
@@ -48,31 +46,11 @@ const resumeText = computed(() => {
       </div>
 
       <div v-if="resumeText" class="mt-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="text-sm font-medium text-slate-200">Tailored resume</p>
-            <p class="mt-1 text-xs text-slate-500">
-              Professional layout — centered name, section headers, and your original structure.
-            </p>
-          </div>
-          <div class="flex rounded-lg border border-slate-700 bg-slate-900/60 p-0.5 text-xs">
-            <button
-              type="button"
-              class="rounded-md px-3 py-1.5 transition"
-              :class="viewMode === 'document' ? 'bg-teal-500/20 text-teal-200' : 'text-slate-500 hover:text-slate-300'"
-              @click="viewMode = 'document'"
-            >
-              Document
-            </button>
-            <button
-              type="button"
-              class="rounded-md px-3 py-1.5 transition"
-              :class="viewMode === 'plain' ? 'bg-teal-500/20 text-teal-200' : 'text-slate-500 hover:text-slate-300'"
-              @click="viewMode = 'plain'"
-            >
-              Plain text
-            </button>
-          </div>
+        <div>
+          <p class="text-sm font-medium text-slate-200">Tailored resume</p>
+          <p class="mt-1 text-xs text-slate-500">
+            Same professional layout as your base resume — skills, jobs, education, and certs organized consistently.
+          </p>
         </div>
 
         <p v-if="kit.resumeStructure?.sectionHeadings?.length" class="mt-2 text-xs text-slate-600">
@@ -80,17 +58,11 @@ const resumeText = computed(() => {
         </p>
 
         <ResumeDocumentPreview
-          v-if="viewMode === 'document'"
           class="mt-4"
           :class="prominent ? 'resume-preview-prominent' : ''"
           :text="resumeText"
           :scale="prominent ? 'full' : 'fit'"
         />
-
-        <pre
-          v-else
-          class="custom-scrollbar mt-4 max-h-[32rem] overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-700/80 bg-white/[0.03] p-5 font-sans text-sm leading-relaxed text-slate-200"
-        >{{ resumeText }}</pre>
       </div>
 
       <div v-if="kit.coverLetterParagraph && !compact" class="mt-5">

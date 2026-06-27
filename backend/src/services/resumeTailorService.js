@@ -2,6 +2,7 @@ const openaiService = require('./openaiService');
 const env = require('../config/env');
 const { contactHeader, contactSignature } = require('./applicantContactService');
 const { HUMAN_WRITING_PROMPT, humanizeKit } = require('./humanizeWritingService');
+const { prepareResumeTextForParsing } = require('./resumeRepairService');
 const {
   parseResumeStructure,
   describeStructureForPrompt,
@@ -354,31 +355,48 @@ function normalizeKit(kit, profile, job, jobDescription, missingKeywords, contac
       baseMatch + (tailorMode === 'high_match' ? Math.max(8, (options.highMatchTarget || 90) - baseMatch) : 4)
   );
 
-  return humanizeKit({
+  return finalizeNormalizedKit(
+    humanizeKit({
+      ...kit,
+      mode: 'full_resume',
+      tailored: true,
+      tailorMode,
+      supplementPagesTarget: pageTarget,
+      highMatchTarget: options.highMatchTarget || kit.highMatchTarget || 90,
+      estimatedMatchPct,
+      pageCount: supplementPages.length,
+      supplementPages,
+      tailoredResumeText,
+      fullSupplementText: tailoredResumeText,
+      resumeAddendum: tailoredResumeText,
+      resumeStructure: {
+        sectionOrder: structure.sectionOrder,
+        headingStyle: structure.headingStyle,
+        sectionHeadings: structure.sections.map((s) => s.heading).filter(Boolean),
+      },
+      missingKeywords: kit.missingKeywords?.length ? kit.missingKeywords : missingKeywords,
+      contactEmail: contact.email || kit.contactEmail || '',
+      contactName: contact.name || kit.contactName || profile?.displayName || '',
+      jobDescriptionLength: jobDescription.length,
+      atsTips: [],
+      guardrails: kit.guardrails || 'Tailored resume preserves all credentials and original section structure.',
+    }),
+    pageTarget
+  );
+}
+
+function finalizeNormalizedKit(kit, pageTarget) {
+  if (!kit?.tailoredResumeText) return kit;
+  const tailoredResumeText = prepareResumeTextForParsing(kit.tailoredResumeText);
+  const supplementPages = splitResumeIntoPages(tailoredResumeText, pageTarget);
+  return {
     ...kit,
-    mode: 'full_resume',
-    tailored: true,
-    tailorMode,
-    supplementPagesTarget: pageTarget,
-    highMatchTarget: options.highMatchTarget || kit.highMatchTarget || 90,
-    estimatedMatchPct,
-    pageCount: supplementPages.length,
-    supplementPages,
     tailoredResumeText,
     fullSupplementText: tailoredResumeText,
     resumeAddendum: tailoredResumeText,
-    resumeStructure: {
-      sectionOrder: structure.sectionOrder,
-      headingStyle: structure.headingStyle,
-      sectionHeadings: structure.sections.map((s) => s.heading).filter(Boolean),
-    },
-    missingKeywords: kit.missingKeywords?.length ? kit.missingKeywords : missingKeywords,
-    contactEmail: contact.email || kit.contactEmail || '',
-    contactName: contact.name || kit.contactName || profile?.displayName || '',
-    jobDescriptionLength: jobDescription.length,
-    atsTips: [],
-    guardrails: kit.guardrails || 'Tailored resume preserves all credentials and original section structure.',
-  });
+    supplementPages,
+    pageCount: supplementPages.length,
+  };
 }
 
 async function generateAdditiveKit({
@@ -429,6 +447,7 @@ STRUCTURE RULES (highest priority):
 10. Do not invent employers, dates, certifications, degrees, or metrics.
 11. Plain professional English — no emojis, no AI/meta language.
 12. FORBIDDEN: "addendum", "supplement", "JD mapping", "ATS glossary", match percentages.
+13. Keep section content on separate lines — job titles, dates, and bullets must not collapse into one paragraph.
 
 ${HUMAN_WRITING_PROMPT}
 

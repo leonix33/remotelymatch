@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import http from '../api/http';
 import { readProfileCache, writeProfileCache, clearProfileCache } from '../utils/profileDraft';
 import { isUnreadableResumeText, sanitizeResumeProfile, sleep } from '../utils/resumeText';
+import { prepareResumeTextForParsing } from '../utils/resumeRepair';
 
 function currentUserId() {
   try {
@@ -92,9 +93,10 @@ export const useProfileStore = defineStore('profile', {
       if (isUnreadableResumeText(resumeText)) {
         throw new Error('Could not read this file. Try PDF or paste your resume text.');
       }
+      const normalized = prepareResumeTextForParsing(resumeText);
       return this.save(
         {
-          resumeText,
+          resumeText: normalized,
           resumeFileName,
           ...extra,
         },
