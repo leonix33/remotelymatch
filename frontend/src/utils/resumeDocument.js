@@ -1,4 +1,10 @@
 import { normalizeResumeLayout } from './resumeLayout';
+import {
+  mergeOrphanPrefixLines,
+  tryParseJobBlock,
+  splitParagraphToBullets,
+  parseJobHeaderLine,
+} from './resumeExperienceParser';
 
 const IMMUTABLE_SECTION_KEYS = new Set([
   'education',
@@ -59,10 +65,67 @@ function isLikelySectionHeader(line) {
 }
 
 function classifySectionLines(contentLines, sectionKey) {
+  if (sectionKey === 'experience') {
+    return parseExperienceSectionLines(contentLines);
+  }
   const rows = [];
   for (const line of contentLines) {
     rows.push(...classifyContentLine(line, sectionKey));
   }
+  return rows;
+}
+
+function parseExperienceSectionLines(contentLines) {
+  const merged = mergeOrphanPrefixLines(contentLines);
+  const rows = [];
+
+  for (const line of merged) {
+    const t = String(line || '').trim();
+    if (!t) {
+      rows.push({ type: 'spacer' });
+      continue;
+    }
+
+    if (/^[-•*●▪◦]\s/.test(t)) {
+      rows.push({ type: 'bullet', text: t.replace(/^[-•*●▪◦]\s+/, '') });
+      continue;
+    }
+
+    if (/^\d+[\).]\s/.test(t)) {
+      rows.push({ type: 'bullet', text: t.replace(/^\d+[\).]\s+/, ''), ordered: true });
+      continue;
+    }
+
+    const jobBlock = tryParseJobBlock(t);
+    if (jobBlock) {
+      rows.push(jobBlock);
+      continue;
+    }
+
+    if (t.length < 160 && (/\|/.test(t) || /\s—\s/.test(t)) && !/^https?:\/\//i.test(t)) {
+      rows.push(parseJobHeaderLine(t));
+      continue;
+    }
+
+    if (t.length > 100) {
+      const bullets = splitParagraphToBullets(t);
+      if (bullets) {
+        rows.push(...bullets);
+        continue;
+      }
+    }
+
+    if (
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}\b/i.test(t) &&
+      t.length < 90
+    ) {
+      rows.push({ type: 'date', text: t });
+      continue;
+    }
+
+    rows.push({ type: 'text', text: t });
+  }
+
   return rows;
 }
 
@@ -241,7 +304,13 @@ export function classifyContentLine(line, sectionKey = '') {
     }
   }
 
-  // Long paragraph in body — split into sentences for readability
+  // Long experience paragraphs → bullets
+  if (t.length > 100 && sectionKey === 'experience') {
+    const bullets = splitParagraphToBullets(t);
+    if (bullets) return bullets;
+  }
+
+  // Long paragraph in summary — split into sentences
   if (t.length > 220 && sectionKey === 'summary') {
     const sentences = t.match(/[^.!?]+[.!?]+/g) || [t];
     if (sentences.length > 1) {

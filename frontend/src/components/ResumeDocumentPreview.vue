@@ -29,18 +29,6 @@ function sectionHeadingClass(heading, style) {
   }
   return 'resume-section-title';
 }
-
-function jobHeaderParts(text) {
-  if (text.includes('|')) {
-    const [left, right] = text.split('|').map((s) => s.trim());
-    return { title: left, meta: right };
-  }
-  if (/\s—\s/.test(text)) {
-    const [left, right] = text.split(/\s—\s/).map((s) => s.trim());
-    return { title: left, meta: right };
-  }
-  return { title: text, meta: '' };
-}
 </script>
 
 <template>
@@ -82,11 +70,19 @@ function jobHeaderParts(text) {
           <template v-for="(row, ridx) in section.lines" :key="ridx">
             <div v-if="row.type === 'spacer'" class="resume-spacer" />
 
+            <article v-else-if="row.type === 'job-block'" class="resume-job-block">
+              <div class="resume-job-block-top">
+                <h3 class="resume-job-block-title">{{ row.title }}</h3>
+                <span v-if="row.dates" class="resume-job-block-dates">{{ row.dates }}</span>
+              </div>
+              <p v-if="row.company" class="resume-job-block-company">{{ row.company }}</p>
+              <div v-if="row.tags?.length" class="resume-job-block-tags">
+                <span v-for="(tag, tidx) in row.tags" :key="tidx" class="resume-job-tag">{{ tag }}</span>
+              </div>
+            </article>
+
             <p v-else-if="row.type === 'job-header'" class="resume-job-header">
-              <span class="resume-job-title">{{ jobHeaderParts(row.text).title }}</span>
-              <span v-if="jobHeaderParts(row.text).meta" class="resume-job-meta">
-                {{ jobHeaderParts(row.text).meta }}
-              </span>
+              <span class="resume-job-title">{{ row.text }}</span>
             </p>
 
             <p v-else-if="row.type === 'date'" class="resume-date-line">{{ row.text }}</p>
@@ -96,10 +92,7 @@ function jobHeaderParts(text) {
             <ul
               v-else-if="row.type === 'bullet'"
               class="resume-bullet-list"
-              :class="{
-                'resume-bullet-nested': row.indent > 2,
-                'resume-skill-list': row.skill,
-              }"
+              :class="{ 'resume-bullet-nested': row.indent > 2 }"
             >
               <li class="resume-bullet-item">{{ row.text }}</li>
             </ul>
