@@ -31,6 +31,8 @@ function statusClass(s) {
   return 'badge-slate';
 }
 
+const companyInitial = (name) => (name || '?').charAt(0).toUpperCase();
+
 onMounted(load);
 </script>
 
@@ -41,8 +43,8 @@ onMounted(load);
 
     <ApplyWorkflowBanner class="mt-6" />
 
-    <div class="mt-6 flex flex-wrap items-center gap-3">
-      <select v-model="statusFilter" class="input w-auto" @change="load">
+    <div class="mt-6 mobile-stack-filters flex flex-wrap items-center gap-3">
+      <select v-model="statusFilter" class="input w-full sm:w-auto" @change="load">
         <option value="">All statuses</option>
         <option value="submitted">Submitted</option>
         <option value="bot-blocked">Bot blocked</option>
@@ -58,7 +60,40 @@ onMounted(load);
     <p v-if="error" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
 
     <div v-if="loading" class="mt-8 text-slate-400">Loading applications…</div>
-    <div v-else class="mt-6 overflow-x-auto">
+    <div v-else class="mt-6">
+      <div v-if="apps.length" class="mobile-applied-cards md:hidden">
+        <div v-for="app in apps" :key="`card-${app.jobId || app._id}`" class="mobile-applied-card">
+          <div class="flex items-start gap-3">
+            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-teal-300">
+              {{ companyInitial(app.company) }}
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="font-medium text-slate-200">{{ app.title }}</p>
+              <p class="mt-0.5 text-xs text-slate-500">
+                {{ app.company || 'Unknown company' }} · {{ app.source || 'Unknown board' }}
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <RouterLink to="/calendar" class="badge text-xs hover:opacity-80" :class="statusClass(app.status)">
+                  {{ app.status }}
+                </RouterLink>
+                <span class="text-xs text-slate-500">{{ app.attempts || 0 }} attempt{{ (app.attempts || 0) === 1 ? '' : 's' }}</span>
+                <span class="text-xs text-slate-500">{{ app.lastAttempted || '—' }}</span>
+              </div>
+              <a
+                v-if="app.applyUrl || app.jobUrl"
+                :href="app.applyUrl || app.jobUrl"
+                target="_blank"
+                rel="noopener"
+                class="mt-2 inline-block text-sm text-teal-400 hover:underline"
+              >
+                Open job →
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mobile-table-wrap hidden overflow-x-auto md:block">
       <table v-if="apps.length" class="w-full text-left text-sm">
         <thead>
           <tr class="border-b border-slate-700 text-slate-400">
@@ -91,7 +126,8 @@ onMounted(load);
           </tr>
         </tbody>
       </table>
-      <div v-else class="rounded-xl border border-dashed border-slate-700 bg-slate-800/30 p-8 text-center">
+      </div>
+      <div v-if="!apps.length" class="rounded-xl border border-dashed border-slate-700 bg-slate-800/30 p-8 text-center">
         <p class="font-medium text-slate-300">No applications yet</p>
         <p class="mt-2 text-sm text-slate-500">
           Approve jobs in your apply queue, then run Apply Approved. Status updates will show here.

@@ -81,7 +81,35 @@ const hasData = computed(() => props.jobs.length > 0 || props.companies.length >
         </div>
       </div>
 
-      <div v-if="jobs.length" class="mt-5 overflow-x-auto rounded-xl border border-slate-800">
+      <div v-if="jobs.length" class="mt-5">
+        <div class="mobile-applied-cards md:hidden">
+          <div v-for="job in jobs" :key="`card-${job.jobId}`" class="mobile-applied-card">
+            <div class="flex items-start gap-3">
+              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-teal-300">
+                {{ companyInitial(job.company) }}
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="font-medium text-slate-200">{{ job.company || '—' }}</p>
+                <a
+                  v-if="job.url"
+                  :href="job.url"
+                  target="_blank"
+                  rel="noopener"
+                  class="mt-1 block text-sm text-slate-300 hover:text-teal-300 hover:underline"
+                >
+                  {{ job.title }}
+                </a>
+                <p v-else class="mt-1 text-sm text-slate-300">{{ job.title }}</p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <span class="badge text-xs" :class="statusClass(job.status)">{{ statusLabel(job.status) }}</span>
+                  <span class="text-xs text-slate-500">{{ formatDate(job.submittedAt || job.lastAttempted) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mobile-table-wrap hidden overflow-x-auto rounded-xl border border-slate-800 md:block">
         <table class="w-full min-w-[32rem] text-left text-sm">
           <thead>
             <tr class="border-b border-slate-800 bg-slate-900/60 text-xs uppercase tracking-wide text-slate-500">
@@ -124,6 +152,7 @@ const hasData = computed(() => props.jobs.length > 0 || props.companies.length >
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </template>
   </div>

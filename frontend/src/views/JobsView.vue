@@ -141,7 +141,7 @@ watch([section, minMatch], load);
     </p>
     <p v-if="queueError" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ queueError }}</p>
 
-    <div class="mt-6 flex flex-wrap gap-3">
+    <div class="mt-6 mobile-stack-filters flex flex-wrap gap-3">
       <select v-model="section" class="input w-auto">
         <option value="all">All sections</option>
         <option value="apply_today">Apply Today</option>
@@ -172,25 +172,25 @@ watch([section, minMatch], load);
             <span v-if="job.atsType && job.atsType !== 'unknown'" class="badge badge-gold">{{ job.atsType }}</span>
           </div>
         </div>
-        <div class="mt-3 flex flex-wrap gap-2 text-sm">
-          <a v-if="job.url" :href="job.url" target="_blank" rel="noopener" class="text-teal-400 hover:underline">View job →</a>
+        <div class="mt-3 mobile-job-actions flex flex-wrap gap-2 text-sm">
+          <a v-if="job.url" :href="job.url" target="_blank" rel="noopener" class="mobile-job-link text-teal-400 hover:underline">View job →</a>
           <button
-            class="btn-secondary px-2 py-1 text-xs"
+            class="btn-secondary"
             :disabled="savingJobId === job.jobId"
             @click="toggleSave(job)"
           >
             {{ isSaved(job.jobId) ? '★ Saved' : '☆ Save' }}
           </button>
           <button
-            class="btn-primary px-2 py-1 text-xs"
+            class="btn-primary"
             :disabled="queueing === job.jobId"
             @click="addJobToQueue(job)"
           >
             {{ queueing === job.jobId ? '…' : '+ Queue' }}
           </button>
-          <button class="btn-secondary px-2 py-1 text-xs" @click="runCopilot(job)">Match Copilot</button>
-          <button class="btn-secondary px-2 py-1 text-xs" @click="runResumeDiff(job)">Application kit</button>
-          <button class="btn-secondary px-2 py-1 text-xs" @click="openSquad(job)">Apply squad</button>
+          <button class="btn-secondary" @click="runCopilot(job)">Match Copilot</button>
+          <button class="btn-secondary" @click="runResumeDiff(job)">Application kit</button>
+          <button class="btn-secondary" @click="openSquad(job)">Apply squad</button>
         </div>
       </div>
       <p v-if="!jobs.length" class="rounded-xl border border-dashed border-slate-700 bg-slate-800/30 p-6 text-center text-slate-500">
@@ -199,8 +199,8 @@ watch([section, minMatch], load);
       </p>
     </div>
 
-    <div v-if="copilotJob" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="copilotJob = null">
-      <div class="card max-h-[80vh] w-full max-w-lg overflow-y-auto p-6">
+    <div v-if="copilotJob" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet" @click.self="copilotJob = null">
+      <div class="card w-full max-w-lg overflow-y-auto p-4 sm:max-h-[80vh] sm:p-6">
         <h3 class="font-semibold text-slate-200">Match Copilot — {{ copilotJob.title }}</h3>
         <p v-if="aiLoading" class="mt-4 text-slate-400">Analyzing…</p>
         <div v-else-if="copilot?.analysis" class="mt-4 space-y-3 text-sm">
@@ -223,8 +223,8 @@ watch([section, minMatch], load);
       @close="kitOpen = false"
     />
 
-    <div v-if="squadJob" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="squadJob = null">
-      <form class="card w-full max-w-md p-6" @submit.prevent="createSquad">
+    <div v-if="squadJob" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet" @click.self="squadJob = null">
+      <form class="card w-full max-w-md p-4 sm:p-6" @submit.prevent="createSquad">
         <h3 class="font-semibold text-slate-200">Apply squad — {{ squadJob.company }}</h3>
         <p class="mt-1 text-sm text-slate-500">Invite teammates to coordinate on this role</p>
         <label v-for="c in contacts" :key="c.id" class="mt-2 flex gap-2 text-sm">

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { parseResumeForDisplay, parseResumeHeader, splitContactParts, isSkillsTagline } from '../utils/resumeDocument';
 import ResumeDocumentRow from './ResumeDocumentRow.vue';
 
@@ -8,6 +8,12 @@ const props = defineProps({
   scale: { type: String, default: 'fit' }, // fit | full
   compact: { type: Boolean, default: false },
 });
+
+const shellRef = ref(null);
+const pageRef = ref(null);
+const pageScale = ref(1);
+const scaledHeight = ref('auto');
+let resizeObserver = null;
 
 const doc = computed(() => parseResumeForDisplay(props.text));
 const header = computed(() => parseResumeHeader(doc.value.headerLines));
@@ -54,17 +60,65 @@ function sectionHeadingClass(heading, style) {
   }
   return 'resume-section-title';
 }
+
+function updatePageScale() {
+  const shell = shellRef.value;
+  const page = pageRef.value;
+  if (!shell || !page || props.scale === 'full') {
+    pageScale.value = 1;
+    scaledHeight.value = 'auto';
+    return;
+  }
+
+  const available = shell.clientWidth;
+  const natural = page.offsetWidth;
+  if (!available || !natural) {
+    pageScale.value = 1;
+    scaledHeight.value = 'auto';
+    return;
+  }
+
+  const nextScale = Math.min(1, available / natural);
+  pageScale.value = nextScale;
+  scaledHeight.value = `${page.offsetHeight * nextScale}px`;
+}
+
+onMounted(() => {
+  resizeObserver = new ResizeObserver(() => updatePageScale());
+  if (shellRef.value) resizeObserver.observe(shellRef.value);
+  updatePageScale();
+});
+
+onUnmounted(() => {
+  resizeObserver?.disconnect();
+});
+
+watch(
+  () => [props.text, props.scale, doc.value.sections.length],
+  () => {
+    requestAnimationFrame(updatePageScale);
+  }
+);
 </script>
 
 <template>
   <div
+    ref="shellRef"
     class="resume-doc-shell"
     :class="[
+      scale === 'fit' ? 'resume-doc-shell-fit' : '',
       scale === 'full' ? 'resume-doc-shell-full' : '',
       compact ? 'resume-doc-shell-compact' : '',
     ]"
   >
-    <div class="resume-page resume-template-pro" role="document" aria-label="Resume preview">
+    <div class="resume-doc-scale-host" :style="{ height: scaledHeight }">
+      <div
+        ref="pageRef"
+        class="resume-page resume-template-pro"
+        :style="scale === 'fit' ? { transform: `scale(${pageScale})`, transformOrigin: 'top left' } : undefined"
+        role="document"
+        aria-label="Resume preview"
+      >
       <header v-if="header.name || header.taglines.length || header.contact.length" class="resume-header-block">
         <h1 class="resume-name">{{ header.name }}</h1>
         <p v-for="(tag, idx) in header.taglines" :key="idx" :class="taglineClass(tag, idx)">
@@ -112,6 +166,7 @@ function sectionHeadingClass(heading, style) {
       </section>
 
       <p v-if="!doc.sections.length && text" class="resume-fallback">{{ text }}</p>
+      </div>
     </div>
   </div>
 </template>

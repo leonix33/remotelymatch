@@ -64,7 +64,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="fixed inset-x-0 z-50 flex flex-col gap-2 px-4 safe-x" style="top: env(safe-area-inset-top, 0);">
+  <div class="mobile-pwa-banners fixed inset-x-0 z-50 flex flex-col gap-2 px-4 safe-x lg:top-0" style="top: env(safe-area-inset-top, 0);">
     <div
       v-if="needRefresh"
       class="flex items-center justify-between gap-3 rounded-xl border border-teal-700/50 bg-slate-900/95 px-4 py-3 text-sm shadow-lg backdrop-blur"

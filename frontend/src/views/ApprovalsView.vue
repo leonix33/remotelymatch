@@ -312,7 +312,7 @@ onMounted(async () => {
 <template>
   <div>
     <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
+      <div class="min-w-0 flex-1">
         <h2 class="text-2xl font-bold text-slate-100">{{ isAdmin ? 'Apply queue' : 'My queue' }}</h2>
         <p class="mt-1 max-w-xl text-slate-400">
           {{ isAdmin
@@ -320,7 +320,7 @@ onMounted(async () => {
             : 'Review jobs, approve the ones you want, then apply.' }}
         </p>
       </div>
-      <div class="flex flex-wrap gap-3">
+      <div class="mobile-queue-stats flex flex-wrap gap-3">
         <div class="card px-4 py-3 text-center">
           <p class="text-2xl font-bold text-amber-300">{{ counts.pending }}</p>
           <p class="text-xs text-slate-500">pending</p>
@@ -329,7 +329,7 @@ onMounted(async () => {
           <p class="text-2xl font-bold text-teal-300">{{ counts.approved }}</p>
           <p class="text-xs text-slate-500">approved</p>
         </div>
-        <div v-if="counts.approved > 0" class="card flex flex-col gap-3 self-center px-4 py-3 min-w-[240px]">
+        <div v-if="counts.approved > 0" class="card mobile-queue-apply-card flex flex-col gap-3 self-center px-4 py-3 min-w-[240px]">
           <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Apply settings</p>
           <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
             <input v-model="applyResumeMode" type="radio" value="base" class="accent-teal-500" />
@@ -386,8 +386,8 @@ onMounted(async () => {
       </template>
     </div>
 
-    <div class="mt-6 flex flex-wrap items-end gap-3">
-      <div class="flex flex-wrap gap-2">
+    <div class="mt-6 mobile-stack-filters flex flex-wrap items-end gap-3">
+      <div class="mobile-filter-tabs flex flex-wrap gap-2">
         <button
           v-for="tab in ['pending', 'approved', 'rejected', 'all']"
           :key="tab"
@@ -398,7 +398,7 @@ onMounted(async () => {
           {{ tab }}
         </button>
       </div>
-      <input v-model="search" class="input max-w-[200px] text-sm" placeholder="Search title or company" />
+      <input v-model="search" class="input w-full text-sm sm:max-w-[200px]" placeholder="Search title or company" />
       <select v-model="minMatch" class="input w-auto text-sm">
         <option value="85">85%+ match</option>
         <option value="75">75%+ match</option>
@@ -491,31 +491,23 @@ onMounted(async () => {
               </RouterLink>
             </div>
           </div>
-          <div class="mt-3 flex flex-wrap items-center gap-3 text-sm">
-            <a v-if="job.url" :href="job.url" target="_blank" rel="noopener" class="text-teal-400 hover:underline">View job →</a>
+          <div class="mt-3 mobile-job-actions flex flex-wrap items-center gap-3 text-sm">
+            <a v-if="job.url" :href="job.url" target="_blank" rel="noopener" class="mobile-job-link text-teal-400 hover:underline">View job →</a>
             <button
               type="button"
-              class="text-sky-400 hover:underline"
+              class="text-sky-400 hover:underline min-h-[44px]"
               @click="openJobLinkedIn(job)"
             >
               {{ isLinkedInJob(job) ? 'Open in LinkedIn →' : 'Search on LinkedIn →' }}
             </button>
-            <RouterLink to="/linkedin" class="text-xs text-slate-500 hover:text-slate-300">LinkedIn workflow</RouterLink>
-            <button type="button" class="text-violet-400 hover:underline" @click="openKit(job)">
+            <button type="button" class="btn-secondary" @click="openKit(job)">
               {{ job.kit?.hasKit ? 'View tailored resume' : 'Application kit' }}
             </button>
-            <router-link
-              v-if="job.kit?.hasKit"
-              to="/tailored-resumes"
-              class="text-xs text-slate-500 hover:text-slate-300"
-            >
-              All tailored →
-            </router-link>
             <template v-if="status === 'pending' || job.status === 'pending'">
-              <button class="btn-primary px-3 py-1.5 text-xs" :disabled="acting === job.jobId" @click="approve(job.jobId)">
+              <button class="btn-primary" :disabled="acting === job.jobId" @click="approve(job.jobId)">
                 Approve
               </button>
-              <button class="btn-secondary px-3 py-1.5 text-xs" :disabled="acting === job.jobId" @click="reject(job.jobId)">
+              <button class="btn-secondary" :disabled="acting === job.jobId" @click="reject(job.jobId)">
                 Skip
               </button>
             </template>

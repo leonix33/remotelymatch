@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router';
 import { useAuthStore } from './stores/auth';
 import { useProfileStore } from './stores/profile';
@@ -8,25 +8,25 @@ import AppLogo from './components/AppLogo.vue';
 import AppSidebar from './components/AppSidebar.vue';
 import AppConcierge from './components/AppConcierge.vue';
 import NotificationBell from './components/NotificationBell.vue';
+import MobileMoreMenu from './components/MobileMoreMenu.vue';
+import { simpleNav } from './utils/navigation';
 import { isProduction, canonicalDomain } from './config';
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const showMoreMenu = ref(false);
 
-const mobileNav = computed(() => [
-  { to: '/', label: 'Apply', icon: '▶' },
-  { to: '/jobs', label: 'Jobs', icon: '◎' },
-  { to: '/approvals', label: 'Queue', icon: '✓' },
-  { to: '/profile', label: 'Profile', icon: '◆' },
-]);
+const mobileNav = computed(() => simpleNav.map((item) => ({ ...item, to: item.to })));
 
 const mainClass = computed(() => {
-  if (route.path === '/onboarding') return 'mobile-main flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-8';
-  return 'mobile-main mobile-main-with-tabs flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-8 lg:pb-8';
+  const base = 'mobile-main flex-1 overflow-y-auto overflow-x-hidden lg:p-8';
+  if (route.path === '/onboarding') return `${base} mobile-main-onboarding pt-2 pb-4`;
+  return `${base} mobile-main-with-tabs py-4 lg:pb-8`;
 });
 
 function isMobileActive(item) {
+  if (item.exact) return route.path === item.to;
   return route.path === item.to || (item.to !== '/' && route.path.startsWith(item.to));
 }
 
@@ -61,12 +61,15 @@ onUnmounted(() => {
     <RouterView />
   </div>
   <div v-else class="mobile-app-shell flex min-h-screen min-h-dvh w-full">
-    <PwaPrompt />
-
     <AppSidebar :on-logout="logout" />
 
-    <div class="flex min-w-0 flex-1 flex-col">
-      <header class="mobile-header safe-top flex items-center justify-between border-b border-teal-900/30 bg-slate-950/80 py-3 backdrop-blur lg:hidden">
+    <div class="flex min-w-0 flex-1 flex-col mobile-content-column">
+      <PwaPrompt />
+
+      <header
+        v-if="route.path !== '/onboarding'"
+        class="mobile-header safe-top flex items-center justify-between border-b border-teal-900/30 bg-slate-950/80 py-3 backdrop-blur lg:hidden"
+      >
         <AppLogo size="sm" />
         <div class="flex items-center gap-2">
           <NotificationBell />
@@ -103,9 +106,20 @@ onUnmounted(() => {
           <span class="mobile-tab-icon" :class="isMobileActive(item) ? 'text-teal-300' : 'text-slate-500'">
             {{ item.icon }}
           </span>
-          <span class="mobile-tab-label">{{ item.label }}</span>
+          <span class="mobile-tab-label">{{ item.label === 'My Queue' ? 'Queue' : item.label }}</span>
         </RouterLink>
+        <button
+          type="button"
+          class="mobile-tab flex flex-1 flex-col items-center justify-center gap-0.5 font-medium text-slate-400 transition hover:text-slate-300"
+          aria-label="More navigation"
+          @click="showMoreMenu = true"
+        >
+          <span class="mobile-tab-icon text-slate-500">☰</span>
+          <span class="mobile-tab-label">More</span>
+        </button>
       </nav>
+
+      <MobileMoreMenu :open="showMoreMenu" @close="showMoreMenu = false" />
     </div>
 
     <AppConcierge

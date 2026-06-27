@@ -666,6 +666,26 @@ body {
   padding: 0.55in 0.65in 0.7in;
 }
 
+.resume-doc-shell-fit {
+  overflow: hidden;
+  padding: 0.5rem 0.35rem;
+}
+
+.resume-doc-scale-host {
+  width: 100%;
+  overflow: hidden;
+}
+
+.resume-doc-shell-fit .resume-page.resume-template-pro {
+  width: 8.5in;
+  max-width: none;
+}
+
+.resume-doc-shell-fit.resume-doc-shell-compact .resume-page {
+  max-height: none;
+  overflow: visible;
+}
+
 /* Professional resume page — matches Leonix-style layout */
 .resume-page.resume-template-pro {
   @apply mx-auto max-w-[8.5in];
@@ -1348,6 +1368,156 @@ body {
   .mobile-stack-filters select {
     max-width: 100% !important;
     width: 100%;
+  }
+
+  .mobile-job-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .mobile-job-actions .btn-primary,
+  .mobile-job-actions .btn-secondary {
+    width: 100%;
+    min-height: 44px;
+    font-size: 0.875rem;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .mobile-job-actions .mobile-job-link {
+    grid-column: 1 / -1;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .mobile-queue-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .mobile-queue-stats .mobile-queue-apply-card {
+    grid-column: 1 / -1;
+    min-width: 0 !important;
+  }
+
+  .mobile-filter-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .mobile-filter-tabs button {
+    min-height: 44px;
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+
+  .mobile-modal-sheet {
+    align-items: stretch !important;
+    padding: 0 !important;
+  }
+
+  .mobile-modal-sheet > .card,
+  .mobile-modal-sheet > .mobile-kit-panel {
+    max-height: 100dvh !important;
+    height: 100dvh;
+    width: 100% !important;
+    max-width: none !important;
+    border-radius: 0 !important;
+    padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px))
+      max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px)) !important;
+  }
+
+  .mobile-pwa-banners {
+    top: calc(env(safe-area-inset-top, 0px) + 3.35rem);
+  }
+
+  .mobile-content-column {
+    min-width: 0;
+  }
+
+  .mobile-main-onboarding {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-more-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(4px);
+  }
+
+  .mobile-more-sheet {
+    width: 100%;
+    border-top-left-radius: 1.25rem;
+    border-top-right-radius: 1.25rem;
+    border: 1px solid rgba(45, 212, 191, 0.15);
+    background: rgba(15, 23, 42, 0.98);
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+  }
+
+  .mobile-more-handle {
+    width: 2.5rem;
+    height: 0.28rem;
+    margin: 0.65rem auto 0;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.45);
+  }
+
+  .mobile-more-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .mobile-more-link {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 48px;
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.85rem;
+    border: 1px solid rgba(51, 65, 85, 0.65);
+    background: rgba(30, 41, 59, 0.45);
+    font-size: 0.875rem;
+    color: #cbd5e1;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .mobile-more-link-active {
+    border-color: rgba(45, 212, 191, 0.35);
+    background: rgba(20, 184, 166, 0.12);
+    color: #ccfbf1;
+  }
+
+  .mobile-more-link-icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    text-align: center;
+  }
+
+  .mobile-applied-cards {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .mobile-applied-card {
+    border-radius: 0.85rem;
+    border: 1px solid rgba(51, 65, 85, 0.65);
+    background: rgba(15, 23, 42, 0.55);
+    padding: 0.85rem 1rem;
+  }
+
+  .mobile-kit-tabs button {
+    min-height: 44px;
+    padding: 0.55rem 0.9rem !important;
   }
 }
 

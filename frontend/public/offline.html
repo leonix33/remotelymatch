@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Offline — RemoteMatch</title>
     <style>
       body {
@@ -13,9 +13,14 @@
         align-items: center;
         justify-content: center;
         min-height: 100vh;
+        min-height: 100dvh;
         margin: 0;
         text-align: center;
         padding: 2rem;
+        padding-top: max(2rem, env(safe-area-inset-top));
+        padding-bottom: max(2rem, env(safe-area-inset-bottom));
+        padding-left: max(2rem, env(safe-area-inset-left));
+        padding-right: max(2rem, env(safe-area-inset-right));
       }
       h1 { color: #14b8a6; }
     </style>
