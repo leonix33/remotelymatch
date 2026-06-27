@@ -2,6 +2,8 @@
  * Parse a plain-text resume into ordered sections while preserving original headings.
  */
 
+const { normalizeResumeLayout } = require('./resumeLayoutService');
+
 const IMMUTABLE_SECTION_KEYS = new Set([
   'education',
   'certifications',
@@ -12,7 +14,7 @@ const IMMUTABLE_SECTION_KEYS = new Set([
 ]);
 
 const SECTION_DEFS = [
-  { key: 'summary', labels: /^(professional\s+)?summary$|^profile$|^objective$|^about(\s+me)?$/i },
+  { key: 'summary', labels: /^(professional\s+)?summary$|^executive\s+summary$|^career\s+summary$|^profile$|^objective$|^about(\s+me)?$/i },
   {
     key: 'experience',
     labels:
@@ -30,8 +32,12 @@ const SECTION_DEFS = [
   { key: 'volunteer', labels: /^volunteer(ing)?$|^community$/i },
 ];
 
+function stripHeader(line) {
+  return String(line).trim().replace(/:+\s*$/, '');
+}
+
 function classifySectionHeading(line) {
-  const t = line.trim();
+  const t = stripHeader(line);
   for (const def of SECTION_DEFS) {
     if (def.labels.test(t)) return def.key;
   }
@@ -39,7 +45,7 @@ function classifySectionHeading(line) {
 }
 
 function isLikelySectionHeader(line) {
-  const t = line.trim();
+  const t = stripHeader(line);
   if (!t || t.length > 90) return false;
   if (/^[-•*●▪]\s/.test(t)) return false;
   if (/^\d+[\).]\s/.test(t)) return false;
@@ -66,7 +72,8 @@ function detectHeadingStyle(line) {
 }
 
 function parseResumeStructure(resumeText = '') {
-  const lines = String(resumeText).replace(/\r\n/g, '\n').split('\n');
+  const normalized = normalizeResumeLayout(resumeText);
+  const lines = normalized.replace(/\r\n/g, '\n').split('\n');
   const sections = [];
   let headerLines = [];
   let current = null;
@@ -80,7 +87,7 @@ function parseResumeStructure(resumeText = '') {
       const key = classifySectionHeading(trimmed);
       current = {
         key,
-        heading: trimmed,
+        heading: stripHeader(trimmed),
         contentLines: [],
         immutable: IMMUTABLE_SECTION_KEYS.has(key),
       };
@@ -92,7 +99,7 @@ function parseResumeStructure(resumeText = '') {
       const key = classifySectionHeading(trimmed);
       current = {
         key,
-        heading: trimmed,
+        heading: stripHeader(trimmed),
         contentLines: [],
         immutable: IMMUTABLE_SECTION_KEYS.has(key),
       };
@@ -108,7 +115,7 @@ function parseResumeStructure(resumeText = '') {
     if (current) current.contentLines.push(line);
   }
 
-  if (!sections.length && resumeText.trim()) {
+  if (!sections.length && normalized.trim()) {
     sections.push({
       key: 'body',
       heading: '',

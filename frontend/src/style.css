@@ -779,9 +779,40 @@ body {
   color: #64748b;
 }
 
+.resume-skill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin: 0.2rem 0 0.35rem;
+  padding-left: 0;
+  list-style: none;
+}
+
+.resume-skill-list .resume-bullet-item {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.25rem;
+  background: #f1f5f9;
+  font-size: 10pt;
+  text-align: left;
+}
+
+.resume-skill-list .resume-bullet-item::before {
+  content: none;
+}
+
+.resume-section-body {
+  margin-top: 0.15rem;
+}
+
+.resume-section + .resume-section {
+  margin-top: 0.65rem;
+}
+
 .resume-body-line {
-  margin: 0.15rem 0;
-  text-align: justify;
+  margin: 0.2rem 0 0.35rem;
+  line-height: 1.4;
+  text-align: left;
 }
 
 .resume-bullet-list {
@@ -796,9 +827,10 @@ body {
 }
 
 .resume-bullet-item {
-  margin: 0.1rem 0;
+  margin: 0.15rem 0;
   padding-left: 0.15rem;
-  text-align: justify;
+  line-height: 1.4;
+  text-align: left;
 }
 
 .resume-spacer {

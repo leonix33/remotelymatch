@@ -1,5 +1,6 @@
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
+const { normalizeResumeLayout, preserveLineBreaksFromExtracted } = require('./resumeLayoutService');
 
 const MUST_HAVE_CATALOG = [
   'kubernetes',
@@ -254,12 +255,14 @@ async function extractTextFromBuffer(buffer, filename = '') {
   const name = filename.toLowerCase();
   if (name.endsWith('.pdf')) {
     const data = await pdf(buffer);
-    return (data.text || '').replace(/\s+/g, ' ').trim();
+    const preserved = preserveLineBreaksFromExtracted(data.text || '');
+    return normalizeResumeLayout(preserved);
   }
   if (name.endsWith('.docx')) {
     try {
       const { value } = await mammoth.extractRawText({ buffer });
-      return (value || '').replace(/\s+/g, ' ').trim();
+      const preserved = preserveLineBreaksFromExtracted(value || '');
+      return normalizeResumeLayout(preserved);
     } catch (err) {
       const error = new Error('Could not read this Word file. Try saving as PDF or paste your resume text.');
       error.status = 400;
@@ -272,7 +275,7 @@ async function extractTextFromBuffer(buffer, filename = '') {
     throw err;
   }
   if (name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.text')) {
-    return buffer.toString('utf8').trim();
+    return normalizeResumeLayout(buffer.toString('utf8').trim());
   }
 
   const asText = buffer.toString('utf8').trim();
@@ -283,7 +286,7 @@ async function extractTextFromBuffer(buffer, filename = '') {
     err.status = 400;
     throw err;
   }
-  return asText;
+  return normalizeResumeLayout(asText);
 }
 
 function mergeSkillLists(existing, incoming) {
@@ -431,13 +434,13 @@ function buildParseResult(resumeText) {
 }
 
 function parseResumeFromText(resumeText) {
-  const cleaned = String(resumeText || '').replace(/\s+/g, ' ').trim();
+  const cleaned = normalizeResumeLayout(resumeText);
   return buildParseResult(cleaned);
 }
 
 function enrichProfileResponse(profile) {
   const unreadable = isUnreadableResumeText(profile.resumeText || '');
-  const resumeText = unreadable ? '' : profile.resumeText || '';
+  const resumeText = unreadable ? '' : normalizeResumeLayout(profile.resumeText || '');
   const extractedSkills = unreadable
     ? []
     : profile.extractedSkills?.length > 0

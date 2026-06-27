@@ -8,6 +8,7 @@ import {
   isUnreadableResumeText,
   isZipDocxFile,
 } from '../utils/resumeText';
+import { normalizeResumeLayout } from '../utils/resumeLayout';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -39,7 +40,7 @@ async function extractDocxText(file) {
   }
   const arrayBuffer = await file.arrayBuffer();
   const { value, messages } = await mammoth.extractRawText({ arrayBuffer });
-  const text = (value || '').replace(/\s+/g, ' ').trim();
+  const text = normalizeResumeLayout(value || '');
   if (!text && messages?.length) {
     throw new Error('Word file opened but no text was found. Try PDF or paste your resume.');
   }

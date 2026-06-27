@@ -81,7 +81,14 @@ function jobHeaderParts(text) {
 
             <p v-else-if="row.type === 'date'" class="resume-date-line">{{ row.text }}</p>
 
-            <ul v-else-if="row.type === 'bullet'" class="resume-bullet-list" :class="{ 'resume-bullet-nested': row.indent > 2 }">
+            <ul
+              v-else-if="row.type === 'bullet'"
+              class="resume-bullet-list"
+              :class="{
+                'resume-bullet-nested': row.indent > 2,
+                'resume-skill-list': row.skill,
+              }"
+            >
               <li class="resume-bullet-item">{{ row.text }}</li>
             </ul>
 
