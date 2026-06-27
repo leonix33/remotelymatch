@@ -4,6 +4,7 @@ const {
   buildDemoKit,
   inferMissingKeywords,
   formatKitAsText,
+  enrichKitForDisplay,
 } = require('../services/resumeTailorService');
 
 describe('resumeTailorService', () => {
@@ -49,6 +50,25 @@ describe('resumeTailorService', () => {
     assert.ok(!text.includes('APPLICATION KIT'));
     assert.ok(!text.includes('ADDENDUM'));
     assert.ok(text.length > 50);
+  });
+
+  it('enrichKitForDisplay repairs legacy chunky tools sections', () => {
+    const legacy = {
+      tailored: true,
+      pageCount: 1,
+      supplementPagesTarget: 3,
+      tailoredResumeText: `PROFESSIONAL EXPERIENCE
+DevOps Engineer Aug 2020 Jan 2022 Wimora Technology
+Implemented DevSecOps pipelines, by integrating security scanning
+TOOLS
+into CI/CD pipelines as mandatory gates, ensuring vulnerabilities were caught before production deployment.
+Cloud Engineer / DevOps Dec 2016 Jul 2020 PRIMUS Global Services
+Built multi-account AWS environments using EC2, VPC, IAM, S3, RDS, Lambda, and CloudFormation.`,
+    };
+    const enriched = enrichKitForDisplay(legacy);
+    assert.ok(!/\nTOOLS\n/i.test(enriched.tailoredResumeText));
+    assert.ok(enriched.tailoredResumeText.includes('into CI/CD pipelines'));
+    assert.ok(enriched.tailoredResumeText.includes('PRIMUS Global Services'));
   });
 });
 

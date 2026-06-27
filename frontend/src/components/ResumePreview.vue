@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import ResumeDocumentPreview from './ResumeDocumentPreview.vue';
+import { prepareResumeTextForParsing } from '../utils/resumeRepair';
 
 const props = defineProps({
   resumeText: { type: String, default: '' },
@@ -15,6 +16,11 @@ const props = defineProps({
 });
 
 const hasContent = computed(() => !props.unreadable && (props.resumeText || '').trim().length >= 20);
+
+const displayText = computed(() => {
+  const raw = (props.resumeText || '').trim();
+  return raw ? prepareResumeTextForParsing(raw) : '';
+});
 
 const scoreLabel = computed(() => {
   if (props.score >= 80) return 'Ready to apply';
@@ -73,7 +79,7 @@ const barColor = computed(() => {
       </div>
 
       <div class="p-4">
-        <ResumeDocumentPreview :text="resumeText" compact />
+        <ResumeDocumentPreview :text="displayText" compact />
       </div>
     </template>
   </div>

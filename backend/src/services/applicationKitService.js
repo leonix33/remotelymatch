@@ -46,8 +46,19 @@ async function findJob(userId, jobId) {
   return null;
 }
 
+async function persistEnrichedKit(userId, jobId, kit) {
+  if (!kit?.tailored) return kit;
+  const enriched = resumeTailorService.enrichKitForDisplay(kit);
+  if (enriched.tailoredResumeText === kit.tailoredResumeText && enriched.pageCount === kit.pageCount) {
+    return enriched;
+  }
+  return applicationKitStore.set(userId, jobId, enriched);
+}
+
 async function getKit(userId, jobId) {
-  return applicationKitStore.get(userId, jobId);
+  const kit = await applicationKitStore.get(userId, jobId);
+  if (!kit?.tailored) return kit;
+  return persistEnrichedKit(userId, jobId, kit);
 }
 
 async function generateForJob(userId, jobId, options = {}) {
@@ -64,7 +75,7 @@ async function generateForJob(userId, jobId, options = {}) {
 
   const existing = await applicationKitStore.get(userId, jobId);
   if (existing?.tailored && !force) {
-    return existing;
+    return getKit(userId, jobId);
   }
 
   const profile = await profileService.getOrCreate(userId);
@@ -308,31 +319,33 @@ async function applicationMetaForJob(userId, jobId) {
 }
 
 function kitListItem(kit) {
+  const display = kit?.tailored ? resumeTailorService.enrichKitForDisplay(kit) : kit;
   return {
-    jobId: kit.jobId,
-    jobTitle: kit.jobTitle,
-    company: kit.company,
-    jobUrl: kit.jobUrl,
-    pageCount: kit.pageCount || kit.supplementPages?.length || 0,
-    supplementPagesTarget: kit.supplementPagesTarget || kit.pageCount || 3,
-    tailorMode: kit.tailorMode || 'balanced',
-    highMatchTarget: kit.highMatchTarget || 90,
-    estimatedMatchPct: kit.estimatedMatchPct || null,
-    generatedAt: kit.generatedAt,
-    updatedAt: kit.updatedAt,
-    useForApply: kit.useForApply !== false,
-    tailorFocus: kit.tailorFocus || '',
-    contactEmail: kit.contactEmail || '',
-    demo: Boolean(kit.demo),
-    hasCoverLetter: Boolean(kit.coverLetterParagraph),
-    missingKeywords: (kit.missingKeywords || []).slice(0, 8),
-    tailored: Boolean(kit.tailored),
-    tailoredResumeText: kit.tailoredResumeText || kit.fullSupplementText || '',
-    supplementPages: kit.supplementPages || [],
-    fullSupplementText: kit.fullSupplementText || '',
-    coverLetterParagraph: kit.coverLetterParagraph || '',
-    formatted: kit.formatted || '',
-    contactName: kit.contactName || '',
+    jobId: display.jobId,
+    jobTitle: display.jobTitle,
+    company: display.company,
+    jobUrl: display.jobUrl,
+    pageCount: display.pageCount || display.supplementPages?.length || 0,
+    supplementPagesTarget: display.supplementPagesTarget || display.pageCount || 3,
+    tailorMode: display.tailorMode || 'balanced',
+    highMatchTarget: display.highMatchTarget || 90,
+    estimatedMatchPct: display.estimatedMatchPct || null,
+    generatedAt: display.generatedAt,
+    updatedAt: display.updatedAt,
+    useForApply: display.useForApply !== false,
+    tailorFocus: display.tailorFocus || '',
+    contactEmail: display.contactEmail || '',
+    demo: Boolean(display.demo),
+    hasCoverLetter: Boolean(display.coverLetterParagraph),
+    missingKeywords: (display.missingKeywords || []).slice(0, 8),
+    tailored: Boolean(display.tailored),
+    tailoredResumeText: display.tailoredResumeText || display.fullSupplementText || '',
+    supplementPages: display.supplementPages || [],
+    fullSupplementText: display.fullSupplementText || '',
+    coverLetterParagraph: display.coverLetterParagraph || '',
+    formatted: display.formatted || '',
+    contactName: display.contactName || '',
+    resumeStructure: display.resumeStructure || null,
   };
 }
 

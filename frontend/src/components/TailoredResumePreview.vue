@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import ResumeDocumentPreview from './ResumeDocumentPreview.vue';
+import { prepareResumeTextForParsing } from '../utils/resumeRepair';
 
 const props = defineProps({
   kit: { type: Object, default: null },
@@ -12,13 +13,13 @@ const props = defineProps({
 const resumeText = computed(() => {
   const k = props.kit;
   if (!k) return '';
-  return (
+  const raw =
     k.tailoredResumeText ||
     k.fullSupplementText ||
     k.supplementPages?.map((p) => p.content).join('\n\n') ||
     k.formatted ||
-    ''
-  );
+    '';
+  return raw ? prepareResumeTextForParsing(raw) : '';
 });
 </script>
 

@@ -307,7 +307,7 @@ function buildDemoKit(profile, job, jobDescription, contact = {}, options = {}) 
     jobDescriptionLength: jobDescription.length,
   });
 
-  return kit;
+  return finalizeNormalizedKit(kit, pageTarget);
 }
 
 function parseKitJson(raw) {
@@ -389,14 +389,29 @@ function finalizeNormalizedKit(kit, pageTarget) {
   if (!kit?.tailoredResumeText) return kit;
   const tailoredResumeText = prepareResumeTextForParsing(kit.tailoredResumeText);
   const supplementPages = splitResumeIntoPages(tailoredResumeText, pageTarget);
-  return {
+  const enriched = {
     ...kit,
     tailoredResumeText,
     fullSupplementText: tailoredResumeText,
     resumeAddendum: tailoredResumeText,
     supplementPages,
     pageCount: supplementPages.length,
+    supplementPagesTarget: pageTarget,
   };
+  enriched.formatted = formatKitAsText(enriched);
+  return enriched;
+}
+
+function enrichKitForDisplay(kit) {
+  if (!kit?.tailored) return kit;
+  const raw =
+    kit.tailoredResumeText ||
+    kit.fullSupplementText ||
+    (Array.isArray(kit.supplementPages) ? kit.supplementPages.map((p) => p.content).join('\n\n') : '') ||
+    '';
+  if (!raw.trim()) return kit;
+  const pageTarget = clampPageCount(kit.supplementPagesTarget || kit.pageCount || DEFAULT_SUPPLEMENT_PAGES);
+  return finalizeNormalizedKit({ ...kit, tailoredResumeText: raw }, pageTarget);
 }
 
 async function generateAdditiveKit({
@@ -546,6 +561,8 @@ module.exports = {
   formatKitAsText,
   clampPageCount,
   finalizeTailoredResume,
+  enrichKitForDisplay,
+  finalizeNormalizedKit,
   MIN_SUPPLEMENT_PAGES,
   MAX_SUPPLEMENT_PAGES,
   DEFAULT_SUPPLEMENT_PAGES,
