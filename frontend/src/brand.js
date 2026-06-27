@@ -1,10 +1,10 @@
-export const appName = import.meta.env.VITE_APP_NAME || 'RemotelyMatch';
+export const appName = import.meta.env.VITE_APP_NAME || 'remotelymatch';
 export const appUrl = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 export const canonicalDomain = import.meta.env.VITE_CUSTOM_DOMAIN || 'remotelymatch.app';
 export const isProduction = import.meta.env.PROD;
 
 export const brand = {
-  name: import.meta.env.VITE_APP_NAME || 'RemotelyMatch',
+  name: import.meta.env.VITE_APP_NAME || 'remotelymatch',
   nameTop: import.meta.env.VITE_BRAND_NAME_TOP || 'remotely',
   nameBottom: import.meta.env.VITE_BRAND_NAME_BOTTOM || 'match',
   tagline: import.meta.env.VITE_BRAND_TAGLINE || 'AI-powered remote job intelligence',

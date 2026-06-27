@@ -3,10 +3,10 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'RemoteMatch', body: event.data?.text() || '' };
+    data = { title: 'remotelymatch', body: event.data?.text() || '' };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || 'RemoteMatch', {
+    self.registration.showNotification(data.title || 'remotelymatch', {
       body: data.body || '',
       icon: '/icon.svg',
       badge: '/icon.svg',

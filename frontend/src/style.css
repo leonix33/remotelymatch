@@ -1751,8 +1751,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.15rem;
-  min-width: 2.35rem;
-  padding: 0.65rem 0.4rem 0.65rem 0.5rem;
+  min-width: 2.65rem;
+  padding: 0.7rem 0.45rem 0.7rem 0.55rem;
   border: 1px solid rgba(45, 212, 191, 0.3);
   border-right: none;
   border-radius: 0.75rem 0 0 0.75rem;
@@ -1782,7 +1782,8 @@ body {
 
 .share-install-tab-text-sub {
   color: #5eead4;
-  font-size: 0.5625rem;
+  font-size: 0.5rem;
+  letter-spacing: 0.04em;
 }
 
 .share-install-overlay {

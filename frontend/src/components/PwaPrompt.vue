@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRegisterSW } from 'virtual:pwa-register/vue';
 import { usePushNotifications } from '../composables/usePushNotifications';
 import { usePwaInstall } from '../composables/usePwaInstall';
-import { brand } from '../brand';
+import { brand, appName } from '../brand';
 import { isIOS, isStandalonePwa, supportsHomeScreenInstall } from '../utils/device';
 
 const { needRefresh, updateServiceWorker } = useRegisterSW({ immediate: true });
@@ -19,7 +19,7 @@ const {
 } = usePwaInstall();
 
 const showPush = ref(false);
-const appName = computed(() => brand.name || 'RemoteMatch');
+const displayName = computed(() => appName || brand.name || 'remotelymatch');
 
 function refresh() {
   updateServiceWorker(true);
@@ -84,7 +84,7 @@ onMounted(() => {
         <div class="pwa-install-hero">
           <img src="/icons/icon-192.png" alt="" class="pwa-install-icon" width="72" height="72" />
           <div class="min-w-0 flex-1">
-            <h2 id="pwa-install-title" class="pwa-install-title">Get the {{ appName }} app</h2>
+            <h2 id="pwa-install-title" class="pwa-install-title">Get the {{ displayName }} app</h2>
             <p class="pwa-install-subtitle">One tap on your home screen — faster apply, queue, and follow-ups.</p>
           </div>
         </div>
@@ -115,7 +115,7 @@ onMounted(() => {
         <template v-else-if="installMode === 'ios'">
           <p class="pwa-install-copy">
             <template v-if="isIOS() && supportsHomeScreenInstall()">
-              Add {{ appName }} to your home screen — works like a native app.
+              Add {{ displayName }} to your home screen — works like a native app.
             </template>
             <template v-else>
               Bookmark this page in Safari for quick access.
@@ -131,13 +131,13 @@ onMounted(() => {
           </ol>
           <ol v-else class="pwa-install-steps">
             <li>Tap <span class="pwa-install-pill">Share</span> → <strong>Add Bookmark</strong></li>
-            <li>Open {{ appName }} from your bookmarks anytime</li>
+            <li>Open {{ displayName }} from your bookmarks anytime</li>
           </ol>
           <p class="pwa-install-hint">On older iPhones, “Add to Home Screen” is below the first row in the Share menu.</p>
         </template>
 
         <template v-else-if="installMode === 'android'">
-          <p class="pwa-install-copy">Add {{ appName }} to your home screen from the browser menu.</p>
+          <p class="pwa-install-copy">Add {{ displayName }} to your home screen from the browser menu.</p>
           <ol class="pwa-install-steps">
             <li>Tap the <span class="pwa-install-pill">⋮</span> menu (top right in Chrome)</li>
             <li>

@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useAppShare } from '../composables/useAppShare';
 import { usePwaInstall } from '../composables/usePwaInstall';
-import { brand } from '../brand';
+import { brand, appName } from '../brand';
 import { isIOS, isMobileDevice, supportsHomeScreenInstall } from '../utils/device';
 
 const {
@@ -25,7 +25,7 @@ const {
   openSheet,
 } = usePwaInstall();
 
-const appName = computed(() => brand.name || 'RemoteMatch');
+const displayName = computed(() => appName || brand.name || 'remotelymatch');
 const showInstallSection = computed(() => showInstallOffer.value && !installed.value);
 
 function close() {
@@ -61,14 +61,14 @@ function focusInstall() {
         <div class="share-install-handle" aria-hidden="true" />
         <button type="button" class="share-install-close" aria-label="Close" @click="close">×</button>
 
-        <h2 id="share-install-title" class="share-install-title">Share & install</h2>
+        <h2 id="share-install-title" class="share-install-title">{{ displayName }}</h2>
         <p class="share-install-subtitle">
-          No account needed — copy the link or add {{ appName }} to your phone.
+          Install the app or share the URL — no account needed.
         </p>
 
         <!-- Share -->
         <section class="share-install-section">
-          <p class="share-install-section-label">Share this app</p>
+          <p class="share-install-section-label">Share URL</p>
           <div class="share-install-url-box">
             <code class="share-install-url">{{ shareUrl }}</code>
           </div>
@@ -90,7 +90,7 @@ function focusInstall() {
 
         <!-- Install (mobile / not yet installed) -->
         <section v-if="showInstallSection" class="share-install-section">
-          <p class="share-install-section-label">Install on your phone</p>
+          <p class="share-install-section-label">Install {{ displayName }}</p>
 
           <button
             v-if="canOneClickInstall"

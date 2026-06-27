@@ -57,7 +57,7 @@ async function submit() {
       </form>
       <p class="mt-6 text-center text-xs text-slate-500">Invite-only access · Admin creates accounts</p>
       <p class="mt-3 text-center text-xs text-slate-600">
-        Tap <strong class="text-teal-400">Share · Install</strong> on the right to copy the link or add the app to your phone.
+        Tap <strong class="text-teal-400">Install · Share URL</strong> on the right to add remotelymatch or copy the link.
       </p>
       <p class="mt-3 text-center text-xs text-slate-600">
         <RouterLink to="/privacy" class="text-teal-500 hover:underline">Privacy</RouterLink>

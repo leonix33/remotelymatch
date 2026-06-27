@@ -59,18 +59,18 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Always on: login, guest pages, and signed-in app -->
+  <PwaPrompt />
+  <ShareInstallTab />
+  <ShareInstallPanel />
+
   <div v-if="route.path === '/login' || route.path === '/privacy' || route.path === '/terms'" class="min-h-screen min-h-dvh safe-top safe-bottom safe-x">
-    <PwaPrompt />
-    <ShareInstallTab />
-    <ShareInstallPanel />
     <RouterView />
   </div>
   <div v-else class="mobile-app-shell flex min-h-screen min-h-dvh w-full flex-col lg:flex-row">
     <AppSidebar :on-logout="logout" />
 
     <div class="flex min-w-0 flex-1 flex-col mobile-content-column">
-      <PwaPrompt />
-
       <header
         v-if="route.path !== '/onboarding'"
         class="mobile-header safe-top flex items-center justify-between border-b border-teal-900/30 bg-slate-950/80 py-3 backdrop-blur lg:hidden"
@@ -130,8 +130,5 @@ onUnmounted(() => {
     <AppConcierge
       v-if="auth.isAdmin && route.path !== '/login' && route.path !== '/onboarding' && route.path !== '/welcome'"
     />
-
-    <ShareInstallTab />
-    <ShareInstallPanel />
   </div>
 </template>
