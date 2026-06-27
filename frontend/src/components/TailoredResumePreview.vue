@@ -52,7 +52,7 @@ const resumeText = computed(() => {
           <div>
             <p class="text-sm font-medium text-slate-200">Tailored resume</p>
             <p class="mt-1 text-xs text-slate-500">
-              Formatted like your original — sections, bullets, and credentials preserved.
+              Professional layout — centered name, section headers, and your original structure.
             </p>
           </div>
           <div class="flex rounded-lg border border-slate-700 bg-slate-900/60 p-0.5 text-xs">

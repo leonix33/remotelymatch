@@ -144,7 +144,9 @@ function describeStructureForPrompt(structure) {
   const lines = ['RESUME STRUCTURE (keep this exact order and headings):'];
 
   if (structure.headerLines.filter((l) => l.trim()).length) {
-    lines.push(`- [CONTACT HEADER] — copy exactly, do not rewrite name/email/phone/links`);
+    lines.push(
+      `- [CONTACT HEADER] — copy exactly: name on line 1, pipe-separated title/tagline lines below, then email/phone/links. Do not merge into one paragraph.`
+    );
   }
 
   for (const section of structure.sections) {

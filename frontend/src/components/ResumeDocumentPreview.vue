@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { classifyContentLine, parseResumeForDisplay, parseResumeHeader, splitContactParts } from '../utils/resumeDocument';
+import { parseResumeForDisplay, parseResumeHeader, splitContactParts, isSkillsTagline } from '../utils/resumeDocument';
 
 const props = defineProps({
   text: { type: String, default: '' },
@@ -17,6 +17,11 @@ const contactParts = computed(() => {
   }
   return parts;
 });
+
+function taglineClass(line, index) {
+  if (index > 0 || isSkillsTagline(line)) return 'resume-tagline resume-tagline-skills';
+  return 'resume-tagline';
+}
 
 function sectionHeadingClass(heading, style) {
   if (style === 'ALL_CAPS' || /^[A-Z][A-Z\s/&\-]{2,}$/.test(heading)) {
@@ -46,10 +51,12 @@ function jobHeaderParts(text) {
       compact ? 'resume-doc-shell-compact' : '',
     ]"
   >
-    <div class="resume-page" role="document" aria-label="Resume preview">
-      <header v-if="header.name || header.contact.length" class="resume-header-block">
+    <div class="resume-page resume-template-pro" role="document" aria-label="Resume preview">
+      <header v-if="header.name || header.taglines.length || header.contact.length" class="resume-header-block">
         <h1 class="resume-name">{{ header.name }}</h1>
-        <p v-if="header.headline" class="resume-headline">{{ header.headline }}</p>
+        <p v-for="(tag, idx) in header.taglines" :key="idx" :class="taglineClass(tag, idx)">
+          {{ tag }}
+        </p>
         <div v-if="contactParts.length" class="resume-contact-row">
           <span v-for="(part, pidx) in contactParts" :key="pidx" class="resume-contact-item">{{ part }}</span>
         </div>
@@ -59,7 +66,10 @@ function jobHeaderParts(text) {
         v-for="(section, sidx) in doc.sections"
         :key="`${section.key}-${sidx}`"
         class="resume-section"
-        :class="{ 'resume-section-credentials': section.immutable }"
+        :class="{
+          'resume-section-credentials': section.immutable,
+          [`resume-section-${section.key}`]: Boolean(section.key),
+        }"
       >
         <h2
           v-if="section.heading"
@@ -80,6 +90,8 @@ function jobHeaderParts(text) {
             </p>
 
             <p v-else-if="row.type === 'date'" class="resume-date-line">{{ row.text }}</p>
+
+            <p v-else-if="row.type === 'pipe-line'" class="resume-pipe-line">{{ row.text }}</p>
 
             <ul
               v-else-if="row.type === 'bullet'"

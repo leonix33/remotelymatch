@@ -154,33 +154,52 @@ function inferHeaderFromBody(lines) {
 
 export function parseResumeHeader(headerLines = []) {
   const lines = headerLines.map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) return { name: '', contact: [], headline: '' };
+  if (!lines.length) return { name: '', taglines: [], contact: [] };
 
-  let name = lines[0];
-  let headline = '';
+  const name = lines[0];
+  const taglines = [];
   const contact = [];
 
   for (let i = 1; i < lines.length; i += 1) {
     const line = lines[i];
-    if (
-      line.includes('@') ||
-      line.includes('|') ||
-      /https?:\/\//i.test(line) ||
-      /linkedin\.com/i.test(line) ||
-      /github\.com/i.test(line) ||
-      /\(\d{3}\)/.test(line) ||
-      /\d{3}[-.\s]\d{3}[-.\s]\d{4}/.test(line) ||
-      /^\+?\d[\d().\s-]{8,}$/.test(line)
-    ) {
+    if (isContactLine(line)) {
       contact.push(line);
-    } else if (!headline && line.length < 100 && !isLikelySectionHeader(line)) {
-      headline = line;
+    } else if (!isLikelySectionHeader(line) && (isTaglineLine(line) || taglines.length < 2)) {
+      taglines.push(line);
+    } else if (!isLikelySectionHeader(line) && line.length < 140) {
+      taglines.push(line);
     } else {
       contact.push(line);
     }
   }
 
-  return { name, headline, contact };
+  return { name, taglines, contact };
+}
+
+function isContactLine(line) {
+  return (
+    line.includes('@') ||
+    /https?:\/\//i.test(line) ||
+    /linkedin\.com/i.test(line) ||
+    /github\.com/i.test(line) ||
+    /\(\d{3}\)/.test(line) ||
+    /\d{3}[-.\s]\d{3}[-.\s]\d{4}/.test(line) ||
+    /^\+?\d[\d().\s-]{8,}$/.test(line)
+  );
+}
+
+function isTaglineLine(line) {
+  if (isContactLine(line)) return false;
+  if (line.includes('|')) return true;
+  return /engineer|architect|manager|developer|analyst|consultant|specialist|lead|director/i.test(line);
+}
+
+export function isSkillsTagline(text) {
+  const t = String(text || '');
+  if (!t.includes('|')) return false;
+  const techHits = (t.match(/\b(Azure|AWS|GCP|Kubernetes|Terraform|Docker|Python|Java|CKA|DevOps|Databricks)\b/gi) || [])
+    .length;
+  return techHits >= 2;
 }
 
 export function classifyContentLine(line, sectionKey = '') {
@@ -209,15 +228,16 @@ export function classifyContentLine(line, sectionKey = '') {
     }
   }
 
-  // Skills / cert lines: comma-separated short tokens
-  if (
-    (sectionKey === 'skills' || sectionKey === 'certifications' || sectionKey === 'credentials') &&
-    t.includes(',') &&
-    t.length < 220
-  ) {
-    const parts = t.split(/,\s*/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 3 && parts.every((p) => p.length < 50)) {
-      return parts.map((text) => ({ type: 'bullet', text, skill: true }));
+  // Skills / certs: pipe or comma separated → single styled line
+  if (sectionKey === 'skills' || sectionKey === 'certifications' || sectionKey === 'credentials') {
+    if (t.includes('|') && t.length < 320) {
+      return [{ type: 'pipe-line', text: t }];
+    }
+    if (t.includes(',') && t.length < 320) {
+      const parts = t.split(/,\s*/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 3 && parts.every((p) => p.length < 55)) {
+        return [{ type: 'pipe-line', text: parts.join(' | ') }];
+      }
     }
   }
 

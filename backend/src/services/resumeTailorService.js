@@ -418,7 +418,7 @@ OUTPUT: Return a structured tailored resume that mirrors the candidate's origina
 
 STRUCTURE RULES (highest priority):
 1. Use the EXACT section headings from the original resume, in the SAME order.
-2. Copy the contact/header block exactly — do not change name, email, phone, or links.
+2. Copy the header block exactly — name, each pipe-separated title/tagline line on its own row, email/phone/links. Never merge header lines into one paragraph.
 3. Education, certifications, credentials, licenses, and training sections: COPY VERBATIM — no rewording.
 4. Experience: keep every employer name, job title, and date line exactly as written; only rewrite bullet/description lines to align with the job.
 5. Summary/profile: tailor wording to the role; keep similar length and tone.

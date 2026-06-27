@@ -635,25 +635,15 @@ body {
   @apply min-h-10 shrink-0 px-4 py-2 text-sm;
 }
 
-/* ── Resume document preview (Word-like) ── */
+/* ── Resume document preview (professional template) ── */
 .resume-doc-shell {
   @apply relative overflow-hidden rounded-xl p-4 sm:p-6;
-  background: linear-gradient(165deg, #94a3b8 0%, #64748b 45%, #475569 100%);
-  border: 1px solid rgba(15, 23, 42, 0.35);
+  background: linear-gradient(165deg, #1e293b 0%, #0f172a 55%, #020617 100%);
+  border: 1px solid rgba(71, 85, 105, 0.45);
 }
 
 .resume-doc-shell::before {
-  content: '';
-  position: absolute;
-  left: 1.25rem;
-  right: 1.25rem;
-  top: 1.5rem;
-  bottom: 1rem;
-  background: #f1f5f9;
-  border-radius: 2px;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
-  transform: rotate(-0.35deg);
-  z-index: 0;
+  display: none;
 }
 
 .resume-doc-shell .resume-page {
@@ -669,23 +659,175 @@ body {
   @apply p-3 sm:p-4;
 }
 
-.resume-doc-shell-compact::before {
-  left: 0.85rem;
-  right: 0.85rem;
-  top: 1rem;
-  bottom: 0.75rem;
-}
-
 .resume-doc-shell-compact .resume-page {
   min-height: auto;
-  max-height: 32rem;
+  max-height: 36rem;
   overflow-y: auto;
-  padding: 0.55in 0.6in 0.65in;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.12),
-    0 8px 24px rgba(15, 23, 42, 0.22);
+  padding: 0.55in 0.65in 0.7in;
 }
 
+/* Professional resume page — matches Leonix-style layout */
+.resume-page.resume-template-pro {
+  @apply mx-auto max-w-[8.5in];
+  min-height: 11in;
+  padding: 0.7in 0.75in 0.8in;
+  font-family: Calibri, 'Segoe UI', Candara, Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.4;
+  background: #0a0a0b;
+  color: #d1d5db;
+  box-shadow:
+    0 0 0 1px rgba(74, 126, 181, 0.15),
+    0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.resume-template-pro .resume-header-block {
+  @apply pb-5 text-center;
+  border-bottom: none;
+  margin-bottom: 0.35rem;
+}
+
+.resume-template-pro .resume-name {
+  margin: 0;
+  font-size: 23pt;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #4a7eb5;
+  line-height: 1.2;
+}
+
+.resume-template-pro .resume-tagline {
+  margin: 0.45rem 0 0;
+  font-size: 10pt;
+  font-weight: 400;
+  color: #9ca3af;
+  line-height: 1.45;
+}
+
+.resume-template-pro .resume-tagline-skills {
+  font-style: italic;
+  font-size: 9.5pt;
+  color: #8b939e;
+}
+
+.resume-template-pro .resume-contact-row {
+  @apply mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1;
+  font-size: 9pt;
+  color: #6b7280;
+}
+
+.resume-template-pro .resume-contact-item + .resume-contact-item::before {
+  content: '·';
+  margin: 0 0.45rem;
+  color: #4b5563;
+}
+
+.resume-template-pro .resume-section {
+  margin-top: 1.1rem;
+}
+
+.resume-template-pro .resume-section-title,
+.resume-template-pro .resume-section-title-caps {
+  margin: 0 0 0.45rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1.5px solid #4a7eb5;
+  font-size: 10pt;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #4a7eb5;
+}
+
+.resume-template-pro .resume-section-title-caps {
+  letter-spacing: 0.16em;
+}
+
+.resume-template-pro .resume-section-body {
+  margin-top: 0.35rem;
+}
+
+.resume-template-pro .resume-body-line {
+  margin: 0.25rem 0 0.4rem;
+  line-height: 1.45;
+  text-align: left;
+  color: #d1d5db;
+  font-size: 10.5pt;
+}
+
+.resume-template-pro .resume-pipe-line {
+  margin: 0.2rem 0 0.35rem;
+  font-size: 10pt;
+  font-style: italic;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+.resume-template-pro .resume-section-skills .resume-pipe-line {
+  font-style: italic;
+}
+
+.resume-template-pro .resume-job-header {
+  @apply mt-3 mb-0.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0;
+}
+
+.resume-template-pro .resume-job-title {
+  font-weight: 700;
+  color: #e5e7eb;
+  font-size: 10.5pt;
+}
+
+.resume-template-pro .resume-job-meta {
+  font-size: 10pt;
+  font-weight: 600;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.resume-template-pro .resume-date-line {
+  margin: 0 0 0.2rem;
+  font-size: 9.5pt;
+  font-style: italic;
+  color: #8b939e;
+}
+
+.resume-template-pro .resume-bullet-list {
+  margin: 0.15rem 0 0.35rem;
+  padding-left: 1.1rem;
+  list-style-type: disc;
+}
+
+.resume-template-pro .resume-bullet-item {
+  margin: 0.18rem 0;
+  padding-left: 0.1rem;
+  line-height: 1.45;
+  color: #d1d5db;
+  text-align: left;
+}
+
+.resume-template-pro .resume-bullet-item::marker {
+  color: #4a7eb5;
+}
+
+.resume-template-pro .resume-section-credentials .resume-body-line,
+.resume-template-pro .resume-section-credentials .resume-bullet-item,
+.resume-template-pro .resume-section-credentials .resume-pipe-line {
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.resume-template-pro .resume-spacer {
+  height: 0.4rem;
+}
+
+.resume-template-pro .resume-fallback {
+  white-space: pre-wrap;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: #d1d5db;
+}
+
+/* Legacy white-page fallback (unused when template-pro is active) */
 .resume-page {
   @apply mx-auto max-w-[8.5in] bg-white text-slate-900;
   min-height: 11in;
@@ -694,143 +836,6 @@ body {
   font-size: 11pt;
   line-height: 1.35;
   color: #1e293b;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.1),
-    0 12px 32px rgba(15, 23, 42, 0.28);
-}
-
-.resume-header-block {
-  @apply border-b border-slate-300 pb-4 text-center;
-}
-
-.resume-name {
-  margin: 0;
-  font-size: 22pt;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #0f172a;
-  line-height: 1.15;
-}
-
-.resume-headline {
-  margin: 0.35rem 0 0;
-  font-size: 11pt;
-  font-weight: 600;
-  color: #334155;
-}
-
-.resume-contact-row {
-  @apply mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1;
-  font-size: 9.5pt;
-  color: #475569;
-}
-
-.resume-contact-item + .resume-contact-item::before {
-  content: '·';
-  margin: 0 0.5rem;
-  color: #94a3b8;
-}
-
-.resume-section {
-  @apply mt-4;
-}
-
-.resume-section-title,
-.resume-section-title-caps {
-  margin: 0 0 0.35rem;
-  padding-bottom: 0.15rem;
-  border-bottom: 1.5px solid #0f172a;
-  font-size: 10.5pt;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #0f172a;
-}
-
-.resume-section-title-caps {
-  letter-spacing: 0.1em;
-}
-
-.resume-section-credentials .resume-body-line,
-.resume-section-credentials .resume-bullet-item {
-  font-weight: 500;
-}
-
-.resume-job-header {
-  @apply mt-2.5 mb-0.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0;
-}
-
-.resume-job-title {
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.resume-job-meta {
-  font-size: 10pt;
-  font-weight: 600;
-  color: #475569;
-  white-space: nowrap;
-}
-
-.resume-date-line {
-  margin: 0 0 0.15rem;
-  font-size: 10pt;
-  font-style: italic;
-  color: #64748b;
-}
-
-.resume-skill-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.75rem;
-  margin: 0.2rem 0 0.35rem;
-  padding-left: 0;
-  list-style: none;
-}
-
-.resume-skill-list .resume-bullet-item {
-  display: inline-block;
-  padding: 0.1rem 0.45rem;
-  border-radius: 0.25rem;
-  background: #f1f5f9;
-  font-size: 10pt;
-  text-align: left;
-}
-
-.resume-skill-list .resume-bullet-item::before {
-  content: none;
-}
-
-.resume-section-body {
-  margin-top: 0.15rem;
-}
-
-.resume-section + .resume-section {
-  margin-top: 0.65rem;
-}
-
-.resume-body-line {
-  margin: 0.2rem 0 0.35rem;
-  line-height: 1.4;
-  text-align: left;
-}
-
-.resume-bullet-list {
-  margin: 0.1rem 0 0.25rem;
-  padding-left: 1.15rem;
-  list-style-type: disc;
-}
-
-.resume-bullet-nested {
-  margin-left: 0.75rem;
-  list-style-type: circle;
-}
-
-.resume-bullet-item {
-  margin: 0.15rem 0;
-  padding-left: 0.15rem;
-  line-height: 1.4;
-  text-align: left;
 }
 
 .resume-spacer {
@@ -926,14 +931,15 @@ body {
 }
 
 @media (max-width: 640px) {
-  .resume-page {
+  .resume-page.resume-template-pro {
     min-height: auto;
     padding: 1rem 1.1rem 1.25rem;
     font-size: 10pt;
   }
 
-  .resume-name {
+  .resume-template-pro .resume-name {
     font-size: 18pt;
+    letter-spacing: 0.06em;
   }
 
   html {
