@@ -33,12 +33,32 @@ async function importApplications(req, res, next) {
       return res.status(400).json({ message: 'applications array is required' });
     }
     let imported = 0;
+    const notifyBatch = [];
     for (const app of applications) {
       if (!app.jobId) continue;
       await applicationService.upsertForUser(req.user.sub, app.jobId, app);
       imported += 1;
+      if (['submitted', 'queued'].includes(app.status) || app.submittedAt) {
+        notifyBatch.push(app);
+      }
     }
-    res.json({ imported });
+
+    let emailNotification = null;
+    if (notifyBatch.length) {
+      try {
+        const tractionService = require('../services/tractionService');
+        emailNotification = await tractionService.sendPostApplyFeedback(req.user.sub, notifyBatch, {
+          authEmail: req.user.email,
+          queued: notifyBatch.some((a) => a.status === 'queued'),
+          status: notifyBatch[0]?.status || 'submitted',
+        });
+      } catch (err) {
+        console.warn('Import apply email failed:', err.message);
+        emailNotification = { sent: false, reason: err.message };
+      }
+    }
+
+    res.json({ imported, emailNotification });
   } catch (err) {
     next(err);
   }

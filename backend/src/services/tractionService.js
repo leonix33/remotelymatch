@@ -282,9 +282,6 @@ async function markFollowUpDone(userId, jobId, notes = '') {
 
 async function sendPostApplyFeedback(userId, jobs = [], options = {}) {
   const profile = await profileService.getOrCreate(userId);
-  if (profile.emailDigestEnabled === false) {
-    return { sent: false, reason: 'Email digest disabled in Profile' };
-  }
   const to = await resolveDigestEmailForUser(userId, profile, options.authEmail);
   if (!to) {
     return { sent: false, reason: 'No personal email — add one in Profile → Email & follow-ups' };
@@ -293,16 +290,30 @@ async function sendPostApplyFeedback(userId, jobs = [], options = {}) {
     return { sent: false, reason: 'Resend not configured (add RESEND_API_KEY on Render)' };
   }
 
-  const list = (jobs || []).map((j) => ({
-    title: j.title,
-    company: j.company,
-    url: j.url || j.applyUrl,
-    matchPct: j.personalMatchPct ?? j.matchPct ?? null,
-  }));
+  const allJobs = scoreJobsForProfile(jobService.readJobsFromSqlite(5000), profile, userId);
+  const jobById = new Map(allJobs.map((j) => [j.jobId, j]));
+
+  const list = (jobs || []).map((j, index) => {
+    const scored = j.jobId ? jobById.get(j.jobId) : null;
+    return {
+      position: index + 1,
+      jobId: j.jobId,
+      title: j.title || scored?.title || 'Role',
+      company: j.company || scored?.company || 'Company',
+      url: j.url || j.applyUrl || j.jobUrl || scored?.url,
+      source: j.source || scored?.source || '',
+      status: j.status || options.status || (options.queued ? 'queued' : 'submitted'),
+      matchPct: j.personalMatchPct ?? j.matchPct ?? scored?.personalMatchPct ?? scored?.matchPct ?? null,
+      interviewLikelihoodPct: j.interviewLikelihoodPct ?? scored?.interviewLikelihoodPct ?? null,
+    };
+  });
+
+  const companies = [...new Set(list.map((j) => (j.company || '').trim()).filter(Boolean))];
 
   const emailResult = await emailService.sendPostApplyBatchEmail({
     to,
     jobs: list,
+    companies,
     profile,
     useTailoredResume: Boolean(options.useTailoredResume),
     queued: Boolean(options.queued),

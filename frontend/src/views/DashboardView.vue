@@ -369,8 +369,8 @@ onMounted(async () => {
           {{ jobCount }} top-matching jobs ·
           {{ autoApplyEnabled ? 'forms filled with the email above' : 'approved and resumes prepared — submit when ready' }}
         </p>
-        <p v-if="digestEmail && profileStore.profile?.emailDigestEnabled !== false" class="mt-3 text-xs text-sky-200/90">
-          After applying, a summary email with every company and follow-up tips goes to
+        <p v-if="digestEmail" class="mt-3 text-xs text-sky-200/90">
+          After applying, a traction summary (every role, company, match scores &amp; follow-up tips) is emailed to
           <span class="font-medium text-teal-300">{{ digestEmail }}</span>.
         </p>
       </div>

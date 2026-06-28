@@ -181,10 +181,15 @@ async function applyApproved(req, res, next) {
           'Python agent not on this server. Approved jobs saved to approved_jobs.json — run apply from your Mac with AGENT_HOME set.'
         );
       }
-      await applicationService.recordApplicationsFromJobs(req.user.sub, scored, {
-        status: 'submitted',
-        submittedAt: new Date(),
-      });
+      const emailNotification = (
+        await applicationService.recordApplicationsFromJobs(req.user.sub, scored, {
+          status: 'submitted',
+          submittedAt: new Date(),
+          authEmail: req.user.email,
+          useTailoredResume,
+          queued: false,
+        })
+      ).emailNotification;
       await approvalService.markApplied(
         req.user.sub,
         scored.map((j) => j.jobId)
@@ -200,7 +205,6 @@ async function applyApproved(req, res, next) {
       if (useTailoredResume && missingKitCount > 0) {
         message += ` (${tailoredCount} with kits, ${missingKitCount} fell back to base resume)`;
       }
-      const emailNotification = await sendApplyEmailNotification(false);
       res.json({
         message,
         count: scored.length,
@@ -216,10 +220,13 @@ async function applyApproved(req, res, next) {
     } catch (applyErr) {
       const unavailable = !agentAvailable || jobService.isAgentUnavailableError(applyErr);
       if (unavailable) {
-        await applicationService.recordApplicationsFromJobs(req.user.sub, scored, {
+        const { emailNotification } = await applicationService.recordApplicationsFromJobs(req.user.sub, scored, {
           status: 'queued',
           notes: 'Application kits ready — submit via Chrome extension or local agent',
           submittedAt: new Date(),
+          authEmail: req.user.email,
+          useTailoredResume,
+          queued: true,
         });
         await approvalService.markApplied(
           req.user.sub,
@@ -232,7 +239,6 @@ async function applyApproved(req, res, next) {
           await run.save();
         }
         const modeLabel = useTailoredResume ? 'tailored kits' : 'base resume';
-        const emailNotification = await sendApplyEmailNotification(true);
         return res.json({
           message: `Queued ${scored.length} application(s) with ${modeLabel}.${shouldDeferKits ? ' Tailored resumes are generating — refresh the preview in a moment.' : ''} Open each job in Chrome and use the remotelymatch extension to submit forms.`,
           count: scored.length,

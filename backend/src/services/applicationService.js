@@ -100,7 +100,30 @@ async function recordApplicationsFromJobs(userId, jobs = [], options = {}) {
       })
     );
   }
-  return results;
+
+  let emailNotification = null;
+  if (options.notify !== false && results.length) {
+    try {
+      const tractionService = require('./tractionService');
+      emailNotification = await tractionService.sendPostApplyFeedback(userId, jobs, {
+        authEmail: options.authEmail,
+        useTailoredResume: options.useTailoredResume,
+        queued: Boolean(options.queued) || status === 'queued',
+        preparedOnly: Boolean(options.preparedOnly),
+        status,
+      });
+      if (emailNotification.sent) {
+        console.log(`Apply traction email sent to ${emailNotification.to}`);
+      } else {
+        console.warn(`Apply traction email skipped: ${emailNotification.reason}`);
+      }
+    } catch (err) {
+      console.warn('Apply traction email failed:', err.message);
+      emailNotification = { sent: false, reason: err.message };
+    }
+  }
+
+  return { applications: results, emailNotification };
 }
 
 async function activityForUser(userId) {

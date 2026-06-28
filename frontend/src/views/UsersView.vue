@@ -31,6 +31,7 @@ const testEmailTo = ref('');
 const testEmailSending = ref(false);
 const testEmailMsg = ref('');
 const testEmailError = ref('');
+const testEmailResendId = ref('');
 const emailDiagnostics = ref(null);
 const loginEmailSending = ref('');
 const loginUrl = import.meta.env.VITE_APP_URL
@@ -253,6 +254,7 @@ async function sendDeliveryTest() {
   const to = testEmailTo.value.trim();
   testEmailMsg.value = '';
   testEmailError.value = '';
+  testEmailResendId.value = '';
   if (!to) {
     testEmailError.value = 'Enter an email address to test.';
     return;
@@ -260,7 +262,8 @@ async function sendDeliveryTest() {
   testEmailSending.value = true;
   try {
     const { data } = await http.post('/setup/test-email', { to });
-    testEmailMsg.value = data.message || `Test email sent to ${to}. Ask them to check inbox and spam.`;
+    testEmailResendId.value = data.id || '';
+    testEmailMsg.value = data.message || `Handed off to Resend for ${to}. Check inbox, Junk, and Spam.`;
     if (data.diagnostics) emailDiagnostics.value = { ...emailDiagnostics.value, ...data.diagnostics };
   } catch (e) {
     testEmailError.value =
@@ -619,8 +622,21 @@ onMounted(() => {
         </button>
       </div>
       <p v-if="testEmailMsg" class="mt-3 rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ testEmailMsg }}</p>
+      <p v-if="testEmailResendId" class="mt-2 text-xs text-slate-500">
+        Resend ID: <code class="text-slate-400">{{ testEmailResendId }}</code> —
+        <a href="https://resend.com/emails" target="_blank" rel="noopener" class="text-teal-400 hover:underline">check delivery status in Resend</a>
+      </p>
       <p v-if="testEmailError" class="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ testEmailError }}</p>
-      <p class="mt-3 text-xs text-slate-600">Yahoo and Hotmail often filter new senders — check spam/bulk folders. If the test arrives but invites do not, use <strong class="text-slate-500">Send login email</strong> on the member.</p>
+      <div class="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-500">
+        <p class="font-medium text-slate-400">If Gmail works but iCloud / Yahoo does not</p>
+        <ul class="mt-2 list-inside list-disc space-y-1">
+          <li>Check <strong class="text-slate-400">Junk</strong> and <strong class="text-slate-400">Trash</strong> — Apple and Yahoo filter new domains aggressively.</li>
+          <li>Wait 10–15 minutes; delivery is often delayed.</li>
+          <li>In iCloud Mail: Settings → Rules — make sure nothing auto-deletes mail from new senders.</li>
+          <li>Open <a href="https://resend.com/emails" target="_blank" rel="noopener" class="text-teal-400 hover:underline">resend.com/emails</a> — if status is <strong class="text-slate-400">Bounced</strong>, the address provider rejected it.</li>
+          <li>If Resend shows <strong class="text-slate-400">Delivered</strong> but nothing in inbox, it is in Junk — or share login details manually via WhatsApp/text.</li>
+        </ul>
+      </div>
     </div>
 
     <div class="mt-10 border-t border-slate-800/80 pt-8">

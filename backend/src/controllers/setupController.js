@@ -82,7 +82,9 @@ async function testEmail(req, res, next) {
       });
     }
     res.json({
-      message: `Test email sent to ${result.to}`,
+      message: `Handed off to Resend for ${result.to}. Check inbox, Junk, and Spam — iCloud and Yahoo often delay new senders by 5–15 minutes.`,
+      deliveryNote:
+        'Accepted by Resend does not guarantee inbox delivery. Open resend.com/emails to see Delivered, Bounced, or Complained.',
       ...result,
     });
   } catch (err) {

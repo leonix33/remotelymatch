@@ -157,8 +157,16 @@ async function getEmailDiagnostics() {
   };
 }
 
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, text }) {
   if (!env.resendApiKey || !to) return { sent: false, reason: 'email not configured' };
+
+  const payload = {
+    from: env.emailFrom,
+    to: [to],
+    subject,
+    html,
+  };
+  if (text) payload.text = text;
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -166,12 +174,7 @@ async function sendEmail({ to, subject, html }) {
       Authorization: `Bearer ${env.resendApiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from: env.emailFrom,
-      to: [to],
-      subject,
-      html,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {
@@ -206,12 +209,22 @@ async function sendTestEmail(to) {
     };
   }
 
+  const text = [
+    `${env.appName} — email delivery test`,
+    '',
+    `This is a test from ${env.emailFrom}.`,
+    'If you received this, password resets, invites, and application summaries will reach this inbox.',
+    '',
+    `Log in: ${env.appUrl.replace(/\/$/, '')}/login`,
+  ].join('\n');
+
   const result = await sendEmail({
     to: recipient,
-    subject: `${env.appName} — email delivery test`,
+    subject: `${env.appName} — please confirm you received this`,
+    text,
     html: wrapHtml(
-      'Email delivery works',
-      `This is a test from <strong>${escapeHtml(env.emailFrom)}</strong>. Password resets, invites, and digests will use this sender.`,
+      'Email delivery test',
+      `If you are reading this, <strong>${escapeHtml(env.appName)}</strong> can reach <strong>${escapeHtml(recipient)}</strong>.<br><br>Sender: <strong>${escapeHtml(env.emailFrom)}</strong><br><br>Invites, password resets, and application traction summaries use this same sender.`,
       '/login'
     ),
   });
@@ -385,77 +398,159 @@ function followUpSnippet(company, title) {
   return `Hi — I applied for ${role} at ${co} recently and wanted to confirm my application was received. I'm very interested in the role and happy to share more on my background. Thank you for your time.`;
 }
 
-async function sendPostApplyBatchEmail({ to, jobs = [], profile, useTailoredResume, queued = false, preparedOnly = false }) {
+function applyStatusMeta(job, { queued, preparedOnly }) {
+  if (preparedOnly) {
+    return { label: 'Ready to submit', bg: '#422006', fg: '#fcd34d', border: '#854d0e' };
+  }
+  if (queued || job.status === 'queued') {
+    return { label: 'Queued — finish the form', bg: '#0c4a6e', fg: '#7dd3fc', border: '#0369a1' };
+  }
+  return { label: 'Submitted', bg: '#064e3b', fg: '#6ee7b7', border: '#047857' };
+}
+
+function tractionMeter(label, value, color) {
+  const pct = Math.min(100, Math.max(0, Number(value) || 0));
+  return `
+    <div style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:4px">
+        <span>${escapeHtml(label)}</span>
+        <span style="color:#e2e8f0;font-weight:600">${pct}%</span>
+      </div>
+      <div style="background:#334155;border-radius:999px;height:7px;overflow:hidden">
+        <div style="width:${pct}%;background:${color};height:7px;border-radius:999px"></div>
+      </div>
+    </div>`;
+}
+
+function renderApplyJobCard(job, index, total, { queued, preparedOnly }) {
+  const status = applyStatusMeta(job, { queued, preparedOnly });
+  const url = job.url || job.applyUrl || job.jobUrl || '';
+  const snippet = followUpSnippet(job.company, job.title);
+  const source = job.source ? `<span style="color:#64748b">via ${escapeHtml(job.source)}</span>` : '';
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;border-collapse:separate;border-spacing:0">
+      <tr>
+        <td style="background:#111827;border:1px solid #1f2937;border-radius:14px;padding:18px 20px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="vertical-align:top">
+                <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#64748b">
+                  Application ${index + 1} of ${total}
+                </div>
+                <div style="margin-top:8px;font-size:20px;line-height:1.25;font-weight:700;color:#f8fafc">${escapeHtml(job.title || 'Role')}</div>
+                <div style="margin-top:4px;font-size:16px;font-weight:600;color:#5eead4">${escapeHtml(job.company || 'Company')}</div>
+                ${source ? `<div style="margin-top:6px;font-size:12px">${source}</div>` : ''}
+              </td>
+              <td style="vertical-align:top;text-align:right;width:120px">
+                <span style="display:inline-block;padding:6px 10px;border-radius:999px;background:${status.bg};border:1px solid ${status.border};color:${status.fg};font-size:11px;font-weight:700;white-space:nowrap">
+                  ${escapeHtml(status.label)}
+                </span>
+              </td>
+            </tr>
+          </table>
+          ${
+            job.matchPct != null || job.interviewLikelihoodPct != null
+              ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid #1f2937">
+                  ${job.matchPct != null ? tractionMeter('Skill match', job.matchPct, '#14b8a6') : ''}
+                  ${job.interviewLikelihoodPct != null ? tractionMeter('Interview likelihood', job.interviewLikelihoodPct, '#38bdf8') : ''}
+                </div>`
+              : ''
+          }
+          ${
+            url
+              ? `<p style="margin:14px 0 0"><a href="${escapeHtml(url)}" style="color:#2dd4bf;text-decoration:none;font-size:13px;font-weight:600">View job posting →</a></p>`
+              : ''
+          }
+          <div style="margin-top:14px;padding:12px 14px;border-radius:10px;background:#0f172a;border:1px solid #334155">
+            <div style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#64748b;margin-bottom:6px">Suggested follow-up</div>
+            <div style="font-size:12px;line-height:1.55;color:#cbd5e1;font-style:italic">${escapeHtml(snippet)}</div>
+          </div>
+        </td>
+      </tr>
+    </table>`;
+}
+
+async function sendPostApplyBatchEmail({
+  to,
+  jobs = [],
+  profile,
+  companies = [],
+  useTailoredResume,
+  queued = false,
+  preparedOnly = false,
+}) {
   const name = profile?.applicantName || profile?.displayName || 'there';
   const count = jobs.length;
+  const companyCount = companies.length || new Set(jobs.map((j) => (j.company || '').trim()).filter(Boolean)).size;
+  const appUrl = env.appUrl.replace(/\/$/, '');
+
   const headline = preparedOnly
-    ? `${count} application${count === 1 ? '' : 's'} prepared — review and submit`
+    ? `${count} application${count === 1 ? '' : 's'} prepared`
     : queued
-      ? `${count} application${count === 1 ? '' : 's'} queued — finish forms, then follow up`
-      : `${count} application${count === 1 ? '' : 's'} submitted — here's your follow-up plan`;
+      ? `${count} application${count === 1 ? '' : 's'} queued`
+      : `${count} application${count === 1 ? '' : 's'} submitted`;
 
-  const rows =
+  const intro = preparedOnly
+    ? 'Your applications are ready. Review each role below, submit the forms, then use the follow-up notes when you reach out.'
+    : queued
+      ? `Finish each form in Chrome with the ${env.appName} extension, then track traction below.`
+      : 'Here is your traction summary — what you applied for, where, and suggested next steps for each role.';
+
+  const jobCards =
     jobs.length > 0
-      ? jobs
-          .map((j) => {
-            const url = j.url || j.applyUrl || j.jobUrl || '';
-            const link = url
-              ? `<a href="${escapeHtml(url)}" style="color:#2dd4bf;text-decoration:none">View posting</a>`
-              : '';
-            const snippet = followUpSnippet(j.company, j.title);
-            return `<tr>
-              <td style="padding:12px 8px;border-bottom:1px solid #334155;vertical-align:top">
-                <strong style="color:#e2e8f0">${escapeHtml(j.title || 'Role')}</strong><br>
-                <span style="color:#94a3b8">${escapeHtml(j.company || 'Company')}</span>
-              </td>
-              <td style="padding:12px 8px;border-bottom:1px solid #334155;vertical-align:top;color:#94a3b8;font-size:13px">
-                ${j.matchPct != null ? `${j.matchPct}% match` : ''}
-                ${link ? `<br>${link}` : ''}
-              </td>
-              <td style="padding:12px 8px;border-bottom:1px solid #334155;vertical-align:top;color:#cbd5e1;font-size:12px;line-height:1.5">
-                <em>${escapeHtml(snippet)}</em>
-              </td>
-            </tr>`;
-          })
-          .join('')
-      : `<tr><td colspan="3" style="padding:12px;color:#94a3b8">No jobs in this batch.</td></tr>`;
+      ? jobs.map((j, i) => renderApplyJobCard(j, i, count, { queued, preparedOnly })).join('')
+      : `<p style="color:#94a3b8;padding:12px 0">No jobs in this batch.</p>`;
 
-  const html = `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:0 auto;color:#e2e8f0;background:#0f172a;padding:28px;border-radius:12px">
-    <h2 style="color:#5eead4;margin:0 0 8px;font-size:22px">${escapeHtml(headline)}</h2>
-    <p style="color:#94a3b8;line-height:1.6;margin:0">
-      Hi ${escapeHtml(name)}, your ${escapeHtml(env.appName)} batch is complete.
-      ${useTailoredResume ? ' Tailored resumes were prepared for each role.' : ''}
-      ${preparedOnly ? ' Review each role below, submit applications, then use the follow-up notes when you reach out.' : queued ? ` Open each posting in Chrome and submit with the ${escapeHtml(env.appName)} extension, then use the follow-up notes below.` : ' Consider a short follow-up in 3–5 business days if you have not heard back.'}
-    </p>
-    <h3 style="color:#5eead4;margin:28px 0 12px;font-size:16px">Companies to follow up with</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:14px">
-      <thead>
-        <tr style="color:#64748b;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.04em">
-          <th style="padding:8px">Role</th>
-          <th style="padding:8px">Details</th>
-          <th style="padding:8px">Suggested message</th>
+  const summaryLine =
+    count === 1 && jobs[0]
+      ? `${jobs[0].title} at ${jobs[0].company}`
+      : `${count} roles across ${companyCount || count} compan${companyCount === 1 ? 'y' : 'ies'}`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#020617">
+  <div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:680px;margin:0 auto;color:#e2e8f0;background:#0f172a;padding:0 0 28px">
+    <div style="background:linear-gradient(135deg,#042f2e 0%,#0f172a 55%,#111827 100%);padding:28px 24px 22px;border-bottom:1px solid #134e4a">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#5eead4">${escapeHtml(env.appName)} traction</div>
+      <h1 style="margin:10px 0 0;font-size:26px;line-height:1.2;color:#f8fafc">${escapeHtml(headline)}</h1>
+      <p style="margin:10px 0 0;font-size:15px;color:#94a3b8">Hi ${escapeHtml(name)} — ${escapeHtml(summaryLine)}</p>
+    </div>
+    <div style="padding:24px">
+      <p style="margin:0 0 20px;font-size:14px;line-height:1.65;color:#94a3b8">
+        ${escapeHtml(intro)}
+        ${useTailoredResume ? ' Tailored resumes were prepared for these roles.' : ''}
+      </p>
+      <h2 style="margin:0 0 14px;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5eead4">Your applications</h2>
+      ${jobCards}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px">
+        <tr>
+          <td style="padding:18px 0 8px">
+            <a href="${appUrl}/applications" style="display:inline-block;background:#14b8a6;color:#042f2e;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:700;font-size:14px;margin-right:8px">View applications →</a>
+            <a href="${appUrl}/follow-ups" style="display:inline-block;border:1px solid #334155;color:#e2e8f0;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:600;font-size:14px">Open traction trace →</a>
+          </td>
         </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <p style="margin:28px 0 0;color:#94a3b8;font-size:14px;line-height:1.6">
-      <strong style="color:#e2e8f0">Next steps:</strong> bookmark these companies, set a calendar reminder for 3–5 days out,
-      and send a polite note to the recruiter or hiring manager on LinkedIn or email.
-    </p>
-    <p style="margin:20px 0 0">
-      <a href="${env.appUrl.replace(/\/$/, '')}/follow-ups" style="display:inline-block;background:#14b8a6;color:#0f172a;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600">Open follow-up tracker →</a>
-      &nbsp;
-      <a href="${env.appUrl.replace(/\/$/, '')}/tailored-resumes" style="display:inline-block;border:1px solid #334155;color:#e2e8f0;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:500">Review tailored resumes →</a>
-    </p>
-    <p style="color:#475569;font-size:12px;margin-top:28px;line-height:1.5">
-      ${escapeHtml(env.appName)} · Applications use your personal email (${escapeHtml(profile?.digestEmail || 'set in Profile')}) ·
-      This message was sent from ${escapeHtml(env.emailFrom)}
-    </p>
-  </div>`;
+      </table>
+      <p style="margin:20px 0 0;font-size:13px;line-height:1.6;color:#64748b">
+        <strong style="color:#94a3b8">Tip:</strong> set a reminder for 3–5 business days, then send a short follow-up to the recruiter or hiring manager.
+      </p>
+    </div>
+    <div style="padding:0 24px">
+      <p style="margin:0;font-size:11px;line-height:1.5;color:#475569;border-top:1px solid #1e293b;padding-top:16px">
+        ${escapeHtml(env.appName)} · Sent to ${escapeHtml(to)} · Applications submitted as ${escapeHtml(profile?.digestEmail || to)} ·
+        From ${escapeHtml(env.emailFrom)}
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const subjectRole = jobs[0]?.title && jobs[0]?.company ? `${jobs[0].title} at ${jobs[0].company}` : summaryLine;
+  const subjectExtra = count > 1 ? ` (+${count - 1} more)` : '';
 
   return sendEmail({
     to,
-    subject: `${env.appName}: ${headline}`,
+    subject: `${env.appName}: ${preparedOnly ? 'Prepared' : queued ? 'Queued' : 'Applied'} — ${subjectRole}${subjectExtra}`,
     html,
   });
 }
