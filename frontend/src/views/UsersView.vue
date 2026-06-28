@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import http from '../api/http';
 import { useAuthStore } from '../stores/auth';
+import PasswordInput from '../components/PasswordInput.vue';
 
 const auth = useAuthStore();
 const users = ref([]);
@@ -26,6 +27,12 @@ const nameEditSaving = ref(false);
 const menuUser = ref(null);
 const userSearch = ref('');
 const showInviteForm = ref(false);
+const testEmailTo = ref('');
+const testEmailSending = ref(false);
+const testEmailMsg = ref('');
+const testEmailError = ref('');
+const emailDiagnostics = ref(null);
+const loginEmailSending = ref('');
 const loginUrl = import.meta.env.VITE_APP_URL
   ? `${import.meta.env.VITE_APP_URL.replace(/\/$/, '')}/login`
   : `${window.location.origin}/login`;
@@ -33,12 +40,14 @@ const loginUrl = import.meta.env.VITE_APP_URL
 async function load() {
   loading.value = true;
   try {
-    const [usersRes, usageRes] = await Promise.all([
+    const [usersRes, usageRes, setupRes] = await Promise.all([
       http.get('/users'),
       http.get('/team/usage').catch(() => ({ data: null })),
+      http.get('/setup/status').catch(() => ({ data: null })),
     ]);
     users.value = usersRes.data;
     teamUsage.value = usageRes.data;
+    emailDiagnostics.value = setupRes.data;
   } finally {
     loading.value = false;
   }
@@ -227,13 +236,78 @@ function userInitials(name) {
     .toUpperCase();
 }
 
-function generatePassword() {
+function randomPassword() {
   const chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let password = '';
   for (let i = 0; i < 12; i += 1) {
     password += chars[Math.floor(Math.random() * chars.length)];
   }
-  form.value.password = password;
+  return password;
+}
+
+function generatePassword() {
+  form.value.password = randomPassword();
+}
+
+async function sendDeliveryTest() {
+  const to = testEmailTo.value.trim();
+  testEmailMsg.value = '';
+  testEmailError.value = '';
+  if (!to) {
+    testEmailError.value = 'Enter an email address to test.';
+    return;
+  }
+  testEmailSending.value = true;
+  try {
+    const { data } = await http.post('/setup/test-email', { to });
+    testEmailMsg.value = data.message || `Test email sent to ${to}. Ask them to check inbox and spam.`;
+    if (data.diagnostics) emailDiagnostics.value = { ...emailDiagnostics.value, ...data.diagnostics };
+  } catch (e) {
+    testEmailError.value =
+      e.response?.data?.message || e.response?.data?.reason || e.message || 'Test email failed';
+    if (e.response?.data?.diagnostics) {
+      emailDiagnostics.value = { ...emailDiagnostics.value, ...e.response.data.diagnostics };
+    }
+  } finally {
+    testEmailSending.value = false;
+  }
+}
+
+function prefillEmailTest(email) {
+  testEmailTo.value = email || '';
+  testEmailMsg.value = '';
+  testEmailError.value = '';
+  document.getElementById('team-email-test')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function sendLoginEmail(user) {
+  const id = userId(user);
+  if (!id || isSelf(user)) return;
+  closeMenu();
+  loginEmailSending.value = id;
+  error.value = '';
+  success.value = '';
+  manualInvite.value = null;
+  const password = randomPassword();
+  try {
+    const { data } = await http.post(`/users/${id}/reset-password`, { password });
+    if (data.resetEmailSent) {
+      success.value = `Login email sent to ${data.email} with a new temporary password.`;
+    } else {
+      manualInvite.value = {
+        name: data.name || user.name,
+        email: data.email,
+        password,
+        loginUrl: data.loginUrl || loginUrl,
+      };
+      success.value = `Email could not reach ${data.email}. Copy the login details below and send manually (WhatsApp, text, etc.).`;
+    }
+    await load();
+  } catch (e) {
+    error.value = e.response?.data?.message || 'Could not send login email';
+  } finally {
+    loginEmailSending.value = '';
+  }
 }
 
 function openActions(user) {
@@ -520,6 +594,35 @@ onMounted(() => {
       </div>
     </div>
 
+    <div id="team-email-test" class="mt-10 card p-6">
+      <h3 class="font-semibold text-slate-200">Test email delivery</h3>
+      <p class="mt-1 text-sm text-slate-500">
+        Send a test message to any address — yours, a teammate’s, or Yahoo/Gmail — to confirm they can receive mail from remotelymatch.
+      </p>
+      <div v-if="emailDiagnostics" class="mt-3 flex flex-wrap gap-2 text-xs">
+        <span class="badge" :class="emailDiagnostics.emailDeliveryReady ? 'badge-teal' : 'badge-slate'">
+          {{ emailDiagnostics.emailDeliveryReady ? 'Email ready' : 'Email not ready' }}
+        </span>
+        <span v-if="emailDiagnostics.emailFrom" class="text-slate-500">From: {{ emailDiagnostics.emailFrom }}</span>
+      </div>
+      <p v-if="emailDiagnostics?.emailDomainError" class="mt-2 text-xs text-amber-300">{{ emailDiagnostics.emailDomainError }}</p>
+      <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+        <input
+          v-model="testEmailTo"
+          type="email"
+          class="input flex-1"
+          placeholder="e.g. ebenezerawosanya@yahoo.com"
+          autocomplete="off"
+        />
+        <button type="button" class="btn-primary shrink-0" :disabled="testEmailSending" @click="sendDeliveryTest">
+          {{ testEmailSending ? 'Sending…' : 'Send test email' }}
+        </button>
+      </div>
+      <p v-if="testEmailMsg" class="mt-3 rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ testEmailMsg }}</p>
+      <p v-if="testEmailError" class="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ testEmailError }}</p>
+      <p class="mt-3 text-xs text-slate-600">Yahoo and Hotmail often filter new senders — check spam/bulk folders. If the test arrives but invites do not, use <strong class="text-slate-500">Send login email</strong> on the member.</p>
+    </div>
+
     <div class="mt-10 border-t border-slate-800/80 pt-8">
       <button
         type="button"
@@ -550,7 +653,7 @@ onMounted(() => {
           <div>
             <label class="mb-1 block text-sm text-slate-400">Temporary password</label>
             <div class="flex gap-2">
-              <input v-model="form.password" type="text" required minlength="8" class="input flex-1" placeholder="8+ characters" />
+              <PasswordInput v-model="form.password" class="flex-1" required :minlength="8" placeholder="8+ characters" />
               <button type="button" class="btn-secondary shrink-0 px-3 text-sm" @click="generatePassword">Generate</button>
             </div>
             <p class="mt-1 text-xs text-slate-500">Copy and send via WhatsApp or text if the invite email doesn’t arrive.</p>
@@ -626,14 +729,18 @@ onMounted(() => {
         <h3 class="font-semibold text-slate-200">Reset password</h3>
         <p class="mt-1 text-sm text-slate-500">{{ resetTarget.name }} · {{ resetTarget.email }}</p>
         <p class="mt-2 text-xs text-amber-300/90">Sets a new password immediately. User must be <strong>Active</strong> to log in.</p>
-        <input
+        <PasswordInput
           v-model="resetPassword"
-          type="password"
+          class="mt-4"
           required
-          minlength="8"
-          class="input mt-4"
+          :minlength="8"
           placeholder="New temporary password"
         />
+        <div class="mt-3 flex justify-end">
+          <button type="button" class="text-xs text-teal-400 hover:underline" @click="resetPassword = randomPassword()">
+            Generate password
+          </button>
+        </div>
         <div class="mt-6 flex gap-3">
           <button type="button" class="btn-secondary flex-1" @click="resetTarget = null">Cancel</button>
           <button type="submit" class="btn-primary flex-1" :disabled="resetSaving">
@@ -677,10 +784,23 @@ onMounted(() => {
           <span class="team-manage-action-hint">Name shown on job applications and resumes</span>
         </button>
 
-        <p class="team-manage-section-label mt-5">Access</p>
+        <p class="team-manage-section-label mt-6">Access</p>
+        <button
+          type="button"
+          class="team-manage-action"
+          :disabled="loginEmailSending === userId(menuUser)"
+          @click="sendLoginEmail(menuUser)"
+        >
+          <span class="team-manage-action-title">Send login email</span>
+          <span class="team-manage-action-hint">New temporary password + invite-style email (use if they never got the invite)</span>
+        </button>
+        <button type="button" class="team-manage-action" @click="prefillEmailTest(menuUser.email)">
+          <span class="team-manage-action-title">Test delivery to this address</span>
+          <span class="team-manage-action-hint">Send a test email to {{ menuUser.email }} and scroll to the test section</span>
+        </button>
         <button type="button" class="team-manage-action" @click="openReset(menuUser)">
           <span class="team-manage-action-title">Reset password</span>
-          <span class="team-manage-action-hint">Set a new temporary password and email it to them</span>
+          <span class="team-manage-action-hint">Choose the password yourself, then email it to them</span>
         </button>
         <button
           v-if="menuUser.role !== 'admin'"

@@ -133,6 +133,35 @@ body {
   color: rgb(100 116 139);
 }
 
+.password-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.password-input-wrap .input {
+  padding-right: 3rem;
+}
+
+.password-input-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  display: flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  transform: translateY(-50%);
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  color: rgb(100 116 139);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.password-input-toggle:hover {
+  color: rgb(153 246 228);
+  background: rgb(30 41 59 / 0.6);
+}
+
 .btn-primary {
   @apply min-h-[48px] rounded-xl bg-gradient-to-r from-teal-500 to-teal-400 px-4 py-2.5 font-semibold text-slate-950 shadow-lg shadow-teal-900/40 ring-1 ring-amber-400/25 transition hover:from-teal-400 hover:to-teal-300 hover:shadow-teal-800/50 hover:ring-amber-300/35 active:scale-[0.98] disabled:opacity-50;
 }
