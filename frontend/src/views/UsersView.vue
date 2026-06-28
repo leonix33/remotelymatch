@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
 import http from '../api/http';
 import { useAuthStore } from '../stores/auth';
 
@@ -24,6 +24,18 @@ const nameEditTarget = ref(null);
 const nameEditValue = ref('');
 const nameEditSaving = ref(false);
 const openMenuId = ref('');
+const menuUser = ref(null);
+const menuStyle = ref({});
+const menuPanelRef = ref(null);
+const MENU_ESTIMATED_HEIGHT = 280;
+const MENU_VIEWPORT_PADDING = 8;
+
+function getViewportBottomInset() {
+  if (!window.matchMedia('(max-width: 1023px)').matches) return 0;
+  const tabBar = document.querySelector('.mobile-tab-bar');
+  return tabBar ? tabBar.getBoundingClientRect().height : 72;
+}
+
 const loginUrl = import.meta.env.VITE_APP_URL
   ? `${import.meta.env.VITE_APP_URL.replace(/\/$/, '')}/login`
   : `${window.location.origin}/login`;
@@ -204,13 +216,55 @@ function roleClass(role) {
   return role === 'admin' ? 'badge-gold' : 'badge-teal';
 }
 
-function toggleMenu(user) {
+function positionMenu(anchorRect) {
+  const bottomInset = getViewportBottomInset();
+  const right = Math.max(MENU_VIEWPORT_PADDING, window.innerWidth - anchorRect.right);
+  const viewportBottom = window.innerHeight - bottomInset - MENU_VIEWPORT_PADDING;
+  const panelHeight = menuPanelRef.value?.offsetHeight || MENU_ESTIMATED_HEIGHT;
+  const openUp = anchorRect.bottom + panelHeight > viewportBottom;
+
+  if (openUp) {
+    return {
+      bottom: `${window.innerHeight - anchorRect.top + 4}px`,
+      right: `${right}px`,
+      maxHeight: `min(calc(100dvh - ${MENU_VIEWPORT_PADDING * 2}px), 18rem)`,
+    };
+  }
+
+  return {
+    top: `${anchorRect.bottom + 4}px`,
+    right: `${right}px`,
+    maxHeight: `min(calc(100dvh - ${anchorRect.bottom + bottomInset + MENU_VIEWPORT_PADDING}px), 18rem)`,
+  };
+}
+
+async function toggleMenu(user, event) {
   const id = userId(user);
-  openMenuId.value = openMenuId.value === id ? '' : id;
+  if (openMenuId.value === id) {
+    closeMenu();
+    return;
+  }
+
+  const btn = event?.currentTarget;
+  const rect = btn?.getBoundingClientRect?.();
+
+  openMenuId.value = id;
+  menuUser.value = user;
+
+  if (!rect) {
+    menuStyle.value = {};
+    return;
+  }
+
+  menuStyle.value = positionMenu(rect);
+  await nextTick();
+  menuStyle.value = positionMenu(rect);
 }
 
 function closeMenu() {
   openMenuId.value = '';
+  menuUser.value = null;
+  menuStyle.value = {};
 }
 
 function openReset(user) {
@@ -266,13 +320,21 @@ function onDocumentClick(e) {
   if (!e.target.closest('[data-user-menu]')) closeMenu();
 }
 
+function onMenuDismiss() {
+  closeMenu();
+}
+
 onMounted(() => {
   load();
   document.addEventListener('click', onDocumentClick);
+  window.addEventListener('scroll', onMenuDismiss, true);
+  window.addEventListener('resize', onMenuDismiss);
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick);
+  window.removeEventListener('scroll', onMenuDismiss, true);
+  window.removeEventListener('resize', onMenuDismiss);
 });
 </script>
 
@@ -439,41 +501,22 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <div v-if="!isSelf(u)" class="mobile-job-actions mt-3">
-            <button type="button" class="btn-secondary text-sm" @click="handleMenuAction(u, 'edit-application-name')">
-              Edit name
-            </button>
+          <div v-if="!isSelf(u)" class="mt-3" data-user-menu>
             <button
-              v-if="u.role !== 'admin'"
               type="button"
-              class="btn-secondary text-sm"
+              class="btn-secondary inline-flex w-full items-center justify-center gap-1.5 py-2.5 text-sm"
               :disabled="roleSaving === userId(u)"
-              @click="handleMenuAction(u, 'make-admin')"
+              @click.stop="toggleMenu(u, $event)"
             >
-              Make admin
-            </button>
-            <button
-              v-else
-              type="button"
-              class="btn-secondary text-sm"
-              :disabled="roleSaving === userId(u)"
-              @click="handleMenuAction(u, 'make-user')"
-            >
-              Make user
-            </button>
-            <button type="button" class="btn-secondary text-sm" @click="openReset(u)">Reset password</button>
-            <button type="button" class="btn-secondary text-sm" @click="handleMenuAction(u, 'toggle-active')">
-              {{ u.active !== false ? 'Disable' : 'Enable' }}
-            </button>
-            <button type="button" class="btn-secondary text-sm text-red-300" @click="handleMenuAction(u, 'delete')">
-              Delete
+              Actions
+              <span class="text-[10px] text-slate-500">▾</span>
             </button>
           </div>
           <p v-else class="mt-3 text-xs text-slate-500">You · {{ u.role }}</p>
         </div>
       </div>
 
-      <div class="card hidden overflow-hidden mobile-table-wrap md:block">
+      <div class="card hidden overflow-x-auto overflow-y-visible mobile-table-wrap md:block">
       <table class="w-full text-left text-sm">
         <thead class="bg-slate-950/50">
           <tr class="border-b border-slate-800 text-slate-400">
@@ -506,63 +549,11 @@ onUnmounted(() => {
                   type="button"
                   class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs"
                   :disabled="roleSaving === userId(u)"
-                  @click.stop="toggleMenu(u)"
+                  @click.stop="toggleMenu(u, $event)"
                 >
                   Actions
                   <span class="text-[10px] text-slate-500">▾</span>
                 </button>
-                <div
-                  v-if="openMenuId === userId(u)"
-                  class="absolute right-0 z-20 mt-1 min-w-[10.5rem] overflow-hidden rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl"
-                >
-                  <button
-                    type="button"
-                    class="block w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
-                    @click="handleMenuAction(u, 'edit-application-name')"
-                  >
-                    Edit application name
-                  </button>
-                  <button
-                    v-if="u.role !== 'admin'"
-                    type="button"
-                    class="block w-full px-4 py-2 text-left text-xs text-amber-200 hover:bg-slate-800"
-                    :disabled="roleSaving === userId(u)"
-                    @click="handleMenuAction(u, 'make-admin')"
-                  >
-                    Make admin
-                  </button>
-                  <button
-                    v-else
-                    type="button"
-                    class="block w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
-                    :disabled="roleSaving === userId(u)"
-                    @click="handleMenuAction(u, 'make-user')"
-                  >
-                    Make user
-                  </button>
-                  <button
-                    type="button"
-                    class="block w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
-                    @click="openReset(u)"
-                  >
-                    Reset password
-                  </button>
-                  <button
-                    type="button"
-                    class="block w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
-                    @click="handleMenuAction(u, 'toggle-active')"
-                  >
-                    {{ u.active !== false ? 'Disable account' : 'Enable account' }}
-                  </button>
-                  <div class="my-1 border-t border-slate-800" />
-                  <button
-                    type="button"
-                    class="block w-full px-4 py-2 text-left text-xs text-red-300 hover:bg-red-950/40"
-                    @click="handleMenuAction(u, 'delete')"
-                  >
-                    Delete user
-                  </button>
-                </div>
               </div>
               <span v-else class="text-xs text-slate-500">You · {{ u.role }}</span>
             </td>
@@ -627,6 +618,65 @@ onUnmounted(() => {
         </div>
       </form>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="menuUser && openMenuId"
+        ref="menuPanelRef"
+        data-user-menu
+        class="fixed z-[200] min-w-[10.5rem] overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl"
+        :style="menuStyle"
+        @click.stop
+      >
+        <button
+          type="button"
+          class="block w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
+          @click="handleMenuAction(menuUser, 'edit-application-name')"
+        >
+          Edit application name
+        </button>
+        <button
+          v-if="menuUser.role !== 'admin'"
+          type="button"
+          class="block w-full px-4 py-2 text-left text-xs text-amber-200 hover:bg-slate-800"
+          :disabled="roleSaving === userId(menuUser)"
+          @click="handleMenuAction(menuUser, 'make-admin')"
+        >
+          Make admin
+        </button>
+        <button
+          v-else
+          type="button"
+          class="block w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
+          :disabled="roleSaving === userId(menuUser)"
+          @click="handleMenuAction(menuUser, 'make-user')"
+        >
+          Make user
+        </button>
+        <button
+          type="button"
+          class="block w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
+          @click="openReset(menuUser)"
+        >
+          Reset password
+        </button>
+        <button
+          type="button"
+          class="block w-full px-4 py-2 text-left text-xs text-slate-200 hover:bg-slate-800"
+          @click="handleMenuAction(menuUser, 'toggle-active')"
+        >
+          {{ menuUser.active !== false ? 'Disable account' : 'Enable account' }}
+        </button>
+        <div class="my-1 border-t border-slate-800" />
+        <button
+          type="button"
+          class="block w-full px-4 py-2 text-left text-xs text-red-300 hover:bg-red-950/40"
+          @click="handleMenuAction(menuUser, 'delete')"
+        >
+          Delete user
+        </button>
+      </div>
+    </Teleport>
 
     <div
       v-if="deleteTarget"
