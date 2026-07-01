@@ -4,6 +4,7 @@
 
 import { normalizeResumeLayout } from './resumeLayout';
 import { insertExperienceBulletBreaks } from './resumeExperienceParser';
+import { sanitizeResumeText } from './resumeSanitize';
 
 const FALSE_MID_SENTENCE_HEADERS = new Set(['EXPERIENCE', 'CERTIFICATION', 'SKILLS', 'TOOLS', 'EDUCATION']);
 const SECTION_HEADER_WORDS = new Set([
@@ -168,5 +169,5 @@ export function repairResumeText(text) {
 export function prepareResumeTextForParsing(text) {
   const normalized = normalizeResumeLayout(repairResumeText(text));
   const dechunked = insertExperienceBulletBreaks(normalized);
-  return repairResumeText(dechunked);
+  return sanitizeResumeText(repairResumeText(dechunked));
 }

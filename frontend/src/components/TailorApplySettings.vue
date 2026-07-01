@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import http from '../api/http';
-import ResumeDocumentPreview from './ResumeDocumentPreview.vue';
+import ResumePreview from './ResumePreview.vue';
 import { useProfileStore } from '../stores/profile';
 import { useAuthStore } from '../stores/auth';
 
@@ -195,11 +195,13 @@ onMounted(loadApplyPreview);
         </label>
       </div>
 
-      <div v-if="hasResumePreview && resumeMode === 'base'" class="mt-4">
-        <p class="text-sm font-medium text-slate-200">Resume document preview</p>
-        <p class="mt-1 text-xs text-slate-500">{{ resumePreviewNote }}</p>
-        <ResumeDocumentPreview class="mt-3" :text="resumeText" compact />
-      </div>
+      <ResumePreview
+        v-if="hasResumePreview && resumeMode === 'base'"
+        class="mt-4"
+        :resume-text="resumeText"
+        title="Resume document preview"
+        :subtitle="resumePreviewNote"
+      />
     </div>
 
     <!-- Tailoring options (only when tailored) -->
@@ -247,11 +249,13 @@ onMounted(loadApplyPreview);
         <span v-if="supplementPages"> · {{ supplementPages }} page{{ supplementPages === 1 ? '' : 's' }}</span>
       </p>
 
-      <div v-if="hasResumePreview" class="mt-5">
-        <p class="text-sm font-medium text-slate-200">Resume document preview</p>
-        <p class="mt-1 text-xs text-slate-500">{{ resumePreviewNote }}</p>
-        <ResumeDocumentPreview class="mt-3" :text="resumeText" compact />
-      </div>
+      <ResumePreview
+        v-if="hasResumePreview"
+        class="mt-5"
+        :resume-text="resumeText"
+        title="Resume document preview"
+        :subtitle="resumePreviewNote"
+      />
     </div>
 
     <div v-if="showJobCount" class="space-y-5">

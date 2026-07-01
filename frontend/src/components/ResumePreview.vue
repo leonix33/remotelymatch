@@ -1,6 +1,6 @@
 <script setup>
-import { computed } from 'vue';
-import ResumeDocumentPreview from './ResumeDocumentPreview.vue';
+import { computed, ref } from 'vue';
+import ResumePreviewModal from './ResumePreviewModal.vue';
 import { prepareResumeTextForParsing } from '../utils/resumeRepair';
 
 const props = defineProps({
@@ -11,9 +11,18 @@ const props = defineProps({
   unreadable: { type: Boolean, default: false },
   emptyMessage: {
     type: String,
-    default: 'Upload or paste your resume to preview it here before applying.',
+    default: 'Upload or paste your resume, then tap Preview to see the formatted layout.',
   },
+  title: { type: String, default: 'Resume preview' },
+  subtitle: {
+    type: String,
+    default: 'Professional layout — same format for every candidate',
+  },
+  downloadFileName: { type: String, default: '' },
+  prominent: { type: Boolean, default: false },
 });
+
+const previewOpen = ref(false);
 
 const hasContent = computed(() => !props.unreadable && (props.resumeText || '').trim().length >= 20);
 
@@ -40,47 +49,60 @@ const barColor = computed(() => {
   if (props.score >= 50) return 'bg-amber-500';
   return 'bg-slate-600';
 });
+
+const modalSubtitle = computed(() => {
+  if (props.fileName) return props.fileName;
+  return props.subtitle;
+});
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/60">
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
-      <div>
-        <p class="text-sm font-medium text-slate-200">Resume preview</p>
+  <div
+    class="resume-preview-launcher overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/60"
+    :class="prominent ? 'resume-preview-launcher-prominent' : ''"
+  >
+    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div class="min-w-0">
+        <p class="text-sm font-medium text-slate-200">{{ title }}</p>
         <p class="mt-0.5 text-xs text-slate-500">
-          {{ fileName ? fileName : 'Professional layout — same format for every candidate' }}
+          <template v-if="unreadable">Re-upload PDF or .docx to preview.</template>
+          <template v-else-if="hasContent">{{ scoreLabel }} · tap Preview for full layout</template>
+          <template v-else>{{ emptyMessage }}</template>
         </p>
       </div>
-      <div v-if="hasContent" class="text-right">
-        <p class="text-2xl font-bold" :class="scoreColor">{{ score }}</p>
-        <p class="text-xs text-slate-500">{{ scoreLabel }}</p>
-      </div>
-    </div>
 
-    <div v-if="!hasContent" class="px-4 py-8 text-center text-sm text-slate-500">
-      <template v-if="unreadable">
-        Resume file was not read correctly. Clear it and upload PDF or .docx again.
-      </template>
-      <template v-else>
-        {{ emptyMessage }}
-      </template>
-    </div>
-
-    <template v-else>
-      <div v-if="score > 0" class="px-4 pt-3">
-        <div class="h-1.5 overflow-hidden rounded-full bg-slate-800">
-          <div class="h-full rounded-full transition-all" :class="barColor" :style="{ width: `${Math.min(score, 100)}%` }" />
+      <div class="flex items-center gap-2">
+        <div v-if="hasContent && score > 0" class="text-right">
+          <p class="text-lg font-bold leading-none" :class="scoreColor">{{ score }}</p>
         </div>
+        <button
+          type="button"
+          class="resume-preview-tab"
+          :disabled="!hasContent"
+          @click="previewOpen = true"
+        >
+          Preview
+        </button>
       </div>
+    </div>
 
-      <div v-if="skills.length" class="flex flex-wrap gap-1.5 px-4 pt-3">
-        <span v-for="skill in skills.slice(0, 10)" :key="skill" class="badge badge-teal text-xs">{{ skill }}</span>
-        <span v-if="skills.length > 10" class="self-center text-xs text-slate-500">+{{ skills.length - 10 }} more</span>
+    <div v-if="hasContent && score > 0" class="px-4 pb-3">
+      <div class="h-1.5 overflow-hidden rounded-full bg-slate-800">
+        <div class="h-full rounded-full transition-all" :class="barColor" :style="{ width: `${Math.min(score, 100)}%` }" />
       </div>
+    </div>
 
-      <div class="p-4">
-        <ResumeDocumentPreview :text="displayText" compact />
-      </div>
-    </template>
+    <div v-if="hasContent && skills.length" class="flex flex-wrap gap-1.5 px-4 pb-3">
+      <span v-for="skill in skills.slice(0, 8)" :key="skill" class="badge badge-teal text-xs">{{ skill }}</span>
+      <span v-if="skills.length > 8" class="self-center text-xs text-slate-500">+{{ skills.length - 8 }} more</span>
+    </div>
+
+    <ResumePreviewModal
+      v-model="previewOpen"
+      :text="displayText"
+      :title="title"
+      :subtitle="modalSubtitle"
+      :download-file-name="downloadFileName"
+    />
   </div>
 </template>

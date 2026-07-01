@@ -30,6 +30,7 @@ defineProps({
     <p class="resume-skill-category-label">{{ row.label }}</p>
     <div class="resume-skill-chips">
       <span v-for="(item, sidx) in row.items" :key="sidx" class="resume-skill-chip">{{ item }}</span>
+      <span v-if="row.overflow" class="resume-skill-chip resume-skill-chip-more">+{{ row.overflow }} more</span>
     </div>
   </div>
 

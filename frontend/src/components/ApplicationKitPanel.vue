@@ -307,8 +307,8 @@ watch(
         {{ kit.message || 'No kit yet — switch to Use / re-tailor to generate.' }}
       </div>
 
-      <div v-else-if="kit?.tailored && viewTab === 'preview'" class="mt-5">
-        <TailoredResumePreview :kit="kit" prominent />
+      <div v-else-if="kit?.tailored && viewTab === 'preview'" class="mt-4">
+        <TailoredResumePreview :kit="kit" />
       </div>
     </div>
   </div>

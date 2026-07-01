@@ -363,7 +363,7 @@ RULES:
 1. ONLY edit summary/profile and experience bullets — never change employers, titles, dates, education, or certifications.
 2. Address missing ATS terms naturally (max once each): ${(redTerms || []).join(', ') || 'none'}
 3. Mirror uncovered posting requirements with real experience from the original resume — never invent.
-4. Max 3-4 bullets per role; verb + outcome; ~180 chars each. No "as measured by" scaffolding.
+4. Max 5-6 substantive bullets per role; verb + outcome + context; ~220-320 chars each. No "as measured by" scaffolding.
 5. Summary: 2 lines naming the target role and top 2 qualifications from the posting.
 6. Cover letter: 4 sentences — ${job?.title || 'role'} at ${job?.company || 'company'}, fit, proof point, close.
 7. Return JSON only: { "sections": [...], "coverLetterParagraph": "..." }`;
@@ -614,7 +614,7 @@ JOB-TARGET RULES:
 1. Summary must name "${job?.title || 'this role'}" fit and reflect top posting requirements.
 2. Experience bullets must prove qualifications from the posting using the candidate's real work only.
 3. Each critical keyword/requirement appears at most once — varied wording, no stuffing.
-4. 3-4 tight bullets per role (~180 chars); verb + outcome; no "as measured by" format.
+4. 5-6 substantive bullets per role (~220-320 chars); verb + outcome + tech context; no "as measured by" format.
 
 STRUCTURE RULES:
 1. EXACT section headings from original, same order.

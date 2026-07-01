@@ -14,7 +14,7 @@ const CAR_MEASURED_RE = /,?\s*as measured by\s+/i;
 const CAR_BY_RE =
   /,?\s*by\s+(?=(?:designing|implementing|building|integrating|automating|establishing|managing|configuring|hardening|enforcing|optimizing|supporting|conducting|participating|strengthening|ensuring|developing|architecting))/i;
 
-const MAX_BULLET_CHARS = 195;
+const MAX_BULLET_CHARS = 340;
 const ACTION_SPLIT_RE = new RegExp(`(?<=\\.)\\s+(?=(?:${ACTION_VERBS})\\b)`, 'g');
 
 export function mergeOrphanPrefixLines(lines) {
@@ -105,21 +105,23 @@ export function condenseCarBullet(text = '') {
     const tail = t.slice(measuredIdx).replace(CAR_MEASURED_RE, '');
     const byIdx = tail.search(CAR_BY_RE);
     const metricRaw = (byIdx >= 0 ? tail.slice(0, byIdx) : tail).trim().replace(/[,.]\s*$/, '');
+    const byClause =
+      byIdx >= 0 ? tail.slice(byIdx).replace(CAR_BY_RE, '').trim().split(/[.!?]/)[0]?.trim() : '';
 
-    if (metricRaw && metricRaw.length < 110) {
-      const hasNumber = /\d/.test(metricRaw);
-      if (hasNumber || metricRaw.length < 70) {
-        return trimToReadable(`${action} — ${metricRaw}.`.replace(/\s{2,}/g, ' '));
-      }
+    let result = action;
+    if (metricRaw) {
+      result = `${action} — ${metricRaw.replace(/[,.]\s*$/, '')}`;
     }
-    if (action.length > 30) {
-      return trimToReadable(`${action}.`.replace(/\s{2,}/g, ' '));
+    if (byClause && byClause.length > 20 && byClause.length < 120) {
+      result = `${result}, ${byClause.replace(/^by\s+/i, '')}`;
     }
+    result = trimToReadable(`${result}.`.replace(/\s{2,}/g, ' '));
+    return result.length > 40 ? result : trimToReadable(`${action}.`);
   }
 
   if (t.length > MAX_BULLET_CHARS) {
     const byIdx = t.search(CAR_BY_RE);
-    if (byIdx > 50) {
+    if (byIdx > 80) {
       return trimToReadable(`${t.slice(0, byIdx).trim().replace(/,\s*$/, '')}.`);
     }
     return trimToReadable(t);
@@ -236,7 +238,7 @@ export function insertExperienceBulletBreaks(text = '') {
       inExperience = false;
     }
 
-    if (inExperience && trimmed.length > 100 && !/^[-•*●▪]/.test(trimmed)) {
+    if (inExperience && trimmed.length > 140 && !/^[-•*●▪]/.test(trimmed)) {
       const car = splitExperienceParagraph(trimmed);
       if (car?.length) {
         out.push(...car.map((row) => `- ${row.text}`));

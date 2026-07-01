@@ -1089,9 +1089,14 @@ body {
 
 .resume-template-pro .resume-section-body-skills,
 .resume-template-pro .resume-section-body-tools {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+@media (min-width: 520px) {
+  .resume-template-pro .resume-section-body-skills {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .resume-template-pro .resume-section-body-education {
@@ -1118,7 +1123,7 @@ body {
 
 .resume-template-pro .resume-skill-category {
   margin: 0;
-  padding: 0.5rem 0.55rem 0.6rem;
+  padding: 0.4rem 0.5rem 0.5rem;
   border-radius: 0.35rem;
   background: rgba(74, 126, 181, 0.06);
   border: 1px solid rgba(74, 126, 181, 0.14);
@@ -1136,19 +1141,25 @@ body {
 .resume-template-pro .resume-skill-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem 0.4rem;
+  gap: 0.22rem 0.32rem;
 }
 
 .resume-template-pro .resume-skill-chip {
   display: inline-block;
-  padding: 0.18rem 0.5rem;
-  border-radius: 0.25rem;
+  padding: 0.12rem 0.42rem;
+  border-radius: 0.2rem;
   background: rgba(15, 23, 42, 0.55);
   border: 1px solid rgba(110, 181, 232, 0.22);
-  font-size: 8.5pt;
+  font-size: 8pt;
   font-weight: 500;
   color: #d8dee6;
-  line-height: 1.35;
+  line-height: 1.3;
+}
+
+.resume-template-pro .resume-skill-chip-more {
+  font-style: italic;
+  color: #94a3b8;
+  border-style: dashed;
 }
 
 .resume-template-pro .resume-tools-block {
@@ -1330,6 +1341,36 @@ body {
 
 .resume-preview-prominent .resume-page {
   min-height: auto;
+}
+
+.resume-preview-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  min-width: 5.25rem;
+  padding: 0.4rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 212, 191, 0.45);
+  background: rgba(20, 184, 166, 0.12);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #5eead4;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.resume-preview-tab:hover:not(:disabled) {
+  background: rgba(20, 184, 166, 0.22);
+  border-color: rgba(45, 212, 191, 0.65);
+}
+
+.resume-preview-tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.resume-preview-modal-panel {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
 }
 
 .resume-cover-letter {
@@ -1715,6 +1756,44 @@ body {
   .mobile-kit-tabs button {
     min-height: 44px;
     padding: 0.55rem 0.9rem !important;
+  }
+
+  .resume-preview-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 5.5rem;
+    padding: 0.45rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(45, 212, 191, 0.45);
+    background: rgba(20, 184, 166, 0.12);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #5eead4;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .resume-preview-tab:hover:not(:disabled) {
+    background: rgba(20, 184, 166, 0.22);
+    border-color: rgba(45, 212, 191, 0.65);
+  }
+
+  .resume-preview-tab:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .resume-preview-modal-panel {
+    border-radius: 1rem 1rem 0 0;
+    border-bottom: none;
+  }
+
+  @media (min-width: 640px) {
+    .resume-preview-modal-panel {
+      border-radius: 1rem;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.65);
+    }
   }
 
   .pwa-install-fab {

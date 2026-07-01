@@ -26,7 +26,7 @@ describe('resumePolishService', () => {
     ];
     const trimmed = trimExperienceBullets(lines);
     const bullets = trimmed.filter((l) => l.trim().startsWith('-'));
-    assert.ok(bullets.length <= 4);
+    assert.ok(bullets.length <= 6);
     assert.ok(bulletSimilarity(bullets[0], bullets[1]) < 0.68 || bullets.length < 2);
   });
 

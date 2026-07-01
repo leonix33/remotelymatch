@@ -1,6 +1,6 @@
 const BULLET_RE = /^(\s*[-•*●▪]\s+)/;
-const MAX_BULLETS_PER_ROLE = 4;
-const MAX_BULLET_CHARS = 195;
+const MAX_BULLETS_PER_ROLE = 6;
+const MAX_BULLET_CHARS = 340;
 const MAX_SUMMARY_LINES = 3;
 
 const JD_ECHO_SUFFIX =
@@ -121,6 +121,9 @@ function trimExperienceBullets(lines) {
     }
 
     let bullet = reduceStackedTechLists(stripJdEcho(trimLongBullet(trimmed)));
+    if (!bullet.replace(/^[-•*●▪]+\s*/, '').trim() || bullet.replace(/^[-•*●▪]+\s*/, '').trim().length < 15) {
+      continue;
+    }
     if (roleBullets.some((b) => bulletSimilarity(b, bullet) > 0.68)) continue;
     if (bulletsInRole >= MAX_BULLETS_PER_ROLE) continue;
 

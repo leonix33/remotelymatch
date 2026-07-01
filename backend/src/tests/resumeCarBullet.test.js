@@ -21,7 +21,7 @@ describe('resumeCarBulletService', () => {
     const blob = `${sample} Built scalable ETL pipelines in Azure Databricks using PySpark processing large datasets from ADLS Gen2, as measured by data processing time reduced by 35% and pipeline reliability improved through Delta Lake ACID architecture, by implementing Delta Lake with schema enforcement.`;
     const bullets = splitExperienceParagraph(blob);
     assert.ok(bullets.length >= 2);
-    assert.ok(bullets.every((b) => b.length < 280));
+    assert.ok(bullets.every((b) => b.length <= 340));
   });
 
   it('inserts bullet lines in experience section', () => {

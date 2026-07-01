@@ -77,6 +77,15 @@ async function forgotPassword(req, res, next) {
       });
       if (!emailResult.sent) {
         console.error('Forgot-password email failed:', emailResult.reason);
+        if (env.nodeEnv !== 'production') {
+          console.log('\n[dev] Password reset link (email not configured locally):\n', result.resetUrl, '\n');
+          return res.status(503).json({
+            message:
+              'Email is not configured for local dev. Check the terminal running npm run dev for a reset link, or sign in with ADMIN_PASSWORD from backend/.env.',
+            emailSent: false,
+            devResetAvailable: true,
+          });
+        }
         return res.status(503).json({
           message:
             'We found your account but could not send the reset email. Try again in a minute, or sign in with your Render admin password if you have access.',

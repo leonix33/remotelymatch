@@ -1,11 +1,14 @@
 const ACTION_VERBS =
   'Architected|Led|Built|Managed|Implemented|Designed|Developed|Created|Established|Reduced|Improved|Automated|Deployed|Migrated|Optimized|Coordinated|Directed|Spearheaded|Delivered|Streamlined|Standardized|Maintained|Supported|Executed|Configured|Integrated|Partnered|Drove|Owned|Introduced|Championed|Facilitated|Engineered|Operationalized|Hardened|Monitored|Troubleshot|Resolved|Scaled|Transformed|Collaborated|Authored|Defined|Enhanced|Enforced|Participated|Conducted|Operated';
 
+const DATE_RANGE_RE =
+  /\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4})\s*(?:[–\-—]\s*|\s+)(Present|Current|Now|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}|\d{4})\b/i;
+
 const CAR_MEASURED_RE = /,?\s*as measured by\s+/i;
 const CAR_BY_RE =
   /,?\s*by\s+(?=(?:designing|implementing|building|integrating|automating|establishing|managing|configuring|hardening|enforcing|optimizing|supporting|conducting|participating|strengthening|ensuring|developing|architecting))/i;
 
-const MAX_BULLET_CHARS = 195;
+const MAX_BULLET_CHARS = 340;
 const ACTION_SPLIT_RE = new RegExp(`(?<=\\.)\\s+(?=(?:${ACTION_VERBS})\\b)`, 'g');
 
 function trimToReadable(text = '') {
@@ -29,21 +32,23 @@ function condenseCarBullet(text = '') {
     const tail = t.slice(measuredIdx).replace(CAR_MEASURED_RE, '');
     const byIdx = tail.search(CAR_BY_RE);
     const metricRaw = (byIdx >= 0 ? tail.slice(0, byIdx) : tail).trim().replace(/[,.]\s*$/, '');
+    const byClause =
+      byIdx >= 0 ? tail.slice(byIdx).replace(CAR_BY_RE, '').trim().split(/[.!?]/)[0]?.trim() : '';
 
-    if (metricRaw && metricRaw.length < 110) {
-      const hasNumber = /\d/.test(metricRaw);
-      if (hasNumber || metricRaw.length < 70) {
-        return trimToReadable(`${action} — ${metricRaw}.`.replace(/\s{2,}/g, ' '));
-      }
+    let result = action;
+    if (metricRaw) {
+      result = `${action} — ${metricRaw.replace(/[,.]\s*$/, '')}`;
     }
-    if (action.length > 30) {
-      return trimToReadable(`${action}.`.replace(/\s{2,}/g, ' '));
+    if (byClause && byClause.length > 20 && byClause.length < 120) {
+      result = `${result}, ${byClause.replace(/^by\s+/i, '')}`;
     }
+    result = trimToReadable(`${result}.`.replace(/\s{2,}/g, ' '));
+    return result.length > 40 ? result : trimToReadable(`${action}.`);
   }
 
   if (t.length > MAX_BULLET_CHARS) {
     const byIdx = t.search(CAR_BY_RE);
-    if (byIdx > 50) {
+    if (byIdx > 80) {
       return trimToReadable(`${t.slice(0, byIdx).trim().replace(/,\s*$/, '')}.`);
     }
     return trimToReadable(t);
@@ -103,6 +108,14 @@ function dechunkExperienceLine(line = '') {
   return bullets.map((b) => (b.startsWith('-') ? b : `- ${b}`));
 }
 
+function isJobMetaLine(line = '') {
+  const t = String(line).trim().replace(/^[-•*●▪]+\s*/, '');
+  if (!t) return false;
+  if (DATE_RANGE_RE.test(t)) return true;
+  if (t.includes('|') && t.length < 220 && !/\b(Architected|Built|Implemented|Designed|Led)\b/.test(t)) return true;
+  return false;
+}
+
 function insertExperienceBulletBreaks(text = '') {
   const lines = String(text).replace(/\r\n/g, '\n').split('\n');
   let inExperience = false;
@@ -121,7 +134,7 @@ function insertExperienceBulletBreaks(text = '') {
       inExperience = false;
     }
 
-    if (inExperience && trimmed.length > 100 && !/^[-•*●▪]/.test(trimmed)) {
+    if (inExperience && trimmed.length > 140 && !/^[-•*●▪]/.test(trimmed) && !isJobMetaLine(trimmed)) {
       const chunks = dechunkExperienceLine(trimmed);
       if (chunks.length > 1 || (chunks.length === 1 && chunks[0] !== trimmed)) {
         out.push(...chunks);

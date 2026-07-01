@@ -99,6 +99,26 @@ export function isFalseToolsHeader(lines, lineIndex) {
   return false;
 }
 
+const MAX_SKILLS_PER_CATEGORY = 10;
+
+function compactSkillLabel(item = '') {
+  let t = String(item).trim();
+  const short = t.match(/^([^(|]{2,42})\s*\(/);
+  if (short && t.length > 36) return short[1].trim();
+  if (t.length > 44) return `${t.slice(0, 42).trim()}…`;
+  return t;
+}
+
+function dedupeSkills(items = []) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = compactSkillLabel(item).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function parseSkillsSectionLines(contentLines) {
   const text = contentLines.map((l) => String(l).trim()).filter(Boolean).join(' ');
   if (!text) return [];
@@ -112,17 +132,29 @@ export function parseSkillsSectionLines(contentLines) {
       const start = hits[i].index + hits[i][0].length;
       const end = i + 1 < hits.length ? hits[i + 1].index : text.length;
       const chunk = text.slice(start, end).trim();
-      const items = splitListTokens(chunk);
+      const items = dedupeSkills(splitListTokens(chunk));
       if (items.length) {
-        rows.push({ type: 'skill-category', label, items });
+        const compact = items.map(compactSkillLabel);
+        rows.push({
+          type: 'skill-category',
+          label,
+          items: compact.slice(0, MAX_SKILLS_PER_CATEGORY),
+          overflow: Math.max(0, compact.length - MAX_SKILLS_PER_CATEGORY),
+        });
       }
     }
     if (rows.length) return rows;
   }
 
-  const items = splitListTokens(text);
+  const items = dedupeSkills(splitListTokens(text));
   if (items.length >= 4) {
-    return [{ type: 'skill-category', label: 'Core skills', items }];
+    const compact = items.map(compactSkillLabel);
+    return [{
+      type: 'skill-category',
+      label: 'Core skills',
+      items: compact.slice(0, MAX_SKILLS_PER_CATEGORY),
+      overflow: Math.max(0, compact.length - MAX_SKILLS_PER_CATEGORY),
+    }];
   }
 
   if (text.includes('|') && text.length < 400) {
@@ -287,6 +319,12 @@ export function splitExperienceBlob(text) {
   return chunks.filter(Boolean);
 }
 
+function isValidBulletRow(row) {
+  if (row.type !== 'bullet') return true;
+  const t = String(row.text || '').trim();
+  return t.length >= 15 && !/^[-–—|.\s]+$/.test(t);
+}
+
 export function parseExperienceSectionLines(contentLines) {
   const flat = contentLines.map((l) => String(l).trim()).filter(Boolean).join(' ');
   const multi = splitExperienceBlob(flat);
@@ -305,7 +343,7 @@ export function parseExperienceSectionLines(contentLines) {
       });
       if (jobBlock.bodyText) {
         const bullets = splitParagraphToBullets(jobBlock.bodyText);
-        if (bullets) rows.push(...bullets.slice(0, 4));
+        if (bullets) rows.push(...bullets.slice(0, 6).filter(isValidBulletRow));
         else rows.push({ type: 'text', text: condenseCarBullet(jobBlock.bodyText) });
       }
       continue;
@@ -314,7 +352,7 @@ export function parseExperienceSectionLines(contentLines) {
     if (t.length > 100) {
       const bullets = splitParagraphToBullets(t);
       if (bullets) {
-        rows.push(...bullets.slice(0, 4));
+        rows.push(...bullets.slice(0, 6).filter(isValidBulletRow));
         continue;
       }
     }
