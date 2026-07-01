@@ -36,6 +36,7 @@ const updateSchema = z.object({
   digestEmail: z.string().email().optional().or(z.literal('')),
   notificationEmail: z.string().email().optional().or(z.literal('')),
   emailDigestEnabled: z.boolean().optional(),
+  applySummaryEmailsEnabled: z.boolean().optional(),
   followUpRemindersEnabled: z.boolean().optional(),
   contactPhone: z.string().optional(),
   defaultSupplementPages: z.number().min(1).max(6).optional(),
@@ -92,12 +93,18 @@ function parseListField(value) {
 async function getMe(req, res, next) {
   try {
     const raw = await profileService.getRaw(req.user.sub);
+    const patch = {};
     if (raw?.resumeText && isUnreadableResumeText(raw.resumeText)) {
-      await profileService.update(req.user.sub, {
-        resumeText: '',
-        resumeFileName: '',
-        extractedSkills: [],
-      });
+      patch.resumeText = '';
+      patch.resumeFileName = '';
+      patch.extractedSkills = [];
+    }
+    const accountEmail = await applicantContactService.resolveAuthEmail(req.user.sub, req.user.email);
+    if (!raw?.digestEmail?.trim() && accountEmail && !applicantContactService.isMailboxOnlyEmail(accountEmail)) {
+      patch.digestEmail = accountEmail;
+    }
+    if (Object.keys(patch).length) {
+      await profileService.update(req.user.sub, patch);
     }
     const profile = await profileService.getOrCreate(req.user.sub);
     res.json(profile);

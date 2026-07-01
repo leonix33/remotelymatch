@@ -25,6 +25,7 @@ const DEFAULT = {
   digestEmail: '',
   notificationEmail: '',
   emailDigestEnabled: true,
+  applySummaryEmailsEnabled: true,
   followUpRemindersEnabled: true,
   contactPhone: '',
   defaultSupplementPages: 3,

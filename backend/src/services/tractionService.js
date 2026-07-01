@@ -35,6 +35,11 @@ async function resolveDigestEmailForUser(userId, profile, authEmail = '') {
   return resolveDigestEmail(profile, accountEmail);
 }
 
+async function resolveNotificationRecipientsForUser(userId, profile, authEmail = '') {
+  const accountEmail = await applicantContactService.resolveAuthEmail(userId, authEmail);
+  return applicantContactService.resolveNotificationRecipients(profile, accountEmail);
+}
+
 function followUpUrgency(days) {
   if (days == null) return { urgency: 'low', status: 'unknown', score: 20 };
   if (days >= 3 && days <= 7) return { urgency: 'high', status: 'due', score: 90 };
@@ -294,8 +299,11 @@ async function markFollowUpDone(userId, jobId, notes = '') {
 
 async function sendPostApplyFeedback(userId, jobs = [], options = {}) {
   const profile = await profileService.getOrCreate(userId);
-  const to = await resolveDigestEmailForUser(userId, profile, options.authEmail);
-  if (!to) {
+  if (profile.applySummaryEmailsEnabled === false) {
+    return { sent: false, reason: 'Apply summary emails disabled in Profile → Email & follow-ups' };
+  }
+  const recipients = await resolveNotificationRecipientsForUser(userId, profile, options.authEmail);
+  if (!recipients.length) {
     return { sent: false, reason: 'No personal email — add one in Profile → Email & follow-ups' };
   }
   if (!emailService.isEmailConfigured()) {
@@ -322,15 +330,22 @@ async function sendPostApplyFeedback(userId, jobs = [], options = {}) {
 
   const companies = [...new Set(list.map((j) => (j.company || '').trim()).filter(Boolean))];
 
-  const emailResult = await emailService.sendPostApplyBatchEmail({
-    to,
-    jobs: list,
-    companies,
-    profile,
-    useTailoredResume: Boolean(options.useTailoredResume),
-    queued: Boolean(options.queued),
-    preparedOnly: Boolean(options.preparedOnly),
-  });
+  const sendResults = [];
+  for (const to of recipients) {
+    const emailResult = await emailService.sendPostApplyBatchEmail({
+      to,
+      jobs: list,
+      companies,
+      profile,
+      useTailoredResume: Boolean(options.useTailoredResume),
+      queued: Boolean(options.queued),
+      preparedOnly: Boolean(options.preparedOnly),
+    });
+    sendResults.push({ to, ...emailResult });
+  }
+
+  const sentTo = sendResults.filter((r) => r.sent).map((r) => r.to);
+  const toLabel = sentTo.length ? sentTo.join(', ') : recipients.join(', ');
 
   try {
     const notificationService = require('./notificationService');
@@ -338,17 +353,18 @@ async function sendPostApplyFeedback(userId, jobs = [], options = {}) {
       jobs: list,
       companies,
       queued: Boolean(options.queued),
-      emailSent: Boolean(emailResult.sent),
-      emailTo: to,
+      emailSent: sentTo.length > 0,
+      emailTo: toLabel,
     });
   } catch (err) {
     console.warn('apply batch in-app notification failed:', err.message);
   }
 
-  if (!emailResult.sent) {
-    return { sent: false, reason: emailResult.reason || 'Email provider rejected the send', to, inAppNotified: true };
+  if (!sentTo.length) {
+    const reason = sendResults[0]?.reason || 'Email provider rejected the send';
+    return { sent: false, reason, to: toLabel, inAppNotified: true };
   }
-  return { sent: true, to, inAppNotified: true, ...emailResult };
+  return { sent: true, to: toLabel, recipients: sentTo, inAppNotified: true };
 }
 
 async function previewDigest(userId, authEmail = '') {

@@ -26,6 +26,7 @@ const profileSchema = new mongoose.Schema(
     digestEmail: { type: String, default: '' },
     notificationEmail: { type: String, default: '' },
     emailDigestEnabled: { type: Boolean, default: true },
+    applySummaryEmailsEnabled: { type: Boolean, default: true },
     followUpRemindersEnabled: { type: Boolean, default: true },
     contactPhone: { type: String, default: '' },
     defaultSupplementPages: { type: Number, default: 3, min: 1, max: 6 },

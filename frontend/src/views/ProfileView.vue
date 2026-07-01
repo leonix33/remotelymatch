@@ -79,6 +79,7 @@ const form = ref({
   defaultApplyResumeMode: 'base',
   digestEmail: '',
   emailDigestEnabled: true,
+  applySummaryEmailsEnabled: true,
   followUpRemindersEnabled: true,
   contactPhone: '',
   defaultSupplementPages: 3,
@@ -105,6 +106,7 @@ function loadForm(p) {
     defaultApplyResumeMode: p.defaultApplyResumeMode === 'tailored' ? 'tailored' : 'base',
     digestEmail: p.digestEmail || '',
     emailDigestEnabled: p.emailDigestEnabled !== false,
+    applySummaryEmailsEnabled: p.applySummaryEmailsEnabled !== false,
     followUpRemindersEnabled: p.followUpRemindersEnabled !== false,
     contactPhone: p.contactPhone || '',
     defaultSupplementPages: p.defaultSupplementPages || 3,
@@ -579,10 +581,19 @@ async function removeApolloKey() {
           <input v-model="form.contactPhone" type="tel" class="input" placeholder="+1 555 123 4567" />
         </div>
         <label class="mt-4 flex cursor-pointer items-start gap-3 text-sm text-slate-300">
+          <input v-model="form.applySummaryEmailsEnabled" type="checkbox" class="mt-0.5 accent-teal-500" />
+          <span>
+            <strong class="text-slate-200">Email me when I apply</strong>
+            <span class="mt-1 block text-slate-500">
+              After each apply batch, send roles, companies, match scores, and follow-up tips to your personal email above.
+            </span>
+          </span>
+        </label>
+        <label class="mt-3 flex cursor-pointer items-start gap-3 text-sm text-slate-300">
           <input v-model="form.emailDigestEnabled" type="checkbox" class="mt-0.5 accent-teal-500" />
           <span>
-            <strong class="text-slate-200">Send application digest emails</strong>
-            <span class="mt-1 block text-slate-500">Best-fit jobs you have applied to, plus follow-ups due.</span>
+            <strong class="text-slate-200">Send weekly application digest</strong>
+            <span class="mt-1 block text-slate-500">Best-fit jobs you have applied to, plus follow-ups due (from Follow-ups page).</span>
           </span>
         </label>
         <label class="mt-3 flex cursor-pointer items-start gap-3 text-sm text-slate-300">
@@ -608,6 +619,7 @@ async function removeApolloKey() {
           v-model:digest-email="form.digestEmail"
           v-model:contact-phone="form.contactPhone"
           v-model:applicant-name="form.applicantName"
+          :apply-summary-emails-enabled="form.applySummaryEmailsEnabled"
           class="mt-4"
           :show-resume-mode="false"
           :show-applicant-contact="false"

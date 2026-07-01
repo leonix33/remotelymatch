@@ -19,6 +19,7 @@ const props = defineProps({
   resumeText: { type: String, default: '' },
   showResumeDocumentPreview: { type: Boolean, default: true },
   emailDigestEnabled: { type: Boolean, default: true },
+  applySummaryEmailsEnabled: { type: Boolean, default: true },
 });
 
 const jobCount = defineModel('jobCount', { type: Number, default: 5 });
@@ -157,7 +158,7 @@ onMounted(loadApplyPreview);
       <p v-else-if="applyPreview?.emailWarning" class="mt-3 text-xs text-amber-300">{{ applyPreview.emailWarning }}</p>
 
       <div
-        v-if="digestEmail && emailDigestEnabled !== false"
+        v-if="digestEmail && applySummaryEmailsEnabled !== false"
         class="mt-4 rounded-lg border border-sky-900/40 bg-sky-950/20 px-3 py-2.5 text-xs text-sky-100/90"
       >
         <strong class="text-sky-200">Application summary emails</strong>
@@ -167,8 +168,8 @@ onMounted(loadApplyPreview);
           Check spam if you do not see it within a few minutes.
         </span>
       </div>
-      <p v-else-if="digestEmail && emailDigestEnabled === false" class="mt-3 text-xs text-slate-500">
-        Application summary emails are off — enable them in Profile → Email & follow-ups.
+      <p v-else-if="digestEmail && applySummaryEmailsEnabled === false" class="mt-3 text-xs text-slate-500">
+        Apply summary emails are off — enable “Email me when I apply” in Profile → Email &amp; follow-ups.
       </p>
     </div>
 

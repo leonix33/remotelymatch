@@ -352,7 +352,7 @@ onMounted(async () => {
         class="mt-5"
         :show-job-count="true"
         :resume-text="resumeUnreadable ? '' : resumeText"
-        :email-digest-enabled="profileStore.profile?.emailDigestEnabled !== false"
+        :apply-summary-emails-enabled="profileStore.profile?.applySummaryEmailsEnabled !== false"
       />
     </section>
 

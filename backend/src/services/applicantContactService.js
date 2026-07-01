@@ -1,17 +1,23 @@
 const env = require('../config/env');
 const User = require('../models/User');
 
-function isAppOrSystemEmail(email) {
+function isMailboxOnlyEmail(email) {
   if (!email) return true;
   const e = email.trim().toLowerCase();
   if (!e.includes('@')) return true;
-  if (e === env.adminEmail?.toLowerCase()) return true;
   if (e.endsWith('@example.com')) return true;
   if (e.includes('@resend.dev')) return true;
   if (e.includes('onboarding@')) return true;
+  if (e.startsWith('noreply@') || e.startsWith('no-reply@')) return true;
   const fromMatch = env.emailFrom?.match(/<([^>]+)>/);
   if (fromMatch && fromMatch[1].toLowerCase() === e) return true;
+  if (env.teamEmail && env.teamEmail.toLowerCase() === e) return true;
   return false;
+}
+
+/** Team/noreply addresses unsuitable for job application forms. */
+function isAppOrSystemEmail(email) {
+  return isMailboxOnlyEmail(email);
 }
 
 function resolveContactEmail(profile, authEmail) {
@@ -22,9 +28,24 @@ function resolveContactEmail(profile, authEmail) {
   ].filter(Boolean);
 
   for (const email of candidates) {
-    if (!isAppOrSystemEmail(email)) return email;
+    if (!isMailboxOnlyEmail(email)) return email;
   }
-  return candidates.find((e) => !isAppOrSystemEmail(e)) || candidates[0] || '';
+  return candidates.find((e) => !isMailboxOnlyEmail(e)) || candidates[0] || '';
+}
+
+function resolveNotificationRecipients(profile, authEmail = '') {
+  const seen = new Set();
+  const recipients = [];
+  for (const email of [profile?.digestEmail, profile?.notificationEmail, authEmail]) {
+    const trimmed = String(email || '').trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    if (isMailboxOnlyEmail(trimmed)) continue;
+    seen.add(key);
+    recipients.push(trimmed);
+  }
+  return recipients;
 }
 
 async function resolveAuthEmail(userId, authEmail) {
@@ -90,7 +111,9 @@ function contactSignature(contact) {
 
 module.exports = {
   isAppOrSystemEmail,
+  isMailboxOnlyEmail,
   resolveContactEmail,
+  resolveNotificationRecipients,
   resolveAuthEmail,
   resolveApplicantName,
   resolveApplicantContact,
