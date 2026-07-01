@@ -157,9 +157,63 @@ async function getEnrichmentStatus(userId) {
   };
 }
 
+async function testEnrichmentProviders(userId, { domain = 'stripe.com', company = 'Stripe' } = {}) {
+  const hunterKey = await resolveHunterKey(userId);
+  const apolloKey = await resolveApolloKey(userId);
+  const result = {
+    hunterConfigured: Boolean(hunterKey),
+    apolloConfigured: Boolean(apolloKey),
+    sampleDomain: domain,
+    sampleCompany: company,
+    hunter: { tested: false, ok: false, emailCount: 0, message: 'Not configured' },
+    apollo: { tested: false, ok: false, peopleCount: 0, message: 'Not configured' },
+  };
+
+  if (hunterKey) {
+    result.hunter.tested = true;
+    try {
+      const hunter = await hunterDomainSearch(domain, hunterKey);
+      if (hunter?.error) {
+        result.hunter.message = 'Hunter API rejected the request — check your API key on Render';
+      } else {
+        result.hunter.ok = true;
+        result.hunter.emailCount = hunter.emails?.length || 0;
+        result.hunter.message =
+          result.hunter.emailCount > 0
+            ? `Found ${result.hunter.emailCount} emails at ${domain}`
+            : `Connected — no public emails at ${domain} (normal for some companies)`;
+      }
+    } catch (err) {
+      result.hunter.message = err.message || 'Hunter request failed';
+    }
+  }
+
+  if (apolloKey) {
+    result.apollo.tested = true;
+    try {
+      const apollo = await apolloPeopleSearch(company, domain, apolloKey);
+      if (apollo?.error) {
+        result.apollo.message = 'Apollo API rejected the request — check your API key on Render';
+      } else {
+        result.apollo.ok = true;
+        result.apollo.peopleCount = apollo.people?.length || 0;
+        result.apollo.message =
+          result.apollo.peopleCount > 0
+            ? `Found ${result.apollo.peopleCount} recruiters at ${company}`
+            : `Connected — no recruiter matches for sample search (API is working)`;
+      }
+    } catch (err) {
+      result.apollo.message = err.message || 'Apollo request failed';
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   enrichContacts,
   getEnrichmentStatus,
+  testEnrichmentProviders,
   hunterDomainSearch,
   apolloPeopleSearch,
 };

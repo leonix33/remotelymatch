@@ -8,7 +8,6 @@ const followUpKitStore = require('./followUpKitStore');
 const followUpScheduleService = require('./followUpScheduleService');
 const followUpScheduleStore = require('./followUpScheduleStore');
 const contactEnrichmentService = require('./contactEnrichmentService');
-const applicationKitStore = require('./applicationKitStore');
 const jobListCache = require('./jobListCache');
 const localNotificationStore = require('./localNotificationStore');
 const emailService = require('./emailService');
@@ -463,13 +462,25 @@ function resolveFollowUpFlags({ completed, days, schedule }) {
   return { followUpDue, followUpUpcoming };
 }
 
+const APPLIED_STATUSES = new Set([
+  'submitted',
+  'queued',
+  'manual-review',
+  'email-apply',
+  'external-apply',
+]);
+
 async function buildFollowUpBoard(userId, authEmail = '') {
   await followUpScheduleService.processDueReminders(userId);
 
   const profile = await profileService.getOrCreate(userId);
   const apps = await applicationService.listForUser(userId, { limit: 500 });
-  const submitted = apps.filter((a) => a.status === 'submitted' || a.submittedAt);
+  const submitted = apps.filter((a) => APPLIED_STATUSES.has(a.status) || a.submittedAt);
   const enrichmentStatus = await contactEnrichmentService.getEnrichmentStatus(userId);
+
+  const kitsByJobId = new Map(
+    followUpKitStore.listForUser(userId).map((kit) => [String(kit.jobId), kit])
+  );
 
   let scoredById = new Map();
   try {
@@ -487,10 +498,8 @@ async function buildFollowUpBoard(userId, authEmail = '') {
   const rows = [];
   for (const app of submitted) {
     const jobId = app.jobId;
-    const kit = followUpKitStore.get(userId, jobId);
+    const kit = kitsByJobId.get(String(jobId)) || followUpKitStore.get(userId, jobId);
     const scored = scoredById.get(jobId);
-    const applicationKit =
-      scored || kit ? null : await applicationKitStore.get(userId, jobId);
     const appliedAt = app.submittedAt || app.lastAttempted;
 
     if (!followUpScheduleStore.get(userId, jobId) && appliedAt) {
@@ -504,7 +513,7 @@ async function buildFollowUpBoard(userId, authEmail = '') {
     const schedule = followUpScheduleService.scheduleMeta(userId, jobId);
     const days = daysSince(appliedAt);
     const completed = localFollowUpStore.isCompleted(userId, jobId);
-    const match = resolveApplicationMatch(app, scored, kit, applicationKit, profile, scoringContext);
+    const match = resolveApplicationMatch(app, scored, kit, null, profile, scoringContext);
     const { followUpDue, followUpUpcoming } = resolveFollowUpFlags({ completed, days, schedule });
 
     rows.push({

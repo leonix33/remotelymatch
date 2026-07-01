@@ -70,6 +70,15 @@ function formatDate(iso) {
             Your number:
             <a :href="`tel:${job.followUpKit.applicantPhone}`" class="text-teal-300 hover:underline">{{ job.followUpKit.applicantPhone }}</a>
           </p>
+          <ul v-if="job.followUpKit.contacts?.enrichmentProviders?.length" class="mt-2 flex flex-wrap gap-1">
+            <li
+              v-for="provider in job.followUpKit.contacts.enrichmentProviders"
+              :key="provider"
+              class="badge badge-teal text-[10px] capitalize"
+            >
+              {{ provider }} verified
+            </li>
+          </ul>
           <ul class="mt-3 space-y-2 text-sm">
             <li
               v-for="(c, i) in job.followUpKit.contacts?.verifiedContacts || []"

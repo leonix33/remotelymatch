@@ -1,4 +1,5 @@
 const tractionService = require('../services/tractionService');
+const contactEnrichmentService = require('../services/contactEnrichmentService');
 const followUpDraftService = require('../services/followUpDraftService');
 
 async function trace(req, res, next) {
@@ -79,4 +80,15 @@ async function enrichFollowUp(req, res, next) {
   }
 }
 
-module.exports = { trace, previewDigest, sendDigest, scan, markDone, followUpKit, followUpBoard, enrichFollowUp };
+async function enrichmentTest(req, res, next) {
+  try {
+    const domain = String(req.body?.domain || req.query?.domain || 'stripe.com').trim();
+    const company = String(req.body?.company || req.query?.company || 'Stripe').trim();
+    const result = await contactEnrichmentService.testEnrichmentProviders(req.user.sub, { domain, company });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { trace, previewDigest, sendDigest, scan, markDone, followUpKit, followUpBoard, enrichFollowUp, enrichmentTest };
