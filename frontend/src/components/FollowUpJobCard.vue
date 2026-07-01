@@ -43,6 +43,7 @@ function formatDate(iso) {
           <h3 class="mt-2 text-lg font-semibold text-slate-100">{{ job.title }}</h3>
           <p class="text-sm text-teal-300/90">{{ job.company }}</p>
           <p class="mt-1 text-xs text-slate-500">Applied {{ formatDate(job.appliedAt) }} · {{ job.daysSinceApply ?? 0 }}d ago</p>
+          <p v-if="!job.hasFollowUpKit" class="mt-1 text-xs text-amber-300/90">No follow-up kit yet — expand to generate</p>
           <div class="mt-2">
             <JobScoreBadges :job="job" />
           </div>

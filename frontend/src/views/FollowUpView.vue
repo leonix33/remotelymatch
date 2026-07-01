@@ -7,6 +7,8 @@ import AtsKeywordScore from '../components/AtsKeywordScore.vue';
 const loading = ref(true);
 const board = ref(null);
 const filter = ref('all');
+const visibleCount = ref(25);
+const pageSize = 25;
 const selectedId = ref('');
 const copied = ref('');
 const enriching = ref('');
@@ -19,11 +21,23 @@ const filteredJobs = computed(() => {
   return jobs.value;
 });
 
+const visibleJobs = computed(() => filteredJobs.value.slice(0, visibleCount.value));
+const hasMoreJobs = computed(() => visibleCount.value < filteredJobs.value.length);
+
+function setFilter(next) {
+  filter.value = next;
+  visibleCount.value = pageSize;
+}
+
 async function loadBoard() {
   loading.value = true;
   try {
     const { data } = await http.get('/traction/follow-up/board');
     board.value = data;
+    if (data.summary?.dueNow > 0) {
+      filter.value = 'due';
+    }
+    visibleCount.value = pageSize;
     if (!selectedId.value && data.jobs?.length) {
       const due = data.jobs.find((j) => j.followUpDue);
       selectedId.value = due?.jobId || data.jobs[0].jobId;
@@ -125,14 +139,26 @@ onMounted(loadBoard);
         <span class="badge" :class="board.enrichment.apolloConfigured ? 'badge-teal' : 'badge-slate'">
           Apollo {{ board.enrichment.apolloConfigured ? 'connected' : 'not set' }}
         </span>
-        <span class="text-slate-500">Add HUNTER_API_KEY / APOLLO_API_KEY on Render for verified recruiter emails</span>
+        <span
+          v-if="!board.enrichment.hunterConfigured && !board.enrichment.apolloConfigured"
+          class="text-slate-500"
+        >
+          Add Hunter / Apollo keys in Profile or Render for verified recruiter emails
+        </span>
       </div>
+      <p v-if="board.summary?.total > 20" class="mt-3 text-xs text-amber-200/90">
+        {{ board.summary.total }} applications on file — use <strong class="text-amber-100">Due for follow-up</strong> to focus.
+        Expand a role and click <strong class="text-amber-100">Generate follow-up kit</strong> for email drafts.
+      </p>
     </header>
 
     <div class="mt-6 flex flex-wrap items-center gap-2">
-      <button type="button" class="btn-secondary text-sm" :class="{ 'ring-1 ring-teal-500': filter === 'all' }" @click="filter = 'all'">All applied</button>
-      <button type="button" class="btn-secondary text-sm" :class="{ 'ring-1 ring-amber-500': filter === 'due' }" @click="filter = 'due'">Due for follow-up</button>
-      <button type="button" class="btn-secondary text-sm" :class="{ 'ring-1 ring-teal-500': filter === 'upcoming' }" @click="filter = 'upcoming'">Upcoming</button>
+      <button type="button" class="btn-secondary text-sm" :class="{ 'ring-1 ring-teal-500': filter === 'all' }" @click="setFilter('all')">All applied</button>
+      <button type="button" class="btn-secondary text-sm" :class="{ 'ring-1 ring-amber-500': filter === 'due' }" @click="setFilter('due')">
+        Due for follow-up
+        <span v-if="board?.summary?.dueNow" class="ml-1 text-amber-300">({{ board.summary.dueNow }})</span>
+      </button>
+      <button type="button" class="btn-secondary text-sm" :class="{ 'ring-1 ring-teal-500': filter === 'upcoming' }" @click="setFilter('upcoming')">Upcoming</button>
       <button type="button" class="btn-secondary ml-auto text-sm" :disabled="loading" @click="loadBoard">
         {{ loading ? 'Refreshing…' : 'Refresh' }}
       </button>
@@ -146,8 +172,12 @@ onMounted(loadBoard);
     </div>
 
     <div v-else class="mt-6 space-y-4">
+      <p class="text-xs text-slate-500">
+        Showing {{ visibleJobs.length }} of {{ filteredJobs.length }}
+        <span v-if="filter !== 'all'">({{ filter }} filter)</span>
+      </p>
       <FollowUpJobCard
-        v-for="job in filteredJobs"
+        v-for="job in visibleJobs"
         :key="job.jobId"
         :job="job"
         :selected="selectedId === job.jobId"
@@ -159,6 +189,12 @@ onMounted(loadBoard);
         @enrich="enrichContacts"
         @generate="generateKit"
       />
+
+      <div v-if="hasMoreJobs" class="text-center">
+        <button type="button" class="btn-secondary text-sm" @click="visibleCount += pageSize">
+          Show more ({{ filteredJobs.length - visibleCount }} remaining)
+        </button>
+      </div>
 
       <div v-if="selectedId && jobs.find((j) => j.jobId === selectedId)?.ats" class="card p-5">
         <AtsKeywordScore :job-id="selectedId" />

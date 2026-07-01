@@ -4,6 +4,11 @@ defineProps({
   showFactors: { type: Boolean, default: false },
 });
 
+const matchPct = (job) => {
+  const v = job.personalMatchPct ?? job.matchPct;
+  return v != null && Number.isFinite(Number(v)) ? Math.round(Number(v)) : null;
+};
+
 function likelihoodClass(pct) {
   if (pct >= 40) return 'badge-gold';
   if (pct >= 25) return 'badge-teal';
@@ -21,7 +26,7 @@ function likelihoodLabel(tier) {
 
 <template>
   <div class="flex flex-wrap items-center gap-2">
-    <span class="badge badge-teal">{{ job.personalMatchPct ?? job.matchPct ?? 0 }}% match</span>
+    <span class="badge badge-teal" v-if="matchPct(job) != null">{{ matchPct(job) }}% match</span>
     <span
       v-if="job.interviewLikelihoodPct != null"
       class="badge"

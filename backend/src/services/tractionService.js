@@ -6,8 +6,10 @@ const localOutcomeStore = require('./localOutcomeStore');
 const localFollowUpStore = require('./localFollowUpStore');
 const followUpKitStore = require('./followUpKitStore');
 const followUpScheduleService = require('./followUpScheduleService');
+const followUpScheduleStore = require('./followUpScheduleStore');
 const contactEnrichmentService = require('./contactEnrichmentService');
 const applicationKitStore = require('./applicationKitStore');
+const jobListCache = require('./jobListCache');
 const localNotificationStore = require('./localNotificationStore');
 const emailService = require('./emailService');
 const applicantContactService = require('./applicantContactService');
@@ -381,22 +383,46 @@ async function previewDigest(userId, authEmail = '') {
   };
 }
 
+function resolveFollowUpFlags({ completed, days, schedule }) {
+  if (completed) {
+    return { followUpDue: false, followUpUpcoming: false };
+  }
+  const urgency = followUpUrgency(days);
+  const followUpDue =
+    Boolean(schedule?.isDue) ||
+    (days != null && days >= 3 && urgency.status === 'due');
+  const followUpUpcoming =
+    !followUpDue &&
+    (Boolean(schedule?.isUpcoming) || (days != null && days >= 1 && days < 3));
+  return { followUpDue, followUpUpcoming };
+}
+
 async function buildFollowUpBoard(userId, authEmail = '') {
   await followUpScheduleService.processDueReminders(userId);
 
   const profile = await profileService.getOrCreate(userId);
-  const apps = await applicationService.listForUser(userId, { limit: 200 });
+  const apps = await applicationService.listForUser(userId, { limit: 500 });
   const submitted = apps.filter((a) => a.status === 'submitted' || a.submittedAt);
   const enrichmentStatus = await contactEnrichmentService.getEnrichmentStatus(userId);
+
+  let scoredById = new Map();
+  try {
+    const { jobs: scoredJobs } = await jobListCache.listScoredForUser(userId);
+    scoredById = new Map(scoredJobs.map((j) => [j.jobId, j]));
+  } catch {
+    /* scoring optional */
+  }
 
   const rows = [];
   for (const app of submitted) {
     const jobId = app.jobId;
     const kit = followUpKitStore.get(userId, jobId);
-    const applicationKit = await applicationKitStore.get(userId, jobId);
-    const schedule = followUpScheduleService.scheduleMeta(userId, jobId);
-    const days = daysSince(app.submittedAt || app.lastAttempted);
-    const completed = localFollowUpStore.isCompleted(userId, jobId);
+    const scored = scoredById.get(jobId);
+    const applicationKit =
+      scored || kit ? null : await applicationKitStore.get(userId, jobId);
+    const kitMatch = kit?.atsMatchPct ?? applicationKit?.estimatedMatchPct ?? null;
+    const personalMatchPct = scored?.personalMatchPct ?? scored?.matchPct ?? kitMatch ?? null;
+    const { followUpDue, followUpUpcoming } = resolveFollowUpFlags({ completed, days, schedule });
 
     rows.push({
       jobId,
@@ -405,15 +431,19 @@ async function buildFollowUpBoard(userId, authEmail = '') {
       url: app.applyUrl || app.jobUrl,
       source: app.source,
       status: app.status,
-      appliedAt: app.submittedAt || app.lastAttempted,
+      appliedAt,
       daysSinceApply: days,
-      matchPct: kit?.atsMatchPct ?? applicationKit?.estimatedMatchPct ?? null,
+      personalMatchPct,
+      matchPct: personalMatchPct,
+      interviewLikelihoodPct: scored?.interviewLikelihoodPct ?? null,
+      likelihoodTier: scored?.likelihoodTier ?? null,
       ats: null,
       followUpKit: kit,
       schedule,
       followUpCompleted: completed,
-      followUpDue: schedule?.isDue && !completed,
-      followUpUpcoming: schedule?.isUpcoming && !completed,
+      followUpDue,
+      followUpUpcoming,
+      hasFollowUpKit: Boolean(kit),
     });
   }
 
