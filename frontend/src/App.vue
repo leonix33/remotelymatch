@@ -6,7 +6,7 @@ import { useProfileStore } from './stores/profile';
 import PwaPrompt from './components/PwaPrompt.vue';
 import ShareInstallTab from './components/ShareInstallTab.vue';
 import ShareInstallPanel from './components/ShareInstallPanel.vue';
-import AppLogo from './components/AppLogo.vue';
+import LogoMark from './components/LogoMark.vue';
 import AppSidebar from './components/AppSidebar.vue';
 import AppConcierge from './components/AppConcierge.vue';
 import NotificationBell from './components/NotificationBell.vue';
@@ -75,7 +75,14 @@ onUnmounted(() => {
         v-if="route.path !== '/onboarding'"
         class="mobile-header safe-top flex items-center justify-between border-b border-teal-900/30 bg-slate-950/80 py-3 backdrop-blur lg:hidden"
       >
-        <AppLogo size="sm" />
+        <RouterLink to="/" class="flex min-w-0 items-center gap-2.5" aria-label="remotelymatch home">
+          <LogoMark :size="40" class="shrink-0 shadow-lg shadow-teal-900/30" />
+          <div class="min-w-0 leading-none">
+            <p class="text-base font-bold tracking-tight">
+              <span class="text-teal-400">remote</span><span class="text-amber-300">match</span>
+            </p>
+          </div>
+        </RouterLink>
         <div class="flex items-center gap-2">
           <NotificationBell />
           <button class="btn-secondary min-h-[44px] px-3 py-2 text-sm" @click="logout">Logout</button>

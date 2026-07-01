@@ -8,8 +8,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'remotelymatch', {
       body: data.body || '',
-      icon: '/icon.svg',
-      badge: '/icon.svg',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
       tag: data.tag || data.url || 'remotelymatch',
       data: { url: data.url || '/' },
     })

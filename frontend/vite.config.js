@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icon.svg', 'logo.svg', 'offline.html', 'icons/icon-192.png', 'icons/icon-512.png'],
+        includeAssets: ['icon.svg', 'logo.svg', 'offline.html', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'],
         manifest: {
           id: appUrl,
           name: appName,
