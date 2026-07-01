@@ -168,7 +168,7 @@ defineExpose({ refresh: loadKits });
         <select v-model="selectedJobId" class="input w-full text-sm sm:max-w-md">
           <option v-for="k in kits" :key="k.jobId" :value="k.jobId">
             {{ k.jobTitle }} · {{ k.company }}
-            ({{ k.pageCount }}p{{ k.tailorMode === 'high_match' ? ' · high-match' : '' }})
+            ({{ k.pageCount }}p{{ k.tailorMode === 'high_match' ? ' · high-match' : '' }}{{ k.atsScore != null ? ` · ATS ${k.atsScore}%` : '' }})
           </option>
         </select>
       </div>

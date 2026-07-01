@@ -290,9 +290,18 @@ export function parseResumeHeader(headerLines = []) {
       continue;
     }
 
-    if (line.includes('|') && taglines.length < 4) {
-      taglines.push(line.replace(/\|\s*$/, '').trim());
-    } else if (line.length < 100 && taglines.length < 4) {
+    if (line.includes('|') && taglines.length < 3) {
+      const parts = line.split(/\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
+      for (const part of parts) {
+        if (/\b[A-Z][a-z]+,\s*[A-Z]{2}\b/.test(part)) {
+          contact.push(part.match(/\b[A-Z][a-z]+,\s*[A-Z]{2}\b/)[0]);
+          const rest = part.replace(/\b[A-Z][a-z]+,\s*[A-Z]{2}\b/, '').trim();
+          if (rest && taglines.length < 3) taglines.push(rest);
+        } else if (part.length < 90) {
+          taglines.push(part);
+        }
+      }
+    } else if (line.length < 100 && taglines.length < 3) {
       taglines.push(line);
     }
   }
@@ -386,5 +395,5 @@ export function splitContactParts(line) {
   return String(line)
     .split(/\s*[|•·]\s*|\s{2,}/)
     .map((p) => p.trim())
-    .filter(Boolean);
+    .filter((p) => p.length > 0);
 }

@@ -183,8 +183,10 @@ function repairResumeText(text) {
 
 function prepareResumeTextForParsing(text) {
   const { normalizeResumeLayout } = require('./resumeLayoutService');
+  const { insertExperienceBulletBreaks } = require('./resumeCarBulletService');
   const normalized = normalizeResumeLayout(repairResumeText(text));
-  return repairResumeText(normalized);
+  const dechunked = insertExperienceBulletBreaks(normalized);
+  return repairResumeText(dechunked);
 }
 
 module.exports = {

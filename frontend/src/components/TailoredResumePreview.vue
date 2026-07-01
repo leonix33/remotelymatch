@@ -42,6 +42,9 @@ const resumeText = computed(() => {
         >
           {{ kit.useForApply !== false ? 'Will submit this version' : 'Saved only' }}
         </span>
+        <span v-if="kit.atsScore != null" class="rounded-full px-2 py-0.5 font-medium" :class="kit.recruiterReady ? 'bg-teal-500/15 text-teal-300' : 'bg-amber-500/15 text-amber-300'">
+          ATS {{ kit.atsScore }}%<span v-if="kit.jdMatchPct != null"> · Fit {{ kit.jdMatchPct }}%</span>
+        </span>
         <span v-if="kit.pageCount">{{ kit.pageCount }} page{{ kit.pageCount === 1 ? '' : 's' }}</span>
         <span v-if="kit.jobTitle">{{ kit.jobTitle }} · {{ kit.company }}</span>
       </div>
@@ -50,7 +53,7 @@ const resumeText = computed(() => {
         <div>
           <p class="text-sm font-medium text-slate-200">Tailored resume</p>
           <p class="mt-1 text-xs text-slate-500">
-            Same professional layout as your base resume — skills, jobs, education, and certs organized consistently.
+            Same professional layout as your base resume — tight bullets, no keyword stuffing.
           </p>
         </div>
 
@@ -65,6 +68,10 @@ const resumeText = computed(() => {
           :scale="prominent ? 'full' : 'fit'"
         />
       </div>
+
+      <ul v-if="kit.atsTips?.length && !compact" class="mt-3 space-y-1 text-xs text-slate-500">
+        <li v-for="(tip, i) in kit.atsTips" :key="i">{{ tip }}</li>
+      </ul>
 
       <div v-if="kit.coverLetterParagraph && !compact" class="mt-5">
         <p class="text-sm font-medium text-slate-200">Cover letter</p>

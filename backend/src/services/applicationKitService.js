@@ -56,9 +56,20 @@ async function persistEnrichedKit(userId, jobId, kit) {
 }
 
 async function getKit(userId, jobId) {
-  const kit = await applicationKitStore.get(userId, jobId);
+  let kit = await applicationKitStore.get(userId, jobId);
   if (!kit?.tailored) return kit;
-  return persistEnrichedKit(userId, jobId, kit);
+  kit = await persistEnrichedKit(userId, jobId, kit);
+
+  try {
+    const job = await findJob(userId, jobId);
+    if (job) {
+      const jobDescription = await jobDescriptionService.resolveJobDescription(job);
+      return resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
+    }
+  } catch {
+    // keep stored kit scores if JD unavailable
+  }
+  return kit;
 }
 
 async function generateForJob(userId, jobId, options = {}) {
@@ -85,7 +96,7 @@ async function generateForJob(userId, jobId, options = {}) {
   const tailorMode =
     options.tailorMode === 'high_match' || options.tailorMode === 'balanced'
       ? options.tailorMode
-      : existing?.tailorMode || profile.defaultTailorMode || 'balanced';
+      : existing?.tailorMode || profile.defaultTailorMode || 'high_match';
   const highMatchTarget = options.highMatchTarget ?? existing?.highMatchTarget ?? profile.highMatchTarget ?? 95;
 
   if (!(profile?.resumeText || '').trim() || profile.resumeText.trim().length < 50) {

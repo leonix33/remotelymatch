@@ -35,6 +35,13 @@ VOICE:
 - Concrete verbs: built, shipped, owned, debugged, migrated, led, maintained, certified.
 - Only facts from the candidate's resume — never invent employers, dates, certs, or metrics.
 
+RECRUITER APPEAL (readability beats keyword density):
+- Recruiters scan in seconds — impact first, not job-description text copied into bullets.
+- 3-4 tight bullets per role max; drop weak or repetitive lines.
+- Mention each important skill once — vary wording, never stack "Kubernetes, Terraform, AWS" in every bullet.
+- Summary: 2-3 lines max. One headline win, not a paragraph of requirements.
+- Bullets under ~180 characters when possible — one clear outcome per line.
+
 STRICTLY FORBIDDEN in resume/cover letter text:
 - Emojis or special Unicode symbols
 - Meta labels: "addendum", "supplement", "JD mapping", "ATS glossary", "keyword alignment", "high-match", "AI", "generated"

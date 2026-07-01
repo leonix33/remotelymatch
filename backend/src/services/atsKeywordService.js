@@ -1,5 +1,13 @@
 const { TECH_KEYWORDS } = require('./resumeTailorService');
 
+const STOP_WORDS = new Set([
+  'with', 'that', 'this', 'from', 'have', 'will', 'your', 'their', 'about', 'years', 'experience',
+  'ability', 'strong', 'working', 'using', 'including', 'within', 'across', 'other', 'such',
+]);
+
+const PRIORITY_SECTION_RE =
+  /(?:requirements?|qualifications?|what you(?:'ll| will) bring|must have|you have|ideal candidate|bonus|nice to have|responsibilities)[:\s]*([\s\S]{0,2400}?)(?:\n\n|\n[A-Z][A-Z][A-Z]|\n#{1,3}\s|$)/gi;
+
 function normalize(text = '') {
   return String(text).toLowerCase();
 }
@@ -11,6 +19,31 @@ function tokenize(text = '') {
     .filter((t) => t.length > 2);
 }
 
+function addLineTerms(terms, line, weight = 1) {
+  const words = tokenize(line).filter((w) => w.length >= 4 && !STOP_WORDS.has(w));
+  for (const w of words.slice(0, weight > 1 ? 12 : 8)) {
+    terms.add(w);
+  }
+  const phraseMatch = line.match(
+    /\b(kubernetes|k8s|terraform|aws|azure|gcp|docker|python|golang|devops|sre|ci\/cd|linux|ansible|jenkins|datadog|kafka|postgres|mongodb|helm|argocd|istio|pulumi|databricks|snowflake|vault|prometheus|grafana)\b/gi
+  );
+  if (phraseMatch) phraseMatch.forEach((p) => terms.add(normalize(p)));
+}
+
+function extractPrioritySectionLines(jobDescription = '') {
+  const lines = [];
+  const text = String(jobDescription || '');
+  let match;
+  while ((match = PRIORITY_SECTION_RE.exec(text)) !== null) {
+    const block = match[1] || '';
+    for (const line of block.split(/[\n•·\-;]+/)) {
+      const trimmed = line.trim();
+      if (trimmed.length > 8 && trimmed.length < 160) lines.push(trimmed);
+    }
+  }
+  return lines.slice(0, 20);
+}
+
 function extractJdTerms(jobDescription = '') {
   const blob = normalize(jobDescription);
   const terms = new Set();
@@ -19,25 +52,127 @@ function extractJdTerms(jobDescription = '') {
     if (blob.includes(keyword)) terms.add(keyword);
   }
 
+  for (const line of extractPrioritySectionLines(jobDescription)) {
+    addLineTerms(terms, line, 2);
+  }
+
   const lines = String(jobDescription || '')
     .split(/[\n•·\-;]+/)
     .map((l) => l.trim())
     .filter((l) => l.length > 8 && l.length < 120);
 
   for (const line of lines.slice(0, 30)) {
-    const words = tokenize(line).filter((w) => w.length >= 4);
-    for (const w of words.slice(0, 8)) {
-      if (!/^(with|that|this|from|have|will|your|their|about|years|experience)$/.test(w)) {
-        terms.add(w);
-      }
-    }
-    const phraseMatch = line.match(
-      /\b(kubernetes|terraform|aws|azure|gcp|docker|python|golang|devops|sre|ci\/cd|linux|ansible|jenkins|datadog|kafka|postgres|mongodb)\b/gi
-    );
-    if (phraseMatch) phraseMatch.forEach((p) => terms.add(normalize(p)));
+    addLineTerms(terms, line);
   }
 
-  return [...terms].slice(0, 40);
+  return [...terms].slice(0, 45);
+}
+
+function getRedTerms(atsOrBreakdown, limit = 12) {
+  const breakdown = Array.isArray(atsOrBreakdown)
+    ? atsOrBreakdown
+    : atsOrBreakdown?.breakdown || atsOrBreakdown?.atsBreakdown || [];
+  return breakdown.filter((b) => b.status === 'red').map((b) => b.term).slice(0, limit);
+}
+
+function buildJdMatchBrief(jobDescription = '', job = {}) {
+  const requirements = extractPrioritySectionLines(jobDescription);
+  const extra = String(jobDescription || '')
+    .split(/[\n•·]+/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 15 && l.length < 140 && /\b(experience|required|must|years|proficient|knowledge|ability)\b/i.test(l))
+    .slice(0, 6);
+  const merged = [...new Set([...requirements, ...extra])].slice(0, 12);
+
+  return {
+    roleTitle: job?.title || '',
+    company: job?.company || '',
+    requirements: merged,
+    criticalTerms: extractJdTerms(jobDescription).slice(0, 28),
+  };
+}
+
+function requirementCovered(resumeText, requirement) {
+  const blob = normalize(resumeText);
+  const tokens = tokenize(requirement).filter((w) => w.length >= 5 && !STOP_WORDS.has(w));
+  if (!tokens.length) return false;
+  const hits = tokens.filter((t) => blob.includes(t) || blob.includes(t.slice(0, Math.max(4, t.length - 1))));
+  const minHits = tokens.length <= 2 ? 1 : Math.min(2, tokens.length);
+  return hits.length >= minHits;
+}
+
+function scoreJdRequirementCoverage(resumeText = '', jobDescription = '', job = {}) {
+  const brief = buildJdMatchBrief(jobDescription, job);
+  const requirements = brief.requirements;
+  if (!requirements.length) {
+    return {
+      jdMatchPct: 100,
+      jdRequirementsCovered: 0,
+      jdRequirementsTotal: 0,
+      uncoveredRequirements: [],
+      brief,
+    };
+  }
+
+  const covered = [];
+  const uncovered = [];
+  for (const req of requirements) {
+    if (requirementCovered(resumeText, req)) covered.push(req);
+    else uncovered.push(req);
+  }
+
+  const jdMatchPct = Math.round((covered.length / requirements.length) * 100);
+  return {
+    jdMatchPct,
+    jdRequirementsCovered: covered.length,
+    jdRequirementsTotal: requirements.length,
+    uncoveredRequirements: uncovered.slice(0, 8),
+    brief,
+  };
+}
+
+function buildAtsTips(ats) {
+  const tips = [];
+  if (!ats) return tips;
+
+  if (ats.readyToSubmit) {
+    tips.push(`ATS ${ats.score}% — strong keyword match for screening filters`);
+    tips.push('Lead top bullets with outcomes — recruiters scan ~6 seconds on first pass');
+  } else {
+    const missing = getRedTerms(ats, 6);
+    tips.push(
+      missing.length
+        ? `ATS ${ats.score}% — weave these JD terms into experience bullets: ${missing.join(', ')}`
+        : `ATS ${ats.score}% — re-tailor with ATS high match to close keyword gaps`
+    );
+    tips.push('Use ATS high match mode before applying to this role');
+  }
+  tips.push('Cover letter: one quantified win + why this role fits you');
+  return tips;
+}
+
+function buildRecruiterTips(ats, jdCoverage) {
+  const tips = buildAtsTips(ats);
+  if (jdCoverage?.jdRequirementsTotal > 0) {
+    if (jdCoverage.jdMatchPct >= 75) {
+      tips.unshift(
+        `Job fit ${jdCoverage.jdMatchPct}% — ${jdCoverage.jdRequirementsCovered}/${jdCoverage.jdRequirementsTotal} posting requirements reflected`
+      );
+    } else {
+      const sample = (jdCoverage.uncoveredRequirements || []).slice(0, 3).join('; ');
+      tips.unshift(
+        sample
+          ? `Job fit ${jdCoverage.jdMatchPct}% — strengthen bullets for: ${sample}`
+          : `Job fit ${jdCoverage.jdMatchPct}% — re-tailor to mirror more posting requirements`
+      );
+    }
+  }
+  return tips;
+}
+
+function isRecruiterReady(ats, jdCoverage) {
+  const jdOk = !jdCoverage?.jdRequirementsTotal || jdCoverage.jdMatchPct >= 70;
+  return Boolean(ats?.readyToSubmit && jdOk && (ats?.score ?? 0) >= 85);
 }
 
 function termInResume(term, resumeBlob, resumeTokens) {
@@ -80,4 +215,15 @@ function scoreAtsKeywords({ resumeText = '', tailoredText = '', jobDescription =
   };
 }
 
-module.exports = { scoreAtsKeywords, extractJdTerms };
+module.exports = {
+  scoreAtsKeywords,
+  extractJdTerms,
+  buildAtsTips,
+  buildRecruiterTips,
+  getRedTerms,
+  extractPrioritySectionLines,
+  buildJdMatchBrief,
+  scoreJdRequirementCoverage,
+  requirementCovered,
+  isRecruiterReady,
+};

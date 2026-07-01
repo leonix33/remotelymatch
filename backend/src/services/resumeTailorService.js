@@ -3,6 +3,7 @@ const env = require('../config/env');
 const { contactHeader, contactSignature } = require('./applicantContactService');
 const { HUMAN_WRITING_PROMPT, humanizeKit } = require('./humanizeWritingService');
 const { prepareResumeTextForParsing } = require('./resumeRepairService');
+const { polishTailoredResumeText, stripJdEcho } = require('./resumePolishService');
 const {
   parseResumeStructure,
   describeStructureForPrompt,
@@ -188,9 +189,7 @@ function buildTailoredResumeDemo(profile, job, jobDescription, contact = {}, opt
   const original = String(profile?.resumeText || '').trim();
   const structure = parseResumeStructure(original);
   const pageTarget = inferResumePageTarget(original, options.supplementPages);
-  const highMatch = options.tailorMode === 'high_match';
   const skills = (profile?.mustHaveSkills || []).slice(0, 12).join(', ') || 'cloud and platform engineering';
-  const reqs = extractJdRequirements(jobDescription).slice(0, 6);
   const name = contact.name || profile?.displayName || profile?.applicantName || 'Candidate';
   const header = contactHeader(contact) || structure.headerLines.join('\n') || `${name}\n${contact.email || ''}`;
 
@@ -202,21 +201,8 @@ function buildTailoredResumeDemo(profile, job, jobDescription, contact = {}, opt
     if (section.key === 'summary') {
       const summaryBody =
         section.content ||
-        `${job?.title || 'Engineer'} with hands-on ${skills} experience.${reqs.length ? ` Background aligns with ${job?.company || 'this role'}'s focus on ${reqs[0].slice(0, 80)}.` : ''}`;
-      let content = summaryBody;
-      if (highMatch && reqs.length) {
-        content = `${content} ${reqs[0].slice(0, 100).replace(/^[-•]\s*/, '')}.`.trim();
-      }
-      return { heading: section.heading, content };
-    }
-
-    if (section.key === 'experience' && highMatch && reqs.length && section.content) {
-      const lines = section.content.split('\n');
-      const bulletIdx = lines.findIndex((l) => /^[-•*●]\s/.test(l.trim()));
-      if (bulletIdx >= 0) {
-        lines[bulletIdx] = `${lines[bulletIdx].trimEnd()} — ${reqs[0].slice(0, 80).replace(/^[-•]\s*/, '')}`;
-      }
-      return { heading: section.heading, content: lines.join('\n') };
+        `${job?.title || 'Engineer'} with hands-on ${skills} experience.`;
+      return { heading: section.heading, content: stripJdEcho(summaryBody) };
     }
 
     return { heading: section.heading, content: section.content };
@@ -245,8 +231,7 @@ function buildTailoredResumeDemo(profile, job, jobDescription, contact = {}, opt
     `Hi,`,
     '',
     `I'm applying for the ${job?.title || 'role'} at ${job?.company || 'your company'}.`,
-    `I've spent the last several years on ${skills} in production environments.`,
-    reqs[0] ? `Your posting mentions ${reqs[0].slice(0, 100)} — that's work I've done in prior roles.` : '',
+    `I've led ${skills.split(',')[0] || 'platform'} work in production — happy to share specifics.`,
     '',
     `Thanks,`,
     signature || name,
@@ -307,7 +292,178 @@ function buildDemoKit(profile, job, jobDescription, contact = {}, options = {}) 
     jobDescriptionLength: jobDescription.length,
   });
 
-  return finalizeNormalizedKit(kit, pageTarget);
+  return applyAtsMetadata(finalizeNormalizedKit(kit, pageTarget, jobDescription), jobDescription, job);
+}
+
+function applyAtsMetadata(kit, jobDescription, job = {}) {
+  if (!kit?.tailoredResumeText || !jobDescription) return kit;
+  const {
+    scoreAtsKeywords,
+    buildRecruiterTips,
+    scoreJdRequirementCoverage,
+    isRecruiterReady,
+  } = require('./atsKeywordService');
+  const ats = scoreAtsKeywords({
+    tailoredText: kit.tailoredResumeText,
+    jobDescription,
+  });
+  const jdCoverage = scoreJdRequirementCoverage(kit.tailoredResumeText, jobDescription, job);
+  const recruiterReady = isRecruiterReady(ats, jdCoverage);
+  const blendedMatch = Math.min(
+    100,
+    Math.round(ats.score * 0.55 + jdCoverage.jdMatchPct * 0.45)
+  );
+
+  return {
+    ...kit,
+    atsScore: ats.score,
+    atsReady: ats.readyToSubmit,
+    recruiterReady,
+    estimatedMatchPct: blendedMatch,
+    jdMatchPct: jdCoverage.jdMatchPct,
+    jdRequirementsCovered: jdCoverage.jdRequirementsCovered,
+    jdRequirementsTotal: jdCoverage.jdRequirementsTotal,
+    uncoveredRequirements: jdCoverage.uncoveredRequirements,
+    atsBreakdown: ats.breakdown?.slice(0, 20),
+    atsGreen: ats.green,
+    atsYellow: ats.yellow,
+    atsRed: ats.red,
+    atsTips: buildRecruiterTips(ats, jdCoverage),
+  };
+}
+
+async function refineKitForInterview({
+  client,
+  kit,
+  profile,
+  structure,
+  jobDescription,
+  job,
+  redTerms,
+  uncoveredRequirements,
+  tailorFocus,
+  pageTarget,
+  atsScore,
+  jdMatchPct,
+}) {
+  if (!client || (!redTerms?.length && !uncoveredRequirements?.length)) return kit;
+
+  const sectionSource =
+    kit.resumeSections?.length
+      ? kit.resumeSections
+      : structure.sections.map((s) => ({ heading: s.heading, content: s.content }));
+
+  const uncoveredBlock = uncoveredRequirements?.length
+    ? `\nUNCOVERED POSTING REQUIREMENTS (reflect in summary or bullets — truthfully, once each):\n${uncoveredRequirements.map((r, i) => `${i + 1}. ${r}`).join('\n')}`
+    : '';
+
+  const system = `You perfect a tailored resume for this specific job: pass ATS filters, mirror posting requirements, and earn recruiter callbacks.
+
+RULES:
+1. ONLY edit summary/profile and experience bullets — never change employers, titles, dates, education, or certifications.
+2. Address missing ATS terms naturally (max once each): ${(redTerms || []).join(', ') || 'none'}
+3. Mirror uncovered posting requirements with real experience from the original resume — never invent.
+4. Max 3-4 bullets per role; verb + outcome; ~180 chars each. No "as measured by" scaffolding.
+5. Summary: 2 lines naming the target role and top 2 qualifications from the posting.
+6. Cover letter: 4 sentences — ${job?.title || 'role'} at ${job?.company || 'company'}, fit, proof point, close.
+7. Return JSON only: { "sections": [...], "coverLetterParagraph": "..." }`;
+
+  const user = `TARGET: ${job?.title || 'Role'} at ${job?.company || 'Company'}
+ATS score: ${atsScore}% · Job requirement fit: ${jdMatchPct ?? '—'}%
+${uncoveredBlock}
+
+CURRENT SECTIONS:
+${JSON.stringify(sectionSource, null, 2)}
+
+ORIGINAL RESUME (truth source):
+${(profile?.resumeText || '').slice(0, 9000)}
+
+JOB DESCRIPTION:
+${jobDescription.slice(0, 7000)}
+
+MISSING ATS TERMS: ${(redTerms || []).join(', ') || 'none'}${tailorFocus ? `\nCandidate notes: ${String(tailorFocus).slice(0, 1200)}` : ''}`;
+
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature: 0.38,
+    max_tokens: Math.min(6000, 1000 + pageTarget * 800),
+  });
+
+  const raw = response.choices[0]?.message?.content?.trim() || '';
+  try {
+    const refined = parseKitJson(raw);
+    if (!refined.sections?.length) return kit;
+    refined.tailoredResumeText = finalizeTailoredResume(profile?.resumeText, structure, refined);
+    refined.coverLetterParagraph = refined.coverLetterParagraph || kit.coverLetterParagraph;
+    refined.resumeSections = refined.sections;
+    return refined;
+  } catch {
+    return kit;
+  }
+}
+
+async function perfectKitForJob({
+  client,
+  kit,
+  profile,
+  job,
+  jobDescription,
+  contact,
+  options,
+  missingKeywords,
+  tailorFocus,
+}) {
+  const structure = parseResumeStructure(profile?.resumeText || '');
+  let result = applyAtsMetadata(kit, jobDescription, job);
+  const threshold = options.highMatchTarget || 90;
+  const maxPasses = 2;
+
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const needsAts = !result.atsReady || (result.atsScore ?? 0) < threshold;
+    const needsJd = (result.jdMatchPct ?? 100) < 75 && (result.jdRequirementsTotal ?? 0) > 0;
+    if (!needsAts && !needsJd) break;
+    if (!client) break;
+
+    const { getRedTerms } = require('./atsKeywordService');
+    const redTerms = getRedTerms(result, 8);
+    const uncovered = result.uncoveredRequirements || [];
+    if (!redTerms.length && !uncovered.length) break;
+
+    const prevScore = result.atsScore ?? 0;
+    const prevJd = result.jdMatchPct ?? 0;
+
+    const refined = await refineKitForInterview({
+      client,
+      kit: result,
+      profile,
+      structure,
+      jobDescription,
+      job,
+      redTerms,
+      uncoveredRequirements: uncovered.slice(0, 5),
+      tailorFocus,
+      pageTarget: options.supplementPages,
+      atsScore: result.atsScore,
+      jdMatchPct: result.jdMatchPct,
+    });
+
+    if (!refined.sections?.length && !refined.tailoredResumeText) break;
+
+    const renormalized = normalizeKit(refined, profile, job, jobDescription, missingKeywords, contact, options);
+    const next = applyAtsMetadata(renormalized, jobDescription, job);
+
+    if ((next.atsScore ?? 0) <= prevScore && (next.jdMatchPct ?? 0) <= prevJd) {
+      break;
+    }
+
+    result = { ...next, atsOptimized: true, perfectionPasses: pass + 1 };
+  }
+
+  return result;
 }
 
 function parseKitJson(raw) {
@@ -378,16 +534,18 @@ function normalizeKit(kit, profile, job, jobDescription, missingKeywords, contac
       contactEmail: contact.email || kit.contactEmail || '',
       contactName: contact.name || kit.contactName || profile?.displayName || '',
       jobDescriptionLength: jobDescription.length,
-      atsTips: [],
+      resumeSections: kit.sections?.length ? kit.sections : kit.resumeSections,
       guardrails: kit.guardrails || 'Tailored resume preserves all credentials and original section structure.',
     }),
-    pageTarget
+    pageTarget,
+    jobDescription
   );
 }
 
-function finalizeNormalizedKit(kit, pageTarget) {
+function finalizeNormalizedKit(kit, pageTarget, jobDescription = '') {
   if (!kit?.tailoredResumeText) return kit;
-  const tailoredResumeText = prepareResumeTextForParsing(kit.tailoredResumeText);
+  let tailoredResumeText = prepareResumeTextForParsing(kit.tailoredResumeText);
+  tailoredResumeText = polishTailoredResumeText(tailoredResumeText, jobDescription);
   const supplementPages = splitResumeIntoPages(tailoredResumeText, pageTarget);
   const enriched = {
     ...kit,
@@ -422,11 +580,12 @@ async function generateAdditiveKit({
   contact = {},
   tailorFocus = '',
   supplementPages = DEFAULT_SUPPLEMENT_PAGES,
-  tailorMode = 'balanced',
+  tailorMode = 'high_match',
   highMatchTarget = 95,
 }) {
   const pageTarget = inferResumePageTarget(profile?.resumeText, supplementPages);
-  const options = { supplementPages: pageTarget, tailorMode, highMatchTarget };
+  const effectiveMode = tailorMode === 'balanced' ? 'balanced' : 'high_match';
+  const options = { supplementPages: pageTarget, tailorMode: effectiveMode, highMatchTarget };
   const missingKeywords = inferMissingKeywords(profile, jobDescription);
   const preservedCredentials = extractMustPreserveFromResume(profile?.resumeText);
   const structure = parseResumeStructure(profile?.resumeText || '');
@@ -434,6 +593,8 @@ async function generateAdditiveKit({
   const sectionPayload = structureToSectionPayload(structure);
   const client = userId ? await getClient(userId) : null;
   const fullJd = jobDescription.slice(0, 14000);
+  const { buildJdMatchBrief } = require('./atsKeywordService');
+  const jdBrief = buildJdMatchBrief(fullJd, job);
 
   if (!client) {
     return buildDemoKit(profile, job, fullJd, contact, options);
@@ -441,38 +602,39 @@ async function generateAdditiveKit({
 
   const contactBlock = contactHeader(contact);
   const jdAlignmentNote =
-    tailorMode === 'high_match'
-      ? `Maximize ATS keyword alignment — target ${highMatchTarget}% overlap with JD terms the candidate truthfully has. Weave exact JD phrases into experience bullets where supported. Never invent experience.`
-      : 'Naturally align experience bullets to the job description without sounding templated.';
+    effectiveMode === 'high_match'
+      ? `Target this exact role: mirror posting requirements and critical keywords truthfully — each term once, scannable bullets, recruiter-first readability.`
+      : 'Align experience to the role with crisp wording — readable for humans and ATS.';
 
-  const system = `You are an expert resume writer helping a candidate tailor their resume for one job application.
+  const system = `You are an expert resume writer tailoring a resume for ONE job application. Goal: pass ATS, match the posting, get recruiter callbacks.
 
-OUTPUT: Return a structured tailored resume that mirrors the candidate's original layout section-by-section, plus a short cover letter.
+OUTPUT: Structured tailored resume (same sections as original) + cover letter.
 
-STRUCTURE RULES (highest priority):
-1. Use the EXACT section headings from the original resume, in the SAME order.
-2. Copy the header block exactly — name, each pipe-separated title/tagline line on its own row, email/phone/links. Never merge header lines into one paragraph.
-3. Education, certifications, credentials, licenses, and training sections: COPY VERBATIM — no rewording.
-4. Experience: keep every employer name, job title, and date line exactly as written; only rewrite bullet/description lines to align with the job.
-5. Summary/profile: tailor wording to the role; keep similar length and tone.
-6. Do not add, remove, or rename sections. Do not merge sections.
-7. Match bullet style (•, -, *) and heading style (${structure.headingStyle}) from the original.
-8. Target length: ~${pageTarget} printed pages — do not truncate if the original is longer.
-9. ${jdAlignmentNote}
-10. Do not invent employers, dates, certifications, degrees, or metrics.
-11. Plain professional English — no emojis, no AI/meta language.
-12. FORBIDDEN: "addendum", "supplement", "JD mapping", "ATS glossary", match percentages.
-13. Keep section content on separate lines — job titles, dates, and bullets must not collapse into one paragraph.
+JOB-TARGET RULES:
+1. Summary must name "${job?.title || 'this role'}" fit and reflect top posting requirements.
+2. Experience bullets must prove qualifications from the posting using the candidate's real work only.
+3. Each critical keyword/requirement appears at most once — varied wording, no stuffing.
+4. 3-4 tight bullets per role (~180 chars); verb + outcome; no "as measured by" format.
+
+STRUCTURE RULES:
+1. EXACT section headings from original, same order.
+2. Header block unchanged — name, taglines, contact on separate lines.
+3. Education, certifications, credentials: COPY VERBATIM.
+4. Experience: keep employer names, titles, dates exactly; rewrite bullets only.
+5. Bullet style (${structure.headingStyle}) and ~${pageTarget} pages.
+6. ${jdAlignmentNote}
+7. Never invent employers, dates, certs, or metrics.
+8. FORBIDDEN: addendum, supplement, JD mapping, match percentages, emojis.
+
+COVER LETTER: 4 sentences for ${job?.title} at ${job?.company} — hook, fit to posting, one proof point, close.
 
 ${HUMAN_WRITING_PROMPT}
 
 Return JSON only:
 {
-  "sections": [
-    { "heading": "EXACT heading from original", "content": "section body text" }
-  ],
-  "coverLetterParagraph": "short cover letter body",
-  "missingKeywords": ["internal jd terms addressed"],
+  "sections": [{ "heading": "...", "content": "..." }],
+  "coverLetterParagraph": "...",
+  "missingKeywords": ["terms addressed"],
   "estimatedMatchPct": number
 }`;
 
@@ -491,8 +653,13 @@ MUST PRESERVE VERBATIM (never drop these lines):
 ${preservedCredentials.length ? preservedCredentials.join('\n') : 'All certification, education, and credential lines from the resume above'}
 
 TARGET ROLE: ${job?.title} at ${job?.company}
-TAILOR MODE: ${tailorMode}
+TAILOR MODE: ${effectiveMode} (ATS + job-requirement alignment)
 TARGET LENGTH: ~${pageTarget} printed pages
+
+TOP POSTING REQUIREMENTS (address each truthfully in summary or experience):
+${jdBrief.requirements.length ? jdBrief.requirements.map((r, i) => `${i + 1}. ${r}`).join('\n') : 'See job description below.'}
+
+CRITICAL KEYWORDS: ${jdBrief.criticalTerms.slice(0, 18).join(', ')}
 
 JOB DESCRIPTION:
 ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice(0, 1500)}` : ''}`;
@@ -505,7 +672,7 @@ ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    temperature: tailorMode === 'high_match' ? 0.48 : 0.52,
+    temperature: effectiveMode === 'high_match' ? 0.42 : 0.5,
     max_tokens: maxTokens,
   });
 
@@ -522,7 +689,18 @@ ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice
       kit.fullSupplementText = kit.tailoredResumeText;
       kit.resumeAddendum = kit.tailoredResumeText;
     }
-    return normalizeKit(kit, profile, job, fullJd, missingKeywords, contact, options);
+    const normalized = normalizeKit(kit, profile, job, fullJd, missingKeywords, contact, options);
+    return perfectKitForJob({
+      client,
+      kit: normalized,
+      profile,
+      job,
+      jobDescription: fullJd,
+      contact,
+      options,
+      missingKeywords,
+      tailorFocus,
+    });
   } catch {
     const demo = buildDemoKit(profile, job, fullJd, contact, options);
     demo.parseError = true;
@@ -563,6 +741,8 @@ module.exports = {
   finalizeTailoredResume,
   enrichKitForDisplay,
   finalizeNormalizedKit,
+  applyAtsMetadata,
+  perfectKitForJob,
   TECH_KEYWORDS,
   extractJdRequirements,
   MIN_SUPPLEMENT_PAGES,

@@ -1,4 +1,4 @@
-import { mergeOrphanPrefixLines, tryParseJobBlock, splitParagraphToBullets } from './resumeExperienceParser';
+import { mergeOrphanPrefixLines, tryParseJobBlock, splitParagraphToBullets, condenseCarBullet } from './resumeExperienceParser';
 
 /**
  * Split comma-separated skill/tool lists while respecting parentheses.
@@ -299,11 +299,14 @@ export function parseExperienceSectionLines(contentLines) {
 
     const jobBlock = tryParseJobBlock(t);
     if (jobBlock) {
-      rows.push(jobBlock);
+      rows.push({
+        ...jobBlock,
+        tags: (jobBlock.tags || []).slice(0, 4),
+      });
       if (jobBlock.bodyText) {
         const bullets = splitParagraphToBullets(jobBlock.bodyText);
-        if (bullets) rows.push(...bullets);
-        else rows.push({ type: 'text', text: jobBlock.bodyText });
+        if (bullets) rows.push(...bullets.slice(0, 4));
+        else rows.push({ type: 'text', text: condenseCarBullet(jobBlock.bodyText) });
       }
       continue;
     }
@@ -311,7 +314,7 @@ export function parseExperienceSectionLines(contentLines) {
     if (t.length > 100) {
       const bullets = splitParagraphToBullets(t);
       if (bullets) {
-        rows.push(...bullets);
+        rows.push(...bullets.slice(0, 4));
         continue;
       }
     }

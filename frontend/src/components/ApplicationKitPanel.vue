@@ -20,7 +20,7 @@ const tailor = ref(true);
 const useForApply = ref(true);
 const tailorFocus = ref('');
 const supplementPages = ref(3);
-const tailorMode = ref('balanced');
+const tailorMode = ref('high_match');
 const viewTab = ref('preview');
 
 async function loadKit() {
@@ -38,7 +38,7 @@ async function loadKit() {
     useForApply.value = true;
     tailorFocus.value = '';
     supplementPages.value = 3;
-    tailorMode.value = 'balanced';
+    tailorMode.value = 'high_match';
   } finally {
     loading.value = false;
   }
@@ -107,6 +107,28 @@ function formatDate(iso) {
   }
 }
 
+function interviewReadinessLabel(k) {
+  if (!k?.tailored) return '';
+  if (k.recruiterReady) {
+    return `Recruiter-ready · ATS ${k.atsScore ?? '—'}% · Job fit ${k.jdMatchPct ?? '—'}%`;
+  }
+  if (k.atsReady && (k.jdMatchPct ?? 0) >= 70) {
+    return `Strong ATS · Job fit ${k.jdMatchPct}% — review bullets before applying`;
+  }
+  if (k.atsScore != null) {
+    const parts = [`ATS ${k.atsScore}%`];
+    if (k.jdMatchPct != null) parts.push(`job fit ${k.jdMatchPct}%`);
+    return `Needs polish · ${parts.join(' · ')}`;
+  }
+  return 'Re-tailor with ATS high match for this role';
+}
+
+function interviewReadinessClass(k) {
+  if (k?.recruiterReady) return 'border-teal-800/60 bg-teal-950/30 text-teal-200';
+  if (k?.atsReady || (k?.atsScore != null && k.atsScore >= 75)) return 'border-amber-900/50 bg-amber-950/20 text-amber-200';
+  return 'border-slate-800 bg-slate-950/40 text-slate-400';
+}
+
 function appliedLabel(k) {
   if (!k) return '';
   if (k.applied || k.applicationStatus === 'submitted') return `Applied${k.submittedAt ? ` · ${formatDate(k.submittedAt)}` : ''}`;
@@ -140,6 +162,16 @@ watch(
       </div>
 
       <div
+        v-if="kit?.tailored"
+        class="mt-3 rounded-lg border px-3 py-2 text-xs"
+        :class="interviewReadinessClass(kit)"
+      >
+        {{ interviewReadinessLabel(kit) }}
+        <span v-if="kit.perfectionPasses" class="ml-1 text-teal-400">· perfected in {{ kit.perfectionPasses }} pass{{ kit.perfectionPasses > 1 ? 'es' : '' }}</span>
+        <span v-else-if="kit.atsOptimized" class="ml-1 text-teal-400">· auto-optimized</span>
+      </div>
+
+      <div
         v-if="kit"
         class="mt-3 rounded-lg border px-3 py-2 text-xs"
         :class="kit.applied ? 'border-teal-800/60 bg-teal-950/30 text-teal-200' : 'border-slate-800 bg-slate-950/40 text-slate-400'"
@@ -148,8 +180,8 @@ watch(
       </div>
 
       <p class="mt-3 rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-teal-100/90">
-        Your base resume is <strong class="text-teal-200">never rewritten</strong>. Review the supplement below, choose whether to
-        <strong class="text-teal-200">use it when applying</strong>, or re-tailor with notes for this specific role.
+        Your credentials and education stay intact. We rewrite experience bullets and summary for this role, score ATS fit,
+        and optionally attach the <strong class="text-teal-200">tailored resume + cover letter</strong> when you apply.
       </p>
 
       <div v-if="kit?.tailored" class="mobile-kit-tabs mt-4 flex gap-2 border-b border-slate-800 pb-2">
@@ -180,7 +212,10 @@ watch(
       </div>
 
       <div v-if="viewTab === 'ats' && kit?.tailored" class="mt-4">
-        <AtsKeywordScore :job-id="job.jobId" :refresh-key="kit.generatedAt ? 1 : 0" />
+        <AtsKeywordScore :job-id="job.jobId" :refresh-key="kit.atsScore ?? (kit.generatedAt ? 1 : 0)" />
+        <ul v-if="kit.atsTips?.length" class="mt-4 space-y-1.5 text-xs text-slate-400">
+          <li v-for="(tip, i) in kit.atsTips" :key="i">{{ tip }}</li>
+        </ul>
       </div>
 
       <div v-if="viewTab === 'settings' || !kit?.tailored" class="mt-4 space-y-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
@@ -190,7 +225,7 @@ watch(
             <input v-model="useForApply" type="radio" :value="true" class="mt-0.5 accent-teal-500" name="use-kit" />
             <span>
               <strong class="text-slate-100">Use tailored kit</strong>
-              <span class="mt-0.5 block text-xs text-slate-500">Cover letter + 3-page supplement attached on auto-apply</span>
+              <span class="mt-0.5 block text-xs text-slate-500">Tailored resume + cover letter sent with auto-apply</span>
             </span>
           </label>
           <label class="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
@@ -220,14 +255,14 @@ watch(
             <input v-model="tailorMode" type="radio" value="balanced" class="mt-0.5 accent-teal-500" name="tailor-mode" />
             <span>
               <strong class="text-slate-100">Balanced</strong>
-              <span class="mt-0.5 block text-xs text-slate-500">Natural wording with strong skill alignment.</span>
+              <span class="mt-0.5 block text-xs text-slate-500">Natural wording — readable for humans, still aligned to the role.</span>
             </span>
           </label>
           <label class="mt-2 flex cursor-pointer items-start gap-2 text-sm text-slate-300">
             <input v-model="tailorMode" type="radio" value="high_match" class="mt-0.5 accent-teal-500" name="tailor-mode" />
             <span>
               <strong class="text-slate-100">ATS high match</strong>
-              <span class="mt-0.5 block text-xs text-slate-500">Target ~95% keyword overlap with the job posting for ATS filters.</span>
+              <span class="mt-0.5 block text-xs text-slate-500">Strong keyword fit without repetition — best for callbacks.</span>
             </span>
           </label>
         </div>
