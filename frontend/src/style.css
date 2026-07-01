@@ -153,13 +153,13 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 0.5rem;
-  color: rgb(100 116 139);
+  color: rgb(94 234 212);
   transition: color 0.15s ease, background 0.15s ease;
 }
 
 .password-input-toggle:hover {
   color: rgb(153 246 228);
-  background: rgb(30 41 59 / 0.6);
+  background: rgba(20, 184, 166, 0.12);
 }
 
 .btn-primary {

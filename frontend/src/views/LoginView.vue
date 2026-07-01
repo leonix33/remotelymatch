@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter, useRoute, RouterLink } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useProfileStore } from '../stores/profile';
 import http from '../api/http';
 import AppLogo from '../components/AppLogo.vue';
+import PasswordInput from '../components/PasswordInput.vue';
 import { brand } from '../brand';
 import {
   biometricLabel,
@@ -13,6 +14,13 @@ import {
   recalledLoginEmail,
   supportsBiometricLogin,
 } from '../composables/usePasskey';
+import {
+  devAutoLoginEnabled,
+  recalledDevCredentials,
+  rememberDevCredentials,
+  resolveDevCredentials,
+  shouldPersistDevCredentials,
+} from '../utils/devAuth';
 
 const email = ref('');
 const password = ref('');
@@ -26,6 +34,16 @@ const mode = ref('login');
 const resetToken = ref('');
 const showBiometric = ref(false);
 const bioLabel = computed(() => biometricLabel());
+const isLocalDev = computed(() => shouldPersistDevCredentials());
+
+watch([email, password], ([e, p]) => {
+  if (!shouldPersistDevCredentials()) return;
+  const trimmedEmail = String(e || '').trim();
+  if (trimmedEmail && String(p || '').length >= 8) {
+    rememberLoginEmail(trimmedEmail);
+    rememberDevCredentials(trimmedEmail, p);
+  }
+});
 
 const router = useRouter();
 const route = useRoute();
@@ -48,6 +66,28 @@ onMounted(async () => {
     info.value = 'Choose a new password for your account.';
   }
   email.value = recalledLoginEmail();
+  const devCreds = recalledDevCredentials();
+  if (devCreds?.email) email.value = devCreds.email;
+  if (devCreds?.password) password.value = devCreds.password;
+  if (devAutoLoginEnabled() && resolveDevCredentials() && auth.accessToken) {
+    await afterAuth();
+    return;
+  }
+  if (devAutoLoginEnabled() && resolveDevCredentials() && !auth.accessToken) {
+    loading.value = true;
+    try {
+      const creds = resolveDevCredentials();
+      await auth.login(creds.email, creds.password);
+      rememberLoginEmail(creds.email);
+      rememberDevCredentials(creds.email, creds.password);
+      await afterAuth();
+      return;
+    } catch (e) {
+      error.value = e.response?.data?.message || e.message || 'Dev auto-login failed';
+    } finally {
+      loading.value = false;
+    }
+  }
   showBiometric.value = await supportsBiometricLogin();
 });
 
@@ -58,6 +98,7 @@ async function submitLogin() {
   try {
     await auth.login(email.value.trim(), password.value);
     rememberLoginEmail(email.value);
+    rememberDevCredentials(email.value, password.value);
     await afterAuth();
   } catch (e) {
     const status = e.response?.status;
@@ -169,16 +210,17 @@ async function submitReset() {
               Forgot password?
             </button>
           </div>
-          <input
+          <PasswordInput
             v-model="password"
-            type="password"
             required
-            minlength="8"
-            class="input"
+            :minlength="8"
             placeholder="8+ characters"
             autocomplete="current-password"
           />
         </div>
+        <p v-if="isLocalDev" class="text-xs text-slate-500">
+          Local dev — credentials are saved on this machine for auto sign-in.
+        </p>
         <p v-if="error" class="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
         <p v-if="info" class="rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ info }}</p>
         <button type="submit" class="btn-primary w-full" :disabled="loading || bioLoading">
@@ -221,8 +263,8 @@ async function submitReset() {
       <form v-else class="mt-8 space-y-4" @submit.prevent="submitReset">
         <h2 class="text-lg font-semibold text-slate-100">Choose a new password</h2>
         <p v-if="info" class="text-sm text-slate-500">{{ info }}</p>
-        <input v-model="newPassword" type="password" required minlength="8" class="input" placeholder="New password (8+ chars)" autocomplete="new-password" />
-        <input v-model="confirmPassword" type="password" required minlength="8" class="input" placeholder="Confirm new password" autocomplete="new-password" />
+        <PasswordInput v-model="newPassword" required :minlength="8" placeholder="New password (8+ chars)" autocomplete="new-password" />
+        <PasswordInput v-model="confirmPassword" required :minlength="8" placeholder="Confirm new password" autocomplete="new-password" />
         <p v-if="error" class="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
         <p v-if="info && !error" class="rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ info }}</p>
         <button type="submit" class="btn-primary w-full" :disabled="loading">

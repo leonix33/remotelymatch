@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useProfileStore } from '../stores/profile';
+import { tryDevAutoLogin } from '../utils/devAuth';
 import LoginView from '../views/LoginView.vue';
 import OnboardingView from '../views/OnboardingView.vue';
 import DashboardView from '../views/DashboardView.vue';
@@ -81,6 +82,11 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
+
+  if (import.meta.env.DEV && !auth.accessToken) {
+    await tryDevAutoLogin(auth);
+  }
+
   if (to.meta.requiresAuth && !auth.accessToken) return '/login';
   if (to.meta.guest && auth.accessToken && !['/welcome', '/privacy', '/terms'].includes(to.path)) return '/';
   if (to.matched.some((record) => record.meta.adminOnly) && auth.user?.role !== 'admin') return '/';

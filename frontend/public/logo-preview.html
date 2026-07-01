@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>remotelymatch — logo preview</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #020617;
+        color: #e2e8f0;
+        padding: 2rem;
+      }
+      h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+      p { color: #94a3b8; margin: 0 0 2rem; max-width: 52ch; line-height: 1.5; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.5rem;
+        max-width: 1100px;
+      }
+      .card {
+        background: #0f172a;
+        border: 1px solid #1e293b;
+        border-radius: 16px;
+        padding: 1.5rem;
+        text-align: center;
+      }
+      .card h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: #64748b; margin: 0 0 1rem; }
+      .sizes { display: flex; flex-wrap: wrap; align-items: end; justify-content: center; gap: 1.25rem; }
+      .sizes img { display: block; }
+      .label { font-size: 0.7rem; color: #475569; margin-top: 0.35rem; }
+      .sidebar-mock {
+        max-width: 280px;
+        text-align: left;
+        padding: 1.25rem;
+        background: #0b1220;
+        border: 1px solid #1e293b;
+        border-radius: 12px;
+      }
+      .brand { display: flex; align-items: center; gap: 12px; }
+      .brand-text { line-height: 1.1; }
+      .brand-text .top { font-weight: 700; font-size: 1.25rem; color: #2dd4bf; }
+      .brand-text .bottom { font-weight: 700; font-size: 1.25rem; color: #fcd34d; }
+      .tagline { margin-top: 6px; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: #64748b; }
+      .compare { margin-top: 2.5rem; max-width: 1100px; }
+      .compare h2 { font-size: 1rem; color: #cbd5e1; margin-bottom: 1rem; }
+      .row { display: flex; flex-wrap: wrap; gap: 2rem; align-items: center; }
+      .note { margin-top: 2rem; padding: 1rem 1.25rem; background: #134e4a33; border: 1px solid #14b8a655; border-radius: 12px; max-width: 52ch; font-size: 0.9rem; color: #99f6e4; }
+    </style>
+  </head>
+  <body>
+    <h1>Logo preview — Sharingan twist</h1>
+    <p>
+      Teal Sharingan layout (3 tomoe, iris ring) with your original colors kept.
+      Twist: crosshair targeting + gold activated pupil + dashed tomoe orbit.
+      <strong>Not pushed yet</strong> — review here first.
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Sizes</h2>
+        <div class="sizes">
+          <div><img src="logo.svg" width="32" height="32" alt="" /><div class="label">32px favicon</div></div>
+          <div><img src="logo.svg" width="40" height="40" alt="" /><div class="label">40px sidebar</div></div>
+          <div><img src="logo.svg" width="56" height="56" alt="" /><div class="label">56px login</div></div>
+          <div><img src="logo.svg" width="128" height="128" alt="" /><div class="label">128px</div></div>
+          <div><img src="logo.svg" width="256" height="256" alt="" /><div class="label">256px</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Sidebar mock</h2>
+        <div class="sidebar-mock">
+          <div class="brand">
+            <img src="logo.svg" width="40" height="40" alt="" />
+            <div class="brand-text">
+              <div><span class="top">remote</span><span class="bottom">match</span></div>
+              <div class="tagline">Quality-first apply</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>On dark / light bg</h2>
+        <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+          <div style="background:#020617;padding:1rem;border-radius:12px;border:1px solid #1e293b">
+            <img src="logo.svg" width="80" height="80" alt="" />
+          </div>
+          <div style="background:#f8fafc;padding:1rem;border-radius:12px">
+            <img src="logo.svg" width="80" height="80" alt="" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      Open this page while dev server runs: <code>http://localhost:5173/logo-preview.html</code>
+      <br />Say if you want more Sharingan (sharper tomoe), less anime (subtler), or no gold center.
+    </div>
+  </body>
+</html>
