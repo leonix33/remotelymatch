@@ -68,6 +68,7 @@ module.exports = {
   deployTag: 'sync-v6',
   resendApiKey: trim(process.env.RESEND_API_KEY) || '',
   gmailSmtpUser: trim(process.env.GMAIL_SMTP_USER) || '',
+  gmailSmtpPass: trim(process.env.GMAIL_SMTP_PASS) || '',
   hunterApiKey: trim(process.env.HUNTER_API_KEY) || '',
   apolloApiKey: trim(process.env.APOLLO_API_KEY) || '',
   emailFrom: resolveEmailFrom(),

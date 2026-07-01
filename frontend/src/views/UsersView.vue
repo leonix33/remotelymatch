@@ -635,14 +635,32 @@ onMounted(() => {
         <span class="badge" :class="emailDiagnostics.emailDeliveryReady ? 'badge-teal' : 'badge-slate'">
           {{ emailDiagnostics.emailDeliveryReady ? 'Email ready' : 'Email not ready' }}
         </span>
+        <span
+          v-if="emailDiagnostics.emailProviders?.includes('resend') && emailDiagnostics.emailDomainStatus === 'verified'"
+          class="badge badge-teal"
+        >
+          Resend · {{ emailDiagnostics.emailDomain }}
+        </span>
         <span v-if="emailDiagnostics.gmailSmtpConfigured" class="badge badge-teal">
           Workspace SMTP
+        </span>
+        <span
+          v-else-if="emailDiagnostics.emailDeliveryReady && emailDiagnostics.emailProviders?.includes('resend')"
+          class="badge badge-gold"
+        >
+          Workspace SMTP optional
         </span>
         <span v-else class="badge badge-slate">Workspace SMTP not set</span>
         <span v-if="emailDiagnostics.teamEmail || emailDiagnostics.emailFrom" class="text-slate-500">
           Sender: {{ emailDiagnostics.teamEmail || emailDiagnostics.emailFrom }}
         </span>
       </div>
+      <p
+        v-if="emailDiagnostics?.emailDeliveryReady && !emailDiagnostics.gmailSmtpConfigured && emailDiagnostics.emailProviders?.includes('resend')"
+        class="mt-2 text-xs text-slate-500"
+      >
+        Outbound mail works via Resend. Add Google Workspace SMTP below only if you need better delivery to Yahoo/iCloud or a real <code class="text-slate-400">team@</code> inbox.
+      </p>
       <div
         v-if="emailDiagnostics?.gmailSmtpConfigured && emailDiagnostics.gmailUsesTeamMailbox === false"
         class="mt-3 rounded-lg border border-amber-900/40 bg-amber-950/20 p-3 text-xs text-amber-100/90"
@@ -691,7 +709,9 @@ onMounted(() => {
         </ol>
         <p class="mt-4 text-xs text-slate-500">
           Resend stays as fallback if Workspace SMTP fails. Keep <code>remotelymatch.app</code> verified in
-          <a href="https://resend.com/domains" target="_blank" rel="noopener" class="text-teal-400 hover:underline">Resend Domains</a>.
+          <a href="https://resend.com/domains" target="_blank" rel="noopener" class="text-teal-400 hover:underline">Resend Domains</a>
+          (sending DNS only — DKIM/SPF). Google Workspace adds separate MX records for receiving mail at
+          <code>{{ TEAM_MAILBOX }}</code>; both can coexist in Cloudflare.
         </p>
       </details>
       <p v-if="emailDiagnostics?.emailDomainError" class="mt-2 text-xs text-amber-300">{{ emailDiagnostics.emailDomainError }}</p>

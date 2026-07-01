@@ -26,6 +26,10 @@ async function buildHealthBase() {
     emailDomainStatus: emailDiagnostics.emailDomainStatus,
     emailDeliveryReady: emailDiagnostics.emailDeliveryReady,
     emailDomainError: emailDiagnostics.emailDomainError,
+    gmailSmtpConfigured: emailDiagnostics.gmailSmtpConfigured,
+    emailPrimaryProvider: emailDiagnostics.emailPrimaryProvider,
+    emailProviders: emailDiagnostics.emailProviders,
+    teamEmail: emailDiagnostics.teamEmail,
     adzunaConfigured,
     mongoConfigured: Boolean(env.mongoUri),
     mongoConnected,
@@ -43,12 +47,14 @@ async function buildHealthBase() {
 async function status(req, res, next) {
   try {
     const base = await buildHealthBase();
+    const emailDiagnostics = await emailService.getEmailDiagnostics();
     const profile = await profileService.getRaw(req.user.sub);
     const openai = profileService.openaiMeta(profile);
     const adzuna = await platformSettingsService.getAdzunaStatus();
 
     res.json({
       ...base,
+      ...emailDiagnostics,
       openaiConfigured: base.openaiConfigured || openai.openaiConnected,
       openaiConnected: openai.openaiConnected,
       openaiKeySource: openai.openaiKeySource,
