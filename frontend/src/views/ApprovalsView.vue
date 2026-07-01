@@ -299,11 +299,11 @@ watch(
   }
 );
 
-onMounted(async () => {
-  await profileStore.fetch().catch(() => {});
+onMounted(() => {
+  profileStore.fetch().catch(() => {});
   tailorOnApprove.value = Boolean(profileStore.profile?.tailorResumeOnApply);
   applyResumeMode.value = profileStore.profile?.defaultApplyResumeMode === 'tailored' ? 'tailored' : 'base';
-  await load();
+  load();
   loadWhisper();
   if (route.query.jobId) highlightQueuedJob(String(route.query.jobId));
 });

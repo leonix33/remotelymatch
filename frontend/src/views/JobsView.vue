@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import http from '../api/http';
 import { useProfileStore } from '../stores/profile';
@@ -12,6 +12,9 @@ const { queueing, addToQueue } = useApplyQueue();
 const jobs = ref([]);
 const contacts = ref([]);
 const loading = ref(true);
+const loadingMore = ref(false);
+const total = ref(0);
+const pageSize = 100;
 const section = ref('all');
 const minMatch = ref('0');
 const search = ref('');
@@ -50,17 +53,30 @@ function isSaved(jobId) {
   return profileStore.isJobSaved(jobId);
 }
 
-async function load() {
-  loading.value = true;
+async function load(append = false) {
+  if (append) loadingMore.value = true;
+  else loading.value = true;
   try {
+    const offset = append ? jobs.value.length : 0;
     const { data } = await http.get('/jobs', {
-      params: { section: section.value, minMatch: minMatch.value, search: search.value },
+      params: {
+        section: section.value,
+        minMatch: minMatch.value,
+        search: search.value,
+        limit: pageSize,
+        offset,
+      },
     });
-    jobs.value = data;
+    const rows = Array.isArray(data?.jobs) ? data.jobs : Array.isArray(data) ? data : [];
+    jobs.value = append ? [...jobs.value, ...rows] : rows;
+    total.value = data?.total ?? rows.length;
   } finally {
     loading.value = false;
+    loadingMore.value = false;
   }
 }
+
+const hasMore = computed(() => jobs.value.length < total.value);
 
 async function loadContacts() {
   try {
@@ -91,6 +107,7 @@ async function runResumeDiff(job) {
 function openSquad(job) {
   squadJob.value = job;
   squadMembers.value = [];
+  if (!contacts.value.length) loadContacts();
 }
 
 async function createSquad() {
@@ -125,9 +142,8 @@ function sectionLabel(s) {
 onMounted(() => {
   profileStore.fetch().catch(() => {});
   load();
-  loadContacts();
 });
-watch([section, minMatch], load);
+watch([section, minMatch], () => load());
 </script>
 
 <template>
@@ -197,6 +213,18 @@ watch([section, minMatch], load);
         No jobs match your filters.
         <span class="mt-2 block text-sm">Run the agent to fetch new listings, or lower the match threshold.</span>
       </p>
+      <div v-if="jobs.length" class="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <p class="text-xs text-slate-500">Showing {{ jobs.length }} of {{ total }} roles</p>
+        <button
+          v-if="hasMore"
+          type="button"
+          class="btn-secondary text-sm"
+          :disabled="loadingMore"
+          @click="load(true)"
+        >
+          {{ loadingMore ? 'Loading…' : 'Load more' }}
+        </button>
+      </div>
     </div>
 
     <div v-if="copilotJob" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet" @click.self="copilotJob = null">

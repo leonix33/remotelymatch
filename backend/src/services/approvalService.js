@@ -8,10 +8,27 @@ const { scoreJobsForProfile } = require('./jobScoringService');
 const teamService = require('./teamService');
 const localApprovalService = require('./localApprovalService');
 const applicationKitService = require('./applicationKitService');
+const applicationKitStore = require('./applicationKitStore');
 const { profileResumeAlignment } = require('./resumeParseService');
 
-const JOB_LIST_CACHE_MS = 60_000;
+const JOB_LIST_CACHE_MS = 120_000;
 const jobListCache = new Map();
+
+function kitSummaryFromKit(kit, jobStatus) {
+  if (!kit?.tailored) {
+    return { hasKit: false, useForApply: null, pageCount: 0, applied: false };
+  }
+  return {
+    hasKit: true,
+    useForApply: kit.useForApply !== false,
+    pageCount: kit.pageCount || 0,
+    supplementPagesTarget: kit.supplementPagesTarget || kit.pageCount,
+    tailorMode: kit.tailorMode || 'balanced',
+    estimatedMatchPct: kit.estimatedMatchPct || null,
+    generatedAt: kit.generatedAt,
+    applied: jobStatus === 'applied' || jobStatus === 'submitted',
+  };
+}
 
 function invalidateJobListCache(userId) {
   jobListCache.delete(String(userId));
@@ -201,23 +218,22 @@ async function listForUser(userId, options = {}) {
   } = options;
 
   const base = await buildJobList(userId);
-  const counts = {
-    pending: base.filter((j) => j.status === 'pending').length,
-    approved: base.filter((j) => j.status === 'approved').length,
-    rejected: base.filter((j) => j.status === 'rejected').length,
-    applied: base.filter((j) => j.status === 'applied').length,
-  };
+  const counts = { pending: 0, approved: 0, rejected: 0, applied: 0 };
+  for (const job of base) {
+    if (job.status in counts) counts[job.status] += 1;
+  }
 
   const all = applyFilters(base, { statusFilter, search, minMatch, ats, sort });
   const total = all.length;
   const slice = limit > 0 ? all.slice(Number(offset), Number(offset) + Number(limit)) : all;
 
-  const items = await Promise.all(
-    slice.map(async (job) => ({
-      ...job,
-      kit: await applicationKitService.kitSummary(userId, job.jobId),
-    }))
-  );
+  const allKits = await applicationKitStore.listForUser(userId);
+  const kitByJobId = new Map(allKits.map((kit) => [kit.jobId, kit]));
+
+  const items = slice.map((job) => ({
+    ...job,
+    kit: kitSummaryFromKit(kitByJobId.get(job.jobId), job.status),
+  }));
 
   let hint = null;
   if (total === 0 && statusFilter === 'pending') {

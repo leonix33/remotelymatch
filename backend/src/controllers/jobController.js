@@ -1,8 +1,7 @@
 const Job = require('../models/Job');
 const jobService = require('../services/jobService');
 const jobIngestService = require('../services/jobs/jobIngestService');
-const profileService = require('../services/profileService');
-const { scoreJobsForProfile } = require('../services/jobScoringService');
+const jobListCache = require('../services/jobListCache');
 const env = require('../config/env');
 
 function applyJobFilters(jobs, { section, minMatch, minQuality, source, freshness, search }) {
@@ -44,9 +43,15 @@ async function listJobs(req, res, next) {
       source = 'all',
       freshness = '',
       search = '',
+      limit: limitParam = '100',
+      offset: offsetParam = '0',
     } = req.query;
+
     let jobs;
-    if (env.mongoUri) {
+    if (req.user?.sub) {
+      const scored = await jobListCache.listScoredForUser(req.user.sub);
+      jobs = applyJobFilters(scored.jobs, { section, minMatch, minQuality, source, freshness, search });
+    } else if (env.mongoUri) {
       const query = {};
       if (section !== 'all') query.emailSection = section;
       if (Number(minMatch) > 0) query.matchPct = { $gte: Number(minMatch) };
@@ -55,30 +60,20 @@ async function listJobs(req, res, next) {
       if (freshness) query.freshnessLabel = freshness;
       jobs = await Job.find(query)
         .sort({ qualityScore: -1, freshnessScore: -1, matchPct: -1 })
-        .limit(5000)
+        .limit(2000)
         .lean();
-      if (search) {
-        jobs = applyJobFilters(jobs, {
-          section: 'all',
-          minMatch: 0,
-          minQuality: 0,
-          source: 'all',
-          freshness: '',
-          search,
-        });
-      }
+      jobs = applyJobFilters(jobs, { section, minMatch, minQuality, source, freshness, search });
     } else {
       jobs = jobService.listJobsFromSqlite({ section, minMatch: 0, search });
       jobs = applyJobFilters(jobs, { section, minMatch, minQuality, source, freshness, search });
     }
 
-    if (req.user?.sub) {
-      const profile = await profileService.getOrCreate(req.user.sub);
-      jobs = scoreJobsForProfile(jobs, profile, req.user.sub);
-      jobs = applyJobFilters(jobs, { section, minMatch, minQuality, source, freshness, search });
-    }
+    const total = jobs.length;
+    const limit = Math.min(200, Math.max(1, Number(limitParam) || 100));
+    const offset = Math.max(0, Number(offsetParam) || 0);
+    const page = jobs.slice(offset, offset + limit);
 
-    res.json(jobs);
+    res.json({ jobs: page, total, limit, offset });
   } catch (err) {
     next(err);
   }
