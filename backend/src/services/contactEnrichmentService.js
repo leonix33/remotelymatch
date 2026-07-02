@@ -50,39 +50,97 @@ async function hunterDomainSearch(domain, apiKey) {
   };
 }
 
+function apolloErrorMessage(raw, status) {
+  try {
+    const parsed = JSON.parse(raw);
+    const msg = parsed.error || parsed.error_message || parsed.message;
+    if (msg) return msg;
+  } catch {
+    /* plain text */
+  }
+  return raw || `HTTP ${status}`;
+}
+
+async function apolloBulkEnrichPeople(ids, apiKey) {
+  if (!ids.length) return {};
+  const res = await fetch(
+    'https://api.apollo.io/api/v1/people/bulk_match?reveal_personal_emails=false&reveal_phone_number=false',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        Accept: 'application/json',
+        'X-Api-Key': apiKey,
+      },
+      body: JSON.stringify({ details: ids.map((id) => ({ id })) }),
+    }
+  );
+  if (!res.ok) return {};
+  const data = await res.json();
+  const byId = {};
+  for (const person of data.matches || []) {
+    if (person?.id) byId[person.id] = person;
+  }
+  return byId;
+}
+
 async function apolloPeopleSearch(company, domain, apiKey) {
   if (!apiKey || (!company && !domain)) return null;
-  const res = await fetch('https://api.apollo.io/api/v1/mixed_people/search', {
+  const cleanDomain = domain ? String(domain).replace(/^www\./i, '').trim() : '';
+  const res = await fetch('https://api.apollo.io/api/v1/mixed_people/api_search', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
+      Accept: 'application/json',
       'X-Api-Key': apiKey,
     },
     body: JSON.stringify({
       q_organization_name: company || undefined,
-      q_organization_domains: domain ? [domain] : undefined,
+      q_organization_domains_list: cleanDomain ? [cleanDomain] : undefined,
       person_titles: ['recruiter', 'talent acquisition', 'technical recruiter', 'hiring manager', 'people operations'],
+      include_similar_titles: true,
       page: 1,
       per_page: 8,
     }),
   });
-  if (!res.ok) return { error: await res.text(), people: [] };
+  if (!res.ok) {
+    const text = await res.text();
+    return { error: apolloErrorMessage(text, res.status), people: [] };
+  }
   const data = await res.json();
-  const people = (data.people || []).map((p) => ({
-    name: [p.first_name, p.last_name].filter(Boolean).join(' '),
-    email: p.email || '',
-    role: p.title || 'recruiter / hiring',
-    phone: p.phone_numbers?.[0]?.sanitized_number || p.organization?.primary_phone?.sanitized_number || '',
-    linkedIn: p.linkedin_url || '',
-    confidence: p.email_status === 'verified' ? 'high' : 'medium',
-    source: 'apollo.io',
-    verified: p.email_status === 'verified',
-  }));
-  const org = data.people?.[0]?.organization;
+  const candidates = (data.people || []).slice(0, 8);
+  const idsToEnrich = candidates.filter((p) => p.id && p.has_email !== false).map((p) => p.id).slice(0, 10);
+  let enrichedById = {};
+  try {
+    enrichedById = await apolloBulkEnrichPeople(idsToEnrich, apiKey);
+  } catch {
+    /* search-only fallback */
+  }
+
+  const people = candidates.map((p) => {
+    const full = enrichedById[p.id] || p;
+    const lastName = full.last_name || p.last_name_obfuscated || '';
+    return {
+      name: full.name || [full.first_name || p.first_name, lastName].filter(Boolean).join(' '),
+      email: full.email || '',
+      role: full.title || p.title || 'recruiter / hiring',
+      phone:
+        full.phone_numbers?.[0]?.sanitized_number ||
+        full.organization?.primary_phone?.sanitized_number ||
+        p.organization?.primary_phone?.sanitized_number ||
+        '',
+      linkedIn: full.linkedin_url || '',
+      confidence: full.email_status === 'verified' ? 'high' : full.email ? 'medium' : 'low',
+      source: 'apollo.io',
+      verified: full.email_status === 'verified',
+    };
+  });
+  const firstOrg = (enrichedById[candidates[0]?.id] || candidates[0])?.organization;
   return {
-    people,
-    companyPhone: org?.primary_phone?.sanitized_number || org?.phone || null,
+    people: people.filter((p) => p.email || p.name),
+    companyPhone: firstOrg?.primary_phone?.sanitized_number || firstOrg?.phone || null,
     provider: 'apollo',
   };
 }
@@ -193,7 +251,10 @@ async function testEnrichmentProviders(userId, { domain = 'stripe.com', company 
     try {
       const apollo = await apolloPeopleSearch(company, domain, apolloKey);
       if (apollo?.error) {
-        result.apollo.message = 'Apollo API rejected the request — check your API key on Render';
+        const hint = String(apollo.error).includes('api_key')
+          ? 'Apollo API rejected the request — check your API key on Render'
+          : `Apollo API error: ${apollo.error}`;
+        result.apollo.message = hint;
       } else {
         result.apollo.ok = true;
         result.apollo.peopleCount = apollo.people?.length || 0;

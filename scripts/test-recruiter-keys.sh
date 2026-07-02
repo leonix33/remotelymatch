@@ -42,16 +42,19 @@ async function testApollo() {
     console.log('Apollo: SKIP (no APOLLO_API_KEY)');
     return;
   }
-  const res = await fetch('https://api.apollo.io/api/v1/mixed_people/search', {
+  const res = await fetch('https://api.apollo.io/api/v1/mixed_people/api_search', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
+      Accept: 'application/json',
       'X-Api-Key': apolloKey,
     },
     body: JSON.stringify({
       q_organization_name: 'Stripe',
+      q_organization_domains_list: ['stripe.com'],
       person_titles: ['recruiter'],
+      include_similar_titles: true,
       page: 1,
       per_page: 1,
     }),
