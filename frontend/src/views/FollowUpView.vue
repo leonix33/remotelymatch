@@ -253,6 +253,13 @@ async function reapplyJob(job) {
 
 async function sendFollowUp(job, contact = null) {
   const jobId = job.jobId;
+  if (!isKitReadyToApply(job.kit)) {
+    kitErrors.value = {
+      ...kitErrors.value,
+      [jobId]: 'Polish kit for apply until ATS is job-ready — then send with tailored attachments.',
+    };
+    return;
+  }
   sending.value = jobId;
   clearJobMsg(jobId);
   try {
@@ -262,8 +269,13 @@ async function sendFollowUp(job, contact = null) {
     });
     actionMsgs.value = {
       ...actionMsgs.value,
-      [jobId]: `Sent to ${data.to} · replies to ${data.replyTo} · attached ${(data.attachments || []).join(', ')}`,
+      [jobId]: `Sent to ${data.recipientName || data.to} (${data.to}) · replies to ${data.replyTo} · ATS ${data.atsScore ?? '—'}% · ${(data.attachments || []).join(', ')}`,
     };
+    const row = board.value?.jobs?.find((j) => j.jobId === jobId);
+    if (row?.followUpKit) {
+      row.followUpKit.emailTo = data.to;
+      row.followUpKit.recipient = { email: data.to, name: data.recipientName || '' };
+    }
   } catch (e) {
     kitErrors.value = {
       ...kitErrors.value,

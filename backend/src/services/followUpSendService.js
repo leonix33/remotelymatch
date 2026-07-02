@@ -1,10 +1,10 @@
 const profileService = require('./profileService');
 const applicantContactService = require('./applicantContactService');
 const applicationKitStore = require('./applicationKitStore');
-const followUpKitStore = require('./followUpKitStore');
 const followUpDraftService = require('./followUpDraftService');
 const emailService = require('./emailService');
 const { pickBestRecipient } = require('./contactRankingService');
+const { isKitReadyToApply } = require('./kitReadinessService');
 
 function firstName(name = '') {
   return String(name || '').trim().split(/\s+/)[0] || 'there';
@@ -27,27 +27,55 @@ function personalizeBody(body = '', recipientName = '') {
   return `${greeting}\n\n${body}`;
 }
 
-function buildAttachments(applicationKit, profile) {
-  const attachments = [];
-  const resumeText =
-    applicationKit?.tailoredResumeText ||
-    applicationKit?.fullSupplementText ||
-    profile?.resumeText ||
-    '';
-  if (resumeText.trim()) {
-    attachments.push({
-      filename: 'Resume.txt',
+function buildAttachments(applicationKit) {
+  if (!applicationKit?.tailored) {
+    const err = new Error('Polish your application kit for this role before sending — only JD-tailored resume and cover letter are attached.');
+    err.status = 400;
+    throw err;
+  }
+
+  const resumeText = applicationKit.tailoredResumeText || applicationKit.fullSupplementText || '';
+  const coverLetter = applicationKit.coverLetterParagraph || '';
+  if (!resumeText.trim() || !coverLetter.trim()) {
+    const err = new Error('Tailored resume or cover letter is missing — run Polish kit for apply, then regenerate the follow-up kit.');
+    err.status = 400;
+    throw err;
+  }
+
+  const companySlug = String(applicationKit.company || 'role')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40);
+
+  return [
+    {
+      filename: `Resume-${companySlug || 'tailored'}.txt`,
       content: Buffer.from(resumeText.trim(), 'utf8').toString('base64'),
-    });
-  }
-  const coverLetter = applicationKit?.coverLetterParagraph || '';
-  if (coverLetter.trim()) {
-    attachments.push({
-      filename: 'Cover-letter.txt',
+    },
+    {
+      filename: `Cover-letter-${companySlug || 'tailored'}.txt`,
       content: Buffer.from(coverLetter.trim(), 'utf8').toString('base64'),
-    });
+    },
+  ];
+}
+
+function assertTailoredKitReady(applicationKit) {
+  const summary = {
+    tailored: Boolean(applicationKit?.tailored),
+    hasKit: Boolean(applicationKit?.tailored),
+    useForApply: applicationKit?.useForApply !== false,
+    atsScore: applicationKit?.atsScore ?? null,
+    jdMatchPct: applicationKit?.jdMatchPct ?? null,
+    recruiterReady: Boolean(applicationKit?.recruiterReady),
+    atsReady: Boolean(applicationKit?.atsReady),
+  };
+  if (!isKitReadyToApply(summary)) {
+    const err = new Error(
+      `Polish kit until ATS is job-ready (target 95%) before sending — current ATS ${summary.atsScore ?? '—'}%.`
+    );
+    err.status = 400;
+    throw err;
   }
-  return attachments;
 }
 
 function buildHtml({ applicant, recipientName, coverLetter, emailBody, job }) {
@@ -72,14 +100,6 @@ function buildHtml({ applicant, recipientName, coverLetter, emailBody, job }) {
   </div>`;
 }
 
-async function resolveFollowUpKit(userId, jobId, authEmail) {
-  let kit = followUpKitStore.get(userId, jobId);
-  if (!kit) {
-    kit = await followUpDraftService.getOrGenerate(userId, jobId, { authEmail });
-  }
-  return kit;
-}
-
 async function sendFollowUpOutreach(userId, jobId, options = {}) {
   const profile = await profileService.getOrCreate(userId);
   const applicant = await applicantContactService.resolveApplicantContact(userId, profile, options.authEmail);
@@ -89,8 +109,14 @@ async function sendFollowUpOutreach(userId, jobId, options = {}) {
     throw err;
   }
 
-  const kit = await resolveFollowUpKit(userId, jobId, options.authEmail);
   const applicationKit = await applicationKitStore.get(userId, jobId);
+  assertTailoredKitReady(applicationKit);
+
+  const kit = await followUpDraftService.generateFollowUpKit(userId, jobId, {
+    authEmail: options.authEmail,
+    kit: applicationKit,
+    daysSinceApply: options.daysSinceApply,
+  });
 
   const pool = [
     ...(kit.contacts?.recommendedContacts || []),
@@ -101,6 +127,7 @@ async function sendFollowUpOutreach(userId, jobId, options = {}) {
         email: options.recipientEmail,
         name: options.recipientName || '',
         verified: false,
+        recommended: false,
         source: 'manual',
       }
     : pickBestRecipient(pool);
@@ -112,10 +139,10 @@ async function sendFollowUpOutreach(userId, jobId, options = {}) {
   }
 
   const recipientName = options.recipientName || picked.name || '';
-  const coverLetter = applicationKit?.coverLetterParagraph || '';
+  const coverLetter = applicationKit.coverLetterParagraph || '';
   const emailBody = personalizeBody(kit.emailBody || '', recipientName);
   const text = [coverLetter, emailBody].filter(Boolean).join('\n\n');
-  const attachments = buildAttachments(applicationKit, profile);
+  const attachments = buildAttachments(applicationKit);
 
   const result = await emailService.sendEmail({
     to: picked.email,
@@ -148,7 +175,9 @@ async function sendFollowUpOutreach(userId, jobId, options = {}) {
     recommended: Boolean(picked.recommended),
     verified: Boolean(picked.verified),
     trustScore: picked.trustScore ?? null,
+    atsScore: applicationKit.atsScore ?? null,
+    jdTailored: true,
   };
 }
 
-module.exports = { sendFollowUpOutreach, personalizeBody, buildAttachments };
+module.exports = { sendFollowUpOutreach, personalizeBody, buildAttachments, assertTailoredKitReady };

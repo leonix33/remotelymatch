@@ -26,22 +26,24 @@ function buildEmailDraft({ contact, job, kit, recipient, daysSinceApply = 5 }) {
   const role = job.title || 'the role';
   const company = job.company || 'your company';
   const greeting = recipient.name ? `Hi ${firstName(recipient.name)},` : 'Hi,';
-  const skillLine = (kit?.skillsToHighlight || []).slice(0, 3).join(', ');
-  const keywordLine = (kit?.missingKeywords || []).slice(0, 4).join(', ');
+  const skills = (kit?.skillsToHighlight || kit?.mustHaveSkills || []).slice(0, 3).join(', ');
+  const keywords = (kit?.missingKeywords || kit?.keywordsAddressed || []).slice(0, 5).join(', ');
+  const atsNote =
+    kit?.atsScore != null ? `My tailored resume is aligned to your posting (ATS ${Math.round(kit.atsScore)}% match).` : '';
 
   const subject = `Following up — ${role} at ${company}`;
   const body = [
     greeting,
     '',
     `I applied for the ${role} position at ${company} about ${daysSinceApply} days ago and wanted to follow up personally.`,
-    skillLine
-      ? `My background in ${skillLine} lines up closely with what you're hiring for.`
+    skills
+      ? `My background in ${skills} lines up closely with what you're hiring for.`
       : `I'm very interested in this role and believe my experience is a strong fit.`,
-    keywordLine
-      ? `I've tailored my application to highlight ${keywordLine} from your posting.`
-      : '',
+    keywords
+      ? `I've attached a JD-tailored resume and cover letter highlighting ${keywords} from your posting.`
+      : atsNote || `I've attached a tailored resume and cover letter for this role.`,
     '',
-    `I'd welcome a brief conversation if you're still reviewing candidates. Happy to share more detail on relevant projects or walk through my resume.`,
+    `I'd welcome a brief conversation if you're still reviewing candidates.`,
     '',
     'Best regards,',
     name,

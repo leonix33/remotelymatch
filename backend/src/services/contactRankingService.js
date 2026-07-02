@@ -36,7 +36,9 @@ function scoreContact(contact = {}) {
   if (source === 'hunter.io') score += 18;
   if (source === 'job_description') score += 25;
   if (RECRUITER_ROLE_RE.test(role)) score += 30;
-  if (contact.name && contact.name.split(/\s+/).length >= 2) score += 10;
+  const fullName = String(contact.name || '').trim();
+  if (fullName.split(/\s+/).length >= 2) score += 15;
+  if (source === 'apollo.io' && fullName && contact.verified && RECRUITER_ROLE_RE.test(role)) score += 20;
   if (isGenericInbox(email)) score -= 50;
   if (/(ceo|founder|chief executive)/i.test(role) && !RECRUITER_ROLE_RE.test(role)) score -= 15;
   if (email.includes('weworkremotely') || email.includes('remoteok')) score -= 40;

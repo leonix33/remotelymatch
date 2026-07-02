@@ -39,6 +39,7 @@ const otherContacts = (job) =>
     : (job.followUpKit?.contacts?.verifiedContacts || []).filter((c) => c.email && !c.recommended);
 
 const canReapply = (job) => isKitReadyToApply(job.kit);
+const canSendFollowUp = (job) => isKitReadyToApply(job.kit) && Boolean(job.followUpKit);
 
 function mailtoLink(kit) {
   const to = kit?.emailTo || kit?.recipient?.email || '';
@@ -151,7 +152,10 @@ function formatDate(iso) {
         <section class="follow-up-section">
           <h4 class="follow-up-section__title">Trusted contacts</h4>
           <p class="mt-1 text-xs text-slate-500">
-            Apollo + Hunter ranked by verified recruiter fit. Send one follow-up per person — includes cover letter + resume attachments.
+            Apollo + Hunter ranked by verified recruiter fit. Send attaches <strong class="text-slate-400">JD-tailored resume + cover letter only</strong> (after Polish kit).
+          </p>
+          <p v-if="!canSendFollowUp(job)" class="mt-2 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+            Polish kit for apply first — follow-up emails won't attach a base resume until ATS is job-ready.
           </p>
           <p v-if="job.followUpKit.applicantEmail" class="mt-2 text-xs text-slate-400">
             Replies go to: <span class="text-teal-300">{{ job.followUpKit.applicantEmail }}</span>
@@ -185,10 +189,10 @@ function formatDate(iso) {
                 <button
                   type="button"
                   class="btn-primary text-xs shrink-0"
-                  :disabled="sending || !c.email"
+                  :disabled="sending || !c.email || !canSendFollowUp(job)"
                   @click.stop="emit('send-follow-up', job, c)"
                 >
-                  {{ sending ? 'Sending…' : 'Send follow-up' }}
+                  {{ sending ? 'Sending…' : `Send to ${c.name?.split(' ')[0] || 'contact'}` }}
                 </button>
               </div>
             </li>
@@ -219,7 +223,7 @@ function formatDate(iso) {
             <button
               type="button"
               class="btn-primary text-xs"
-              :disabled="sending || !recommendedContacts(job).length"
+              :disabled="sending || !recommendedContacts(job).length || !canSendFollowUp(job)"
               @click.stop="emit('send-follow-up', job)"
             >
               {{ sending ? 'Sending…' : 'Send to best contact' }}
@@ -232,7 +236,9 @@ function formatDate(iso) {
           <h4 class="follow-up-section__title">Pre-drafted follow-up email</h4>
           <p class="mt-1 text-xs text-slate-500">To: {{ job.followUpKit.emailTo || job.followUpKit.recipient?.email || 'Best verified contact' }}</p>
           <p class="text-xs font-medium text-slate-400">Subject: {{ job.followUpKit.emailSubject }}</p>
-          <p class="mt-2 text-xs text-slate-500">Attachments: tailored resume + cover letter (.txt)</p>
+          <p class="mt-2 text-xs text-slate-500">
+            Attachments: JD-tailored resume + cover letter (.txt) — only after Polish kit
+          </p>
           <pre class="follow-up-draft mt-3">{{ job.followUpKit.emailBody }}</pre>
           <div class="mt-3 flex flex-wrap gap-2">
             <button type="button" class="btn-secondary text-xs" @click.stop="emit('copy', job.followUpKit.emailBody, 'email')">
