@@ -12,7 +12,7 @@ import AppConcierge from './components/AppConcierge.vue';
 import NotificationBell from './components/NotificationBell.vue';
 import MobileMoreMenu from './components/MobileMoreMenu.vue';
 import { simpleNav } from './utils/navigation';
-import { isProduction, canonicalDomain } from './config';
+import { isProduction, canonicalDomain, showAskAi } from './config';
 
 const route = useRoute();
 const router = useRouter();
@@ -137,7 +137,7 @@ onUnmounted(() => {
     </div>
 
     <AppConcierge
-      v-if="auth.isAdmin && route.path !== '/login' && route.path !== '/onboarding' && route.path !== '/welcome'"
+      v-if="showAskAi && auth.isAdmin && route.path !== '/login' && route.path !== '/onboarding' && route.path !== '/welcome'"
     />
   </div>
 </template>

@@ -1,3 +1,5 @@
+import { showAskAi } from '../config';
+
 /** Core quality-first workflow — everyone sees these. */
 export const simpleNav = [
   { to: '/', label: 'Apply', icon: '▶', exact: true },
@@ -8,11 +10,13 @@ export const simpleNav = [
 ];
 
 /** Optional extras for normal users — keep the sidebar simple. */
-export const userMoreNav = [
-  { to: '/concierge', label: 'Ask AI', icon: '✦' },
+const userMoreNavAll = [
+  { to: '/concierge', label: 'Ask AI', icon: '✦', askAi: true },
   { to: '/tailored-resumes', label: 'Tailored resumes', icon: '📋' },
   { to: '/interview', label: 'Interview prep', icon: '🎙' },
 ];
+
+export const userMoreNav = userMoreNavAll.filter((item) => !item.askAi || showAskAi);
 
 /** Workspace operations — admins only. */
 export const adminNav = [

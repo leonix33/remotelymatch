@@ -34,6 +34,7 @@ import MonitorAgentView from '../views/monitor/MonitorAgentView.vue';
 import MonitorSwarmView from '../views/monitor/MonitorSwarmView.vue';
 import MonitorApplicationsView from '../views/monitor/MonitorApplicationsView.vue';
 import ConciergeView from '../views/ConciergeView.vue';
+import { showAskAi } from '../config';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -89,6 +90,7 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !auth.accessToken) return '/login';
   if (to.meta.guest && auth.accessToken && !['/welcome', '/privacy', '/terms'].includes(to.path)) return '/';
+  if (!showAskAi && to.path === '/concierge') return '/';
   if (to.matched.some((record) => record.meta.adminOnly) && auth.user?.role !== 'admin') return '/';
 
   if (auth.accessToken && to.meta.requiresAuth) {
