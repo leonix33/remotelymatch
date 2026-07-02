@@ -9,6 +9,8 @@ const followUpScheduleService = require('./followUpScheduleService');
 const followUpScheduleStore = require('./followUpScheduleStore');
 const contactEnrichmentService = require('./contactEnrichmentService');
 const jobListCache = require('./jobListCache');
+const applicationKitStore = require('./applicationKitStore');
+const { buildKitSummary } = require('./kitReadinessService');
 const localNotificationStore = require('./localNotificationStore');
 const emailService = require('./emailService');
 const applicantContactService = require('./applicantContactService');
@@ -485,6 +487,10 @@ async function buildFollowUpBoard(userId, authEmail = '') {
   const kitsByJobId = new Map(
     followUpKitStore.listForUser(userId).map((kit) => [String(kit.jobId), kit])
   );
+  const applicationKits = await applicationKitStore.listForUser(userId);
+  const appKitByJobId = new Map(
+    applicationKits.map((kit) => [String(kit.jobId), buildKitSummary(kit, 'submitted')])
+  );
 
   let scoredById = new Map();
   try {
@@ -535,6 +541,7 @@ async function buildFollowUpBoard(userId, authEmail = '') {
       likelihoodTier: match.likelihoodTier,
       ats: null,
       followUpKit: kit,
+      kit: appKitByJobId.get(String(jobId)) || buildKitSummary(null),
       schedule,
       followUpCompleted: completed,
       followUpDue,

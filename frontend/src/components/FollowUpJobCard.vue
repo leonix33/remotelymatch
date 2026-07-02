@@ -1,13 +1,32 @@
 <script setup>
 import JobScoreBadges from './JobScoreBadges.vue';
+import KitReadinessBadges from './KitReadinessBadges.vue';
+import { isKitReadyToApply } from '../utils/kitReadiness';
 
 const props = defineProps({
   job: { type: Object, required: true },
   selected: { type: Boolean, default: false },
   copied: { type: String, default: '' },
+  generating: { type: Boolean, default: false },
+  polishing: { type: Boolean, default: false },
+  reapplying: { type: Boolean, default: false },
+  kitError: { type: String, default: '' },
+  polishMsg: { type: String, default: '' },
+  actionMsg: { type: String, default: '' },
 });
 
-const emit = defineEmits(['select', 'mark-done', 'copy', 'open-job', 'enrich', 'generate']);
+const emit = defineEmits([
+  'select',
+  'mark-done',
+  'copy',
+  'open-job',
+  'enrich',
+  'generate',
+  'polish',
+  'reapply',
+]);
+
+const canReapply = (job) => isKitReadyToApply(job.kit);
 
 function mailtoLink(kit) {
   const to = kit?.emailTo || kit?.recipient?.email || '';
@@ -43,7 +62,8 @@ function formatDate(iso) {
           <h3 class="mt-2 text-lg font-semibold text-slate-100">{{ job.title }}</h3>
           <p class="text-sm text-teal-300/90">{{ job.company }}</p>
           <p class="mt-1 text-xs text-slate-500">Applied {{ formatDate(job.appliedAt) }} · {{ job.daysSinceApply ?? 0 }}d ago</p>
-          <p v-if="!job.hasFollowUpKit" class="mt-1 text-xs text-amber-300/90">No follow-up kit yet — expand to generate</p>
+          <p v-if="!job.hasFollowUpKit && !generating" class="mt-1 text-xs text-amber-300/90">No follow-up kit yet — expand to generate</p>
+          <p v-if="generating" class="mt-1 text-xs text-teal-300">Generating follow-up kit…</p>
           <div class="mt-2">
             <JobScoreBadges :job="job" />
           </div>
@@ -51,15 +71,71 @@ function formatDate(iso) {
       </div>
     </button>
 
-    <div v-if="selected && !job.followUpKit" class="follow-up-card__detail border-t border-slate-800/80 p-4 sm:p-5">
-      <p class="text-sm text-slate-400">Follow-up kit not generated yet for this role.</p>
-      <button type="button" class="btn-primary mt-3 text-sm" @click="emit('generate', job)">
-        Generate follow-up kit
-      </button>
-    </div>
+    <div v-if="selected" class="follow-up-card__detail border-t border-slate-800/80 p-4 sm:p-5">
+      <section class="follow-up-section mb-5">
+        <h4 class="follow-up-section__title">Application kit</h4>
+        <p class="mt-1 text-xs text-slate-500">
+          Polish your tailored resume for this role, refresh the follow-up email, then reapply if the posting allows it.
+        </p>
+        <div class="mt-2">
+          <KitReadinessBadges :kit="job.kit" />
+        </div>
+        <p v-if="polishMsg" class="mt-2 text-xs text-teal-300">{{ polishMsg }}</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            :disabled="polishing || generating"
+            @click.stop="emit('polish', job)"
+          >
+            {{ polishing ? 'Polishing…' : 'Polish kit for apply' }}
+          </button>
+          <button
+            v-if="canReapply(job)"
+            type="button"
+            class="btn-primary text-xs"
+            :disabled="reapplying || polishing || generating"
+            @click.stop="emit('reapply', job)"
+          >
+            {{ reapplying ? 'Reapplying…' : 'Reapply with tailored resume' }}
+          </button>
+        </div>
+        <p v-if="actionMsg" class="mt-2 text-xs text-slate-400">{{ actionMsg }}</p>
+      </section>
 
-    <div v-if="selected && job.followUpKit" class="follow-up-card__detail border-t border-slate-800/80 p-4 sm:p-5">
-      <div class="grid gap-5 lg:grid-cols-2">
+      <div v-if="kitError" class="mb-4 rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+        {{ kitError }}
+      </div>
+
+      <div v-if="!job.followUpKit && !generating">
+        <p class="text-sm text-slate-400">Follow-up kit not generated yet for this role.</p>
+        <button
+          type="button"
+          class="btn-primary mt-3 text-sm"
+          :disabled="generating"
+          @click.stop="emit('generate', job)"
+        >
+          Generate follow-up kit
+        </button>
+      </div>
+
+      <div v-else-if="generating && !job.followUpKit" class="text-sm text-slate-400">
+        Building email draft, contacts, and call script…
+      </div>
+
+      <div v-else-if="job.followUpKit" class="grid gap-5 lg:grid-cols-2">
+        <section class="follow-up-section lg:col-span-2 flex flex-wrap items-center justify-between gap-2">
+          <p class="text-xs text-slate-500">Follow-up kit ready</p>
+          <button
+            type="button"
+            class="btn-secondary text-xs"
+            :disabled="generating"
+            @click.stop="emit('generate', job, true)"
+          >
+            {{ generating ? 'Regenerating…' : 'Regenerate follow-up kit' }}
+          </button>
+        </section>
+
         <section class="follow-up-section">
           <h4 class="follow-up-section__title">Contacts</h4>
           <p v-if="job.followUpKit.companyPhone" class="mt-2 text-sm text-slate-300">
@@ -104,8 +180,9 @@ function formatDate(iso) {
               target="_blank"
               rel="noopener"
               class="btn-secondary text-xs"
+              @click.stop
             >Find on LinkedIn</a>
-            <button type="button" class="btn-secondary text-xs" @click="emit('enrich', job)">Refresh contacts (Hunter/Apollo)</button>
+            <button type="button" class="btn-secondary text-xs" @click.stop="emit('enrich', job)">Refresh contacts (Hunter/Apollo)</button>
           </div>
         </section>
 
@@ -119,8 +196,9 @@ function formatDate(iso) {
               v-if="job.followUpKit.emailTo || job.followUpKit.recipient?.email"
               :href="mailtoLink(job.followUpKit)"
               class="btn-primary text-xs"
+              @click.stop
             >Send email</a>
-            <button type="button" class="btn-secondary text-xs" @click="emit('copy', job.followUpKit.emailBody, 'email')">
+            <button type="button" class="btn-secondary text-xs" @click.stop="emit('copy', job.followUpKit.emailBody, 'email')">
               {{ copied === 'email' ? 'Copied' : 'Copy email' }}
             </button>
           </div>
@@ -129,23 +207,23 @@ function formatDate(iso) {
         <section class="follow-up-section lg:col-span-2">
           <h4 class="follow-up-section__title">LinkedIn & call script</h4>
           <pre class="follow-up-draft mt-2">{{ job.followUpKit.linkedInMessage }}</pre>
-          <button type="button" class="btn-secondary mt-2 text-xs" @click="emit('copy', job.followUpKit.linkedInMessage, 'li')">
+          <button type="button" class="btn-secondary mt-2 text-xs" @click.stop="emit('copy', job.followUpKit.linkedInMessage, 'li')">
             {{ copied === 'li' ? 'Copied' : 'Copy LinkedIn' }}
           </button>
           <pre class="follow-up-draft mt-4">{{ job.followUpKit.callScript }}</pre>
-          <button type="button" class="btn-secondary mt-2 text-xs" @click="emit('copy', job.followUpKit.callScript, 'call')">
+          <button type="button" class="btn-secondary mt-2 text-xs" @click.stop="emit('copy', job.followUpKit.callScript, 'call')">
             {{ copied === 'call' ? 'Copied' : 'Copy call script' }}
           </button>
         </section>
       </div>
 
-      <div class="mt-5 flex flex-wrap gap-2 border-t border-slate-800/80 pt-4">
-        <button type="button" class="btn-secondary text-sm" @click="emit('open-job', job)">Open job posting</button>
+      <div v-if="job.followUpKit" class="mt-5 flex flex-wrap gap-2 border-t border-slate-800/80 pt-4">
+        <button type="button" class="btn-secondary text-sm" @click.stop="emit('open-job', job)">Open job posting</button>
         <button
           v-if="!job.followUpCompleted"
           type="button"
           class="btn-primary text-sm"
-          @click="emit('mark-done', job)"
+          @click.stop="emit('mark-done', job)"
         >Mark followed up</button>
       </div>
     </div>

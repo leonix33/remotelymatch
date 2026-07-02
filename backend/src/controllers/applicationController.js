@@ -64,4 +64,19 @@ async function importApplications(req, res, next) {
   }
 }
 
-module.exports = { listApplications, myActivity, importApplications };
+async function reapply(req, res, next) {
+  try {
+    const result = await applicationService.reapplyForJob(req.user.sub, req.params.jobId, {
+      authEmail: req.user.email,
+      useTailoredResume: req.body?.useTailoredResume !== false,
+    });
+    res.json(result);
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    next(err);
+  }
+}
+
+module.exports = { listApplications, myActivity, importApplications, reapply };

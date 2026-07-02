@@ -4,6 +4,15 @@ import { RouterLink } from 'vue-router';
 import http from '../api/http';
 import FollowUpJobCard from '../components/FollowUpJobCard.vue';
 import AtsKeywordScore from '../components/AtsKeywordScore.vue';
+import {
+  isKitReadyToApply,
+  summaryFromKitPayload,
+  READY_ATS_TARGET,
+} from '../utils/kitReadiness';
+import { useProfileStore } from '../stores/profile';
+
+const profileStore = useProfileStore();
+const MAX_POLISH_PASSES = 4;
 
 const loading = ref(true);
 const loadError = ref('');
@@ -14,7 +23,12 @@ const pageSize = 25;
 const selectedId = ref('');
 const copied = ref('');
 const enriching = ref('');
-const marking = ref('');
+const generating = ref('');
+const polishing = ref('');
+const reapplying = ref('');
+const kitErrors = ref({});
+const polishMsgs = ref({});
+const actionMsgs = ref({});
 const enrichmentTest = ref(null);
 const testingEnrichment = ref(false);
 
@@ -89,6 +103,9 @@ async function loadBoard() {
 
 function selectJob(job) {
   selectedId.value = selectedId.value === job.jobId ? '' : job.jobId;
+  if (selectedId.value === job.jobId) {
+    kitErrors.value = { ...kitErrors.value, [job.jobId]: '' };
+  }
 }
 
 async function copyText(value, label) {
@@ -101,14 +118,135 @@ async function copyText(value, label) {
 }
 
 async function markDone(job) {
-  marking.value = job.jobId;
   try {
     await http.post(`/traction/follow-up/${job.jobId}/done`, { notes: '' });
     job.followUpCompleted = true;
     job.followUpDue = false;
     await loadBoard();
+  } catch (e) {
+    kitErrors.value = {
+      ...kitErrors.value,
+      [job.jobId]: e.response?.data?.message || 'Could not mark complete',
+    };
+  }
+}
+
+function patchJobRow(jobId, patch) {
+  const row = board.value?.jobs?.find((j) => j.jobId === jobId);
+  if (row) Object.assign(row, patch);
+}
+
+function clearJobMsg(jobId) {
+  kitErrors.value = { ...kitErrors.value, [jobId]: '' };
+  polishMsgs.value = { ...polishMsgs.value, [jobId]: '' };
+  actionMsgs.value = { ...actionMsgs.value, [jobId]: '' };
+}
+
+async function generateKit(job, force = false) {
+  const jobId = job.jobId;
+  selectedId.value = jobId;
+  generating.value = jobId;
+  clearJobMsg(jobId);
+  try {
+    const { data } = await http.get(`/traction/follow-up/${encodeURIComponent(jobId)}/kit`, {
+      timeout: 120000,
+      params: force ? { regenerate: '1' } : {},
+    });
+    patchJobRow(jobId, { followUpKit: data, hasFollowUpKit: true });
+    actionMsgs.value = { ...actionMsgs.value, [jobId]: force ? 'Follow-up kit regenerated.' : 'Follow-up kit ready.' };
+  } catch (e) {
+    kitErrors.value = {
+      ...kitErrors.value,
+      [jobId]: e.response?.data?.message || 'Could not generate follow-up kit — check Profile email and try again.',
+    };
   } finally {
-    marking.value = '';
+    generating.value = '';
+  }
+}
+
+async function polishKit(job) {
+  const jobId = job.jobId;
+  selectedId.value = jobId;
+  polishing.value = jobId;
+  clearJobMsg(jobId);
+  const profile = profileStore.profile || {};
+  let lastAts = -1;
+  let lastJd = -1;
+  try {
+    for (let attempt = 0; attempt < MAX_POLISH_PASSES; attempt += 1) {
+      const { data } = await http.post(`/applications/kit/${encodeURIComponent(jobId)}/generate`, {
+        tailorResume: true,
+        force: true,
+        tailorMode: 'high_match',
+        supplementPages: profile.defaultSupplementPages || 3,
+        highMatchTarget: READY_ATS_TARGET,
+      }, { timeout: 180000 });
+      const kit = summaryFromKitPayload(data);
+      patchJobRow(jobId, { kit });
+      polishMsgs.value = {
+        ...polishMsgs.value,
+        [jobId]: `Pass ${attempt + 1}: ATS ${kit.atsScore ?? '—'}% · Fit ${kit.jdMatchPct ?? '—'}%`,
+      };
+      if (isKitReadyToApply(kit)) {
+        polishMsgs.value = {
+          ...polishMsgs.value,
+          [jobId]: `Ready — ATS ${kit.atsScore}% · regenerating follow-up kit…`,
+        };
+        await generateKit(job, true);
+        return;
+      }
+      const ats = kit.atsScore ?? 0;
+      const jd = kit.jdMatchPct ?? 0;
+      if (attempt > 0 && ats <= lastAts && jd <= lastJd) break;
+      lastAts = ats;
+      lastJd = jd;
+    }
+    const kit = board.value?.jobs?.find((j) => j.jobId === jobId)?.kit;
+    polishMsgs.value = {
+      ...polishMsgs.value,
+      [jobId]: `Best: ATS ${kit?.atsScore ?? '—'}% — regenerate follow-up kit or reapply when ready.`,
+    };
+  } catch (e) {
+    kitErrors.value = {
+      ...kitErrors.value,
+      [jobId]: e.response?.data?.message || 'Polish kit failed',
+    };
+  } finally {
+    polishing.value = '';
+  }
+}
+
+async function reapplyJob(job) {
+  const jobId = job.jobId;
+  if (!isKitReadyToApply(job.kit)) {
+    kitErrors.value = {
+      ...kitErrors.value,
+      [jobId]: 'Polish your application kit to ATS 95%+ before reapplying.',
+    };
+    return;
+  }
+  reapplying.value = jobId;
+  clearJobMsg(jobId);
+  try {
+    const { data } = await http.post(`/applications/${encodeURIComponent(jobId)}/reapply`, {
+      useTailoredResume: true,
+    }, { timeout: 180000 });
+    actionMsgs.value = { ...actionMsgs.value, [jobId]: data.message || 'Reapplied.' };
+    if (data.queued) {
+      actionMsgs.value = {
+        ...actionMsgs.value,
+        [jobId]: `${data.message} Open the job posting or use your local agent to submit.`,
+      };
+    }
+    await generateKit(job, true);
+    await loadBoard();
+  } catch (e) {
+    kitErrors.value = {
+      ...kitErrors.value,
+      [jobId]: e.response?.data?.message || 'Reapply failed',
+    };
+  } finally {
+    reapplying.value = '';
   }
 }
 
@@ -124,24 +262,15 @@ async function enrichContacts(job) {
   }
 }
 
-async function generateKit(job) {
-  enriching.value = job.jobId;
-  try {
-    const { data } = await http.get(`/traction/follow-up/${job.jobId}/kit`);
-    job.followUpKit = data;
-    const row = board.value?.jobs?.find((j) => j.jobId === job.jobId);
-    if (row) row.followUpKit = data;
-  } finally {
-    enriching.value = '';
-  }
-}
-
 function openJob(job) {
   const url = job.url || job.followUpKit?.jobUrl;
   if (url) window.open(url, '_blank', 'noopener');
 }
 
-onMounted(loadBoard);
+onMounted(() => {
+  profileStore.fetch().catch(() => {});
+  loadBoard();
+});
 </script>
 
 <template>
@@ -304,12 +433,20 @@ onMounted(loadBoard);
         :job="job"
         :selected="selectedId === job.jobId"
         :copied="copied"
+        :generating="generating === job.jobId"
+        :polishing="polishing === job.jobId"
+        :reapplying="reapplying === job.jobId"
+        :kit-error="kitErrors[job.jobId] || ''"
+        :polish-msg="polishMsgs[job.jobId] || ''"
+        :action-msg="actionMsgs[job.jobId] || ''"
         @select="selectJob"
         @copy="copyText"
         @mark-done="markDone"
         @open-job="openJob"
         @enrich="enrichContacts"
         @generate="generateKit"
+        @polish="polishKit"
+        @reapply="reapplyJob"
       />
 
       <div v-if="hasMoreJobs" class="text-center">
@@ -324,8 +461,9 @@ onMounted(loadBoard);
     </div>
 
     <p class="mt-8 text-center text-xs text-slate-600">
-      Tip: Expand a job → <strong class="text-slate-400">Generate follow-up kit</strong> →
-      <strong class="text-slate-400">Find recruiter emails</strong> uses Hunter + Apollo when configured.
+      Tip: Expand a job → <strong class="text-slate-400">Polish kit for apply</strong> →
+      <strong class="text-slate-400">Regenerate follow-up kit</strong> →
+      <strong class="text-slate-400">Reapply</strong> when ATS is 95%+.
     </p>
   </div>
 </template>
