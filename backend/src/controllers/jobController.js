@@ -2,6 +2,7 @@ const Job = require('../models/Job');
 const jobService = require('../services/jobService');
 const jobIngestService = require('../services/jobs/jobIngestService');
 const jobListCache = require('../services/jobListCache');
+const jobBoardCatalogService = require('../services/jobBoardCatalogService');
 const env = require('../config/env');
 
 function applyJobFilters(jobs, { section, minMatch, minQuality, source, freshness, search }) {
@@ -139,4 +140,12 @@ async function ingestStatus(req, res, next) {
   }
 }
 
-module.exports = { listJobs, syncJobs, importJobs, ingestJobs, ingestStatus };
+async function boardCatalog(req, res, next) {
+  try {
+    res.json(jobBoardCatalogService.getCatalog());
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listJobs, syncJobs, importJobs, ingestJobs, ingestStatus, boardCatalog };

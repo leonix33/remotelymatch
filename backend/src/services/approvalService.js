@@ -10,24 +10,13 @@ const localApprovalService = require('./localApprovalService');
 const applicationKitService = require('./applicationKitService');
 const applicationKitStore = require('./applicationKitStore');
 const { profileResumeAlignment } = require('./resumeParseService');
+const { buildKitSummary } = require('./kitReadinessService');
 
 const JOB_LIST_CACHE_MS = 120_000;
 const jobListCache = new Map();
 
 function kitSummaryFromKit(kit, jobStatus) {
-  if (!kit?.tailored) {
-    return { hasKit: false, useForApply: null, pageCount: 0, applied: false };
-  }
-  return {
-    hasKit: true,
-    useForApply: kit.useForApply !== false,
-    pageCount: kit.pageCount || 0,
-    supplementPagesTarget: kit.supplementPagesTarget || kit.pageCount,
-    tailorMode: kit.tailorMode || 'balanced',
-    estimatedMatchPct: kit.estimatedMatchPct || null,
-    generatedAt: kit.generatedAt,
-    applied: jobStatus === 'applied' || jobStatus === 'submitted',
-  };
+  return buildKitSummary(kit, jobStatus);
 }
 
 function invalidateJobListCache(userId) {

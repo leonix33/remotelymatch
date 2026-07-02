@@ -5,6 +5,7 @@ import http from '../api/http';
 import { useProfileStore } from '../stores/profile';
 import { useApplyQueue } from '../composables/useApplyQueue';
 import ApplicationKitPanel from '../components/ApplicationKitPanel.vue';
+import MatchCopilotBrief from '../components/MatchCopilotBrief.vue';
 import JobScoreBadges from '../components/JobScoreBadges.vue';
 
 const profileStore = useProfileStore();
@@ -19,12 +20,10 @@ const section = ref('all');
 const minMatch = ref('0');
 const search = ref('');
 const copilotJob = ref(null);
-const copilot = ref(null);
 const resumeJob = ref(null);
 const kitOpen = ref(false);
 const squadJob = ref(null);
 const squadMembers = ref([]);
-const aiLoading = ref(false);
 const savingJobId = ref('');
 const queueMessage = ref('');
 const queueError = ref('');
@@ -87,16 +86,8 @@ async function loadContacts() {
   }
 }
 
-async function runCopilot(job) {
+function runCopilot(job) {
   copilotJob.value = job;
-  aiLoading.value = true;
-  copilot.value = null;
-  try {
-    const { data } = await http.get(`/intelligence/match/${encodeURIComponent(job.jobId)}`);
-    copilot.value = data;
-  } finally {
-    aiLoading.value = false;
-  }
 }
 
 async function runResumeDiff(job) {
@@ -230,16 +221,7 @@ watch([section, minMatch], () => load());
     <div v-if="copilotJob" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet" @click.self="copilotJob = null">
       <div class="card w-full max-w-lg overflow-y-auto p-4 sm:max-h-[80vh] sm:p-6">
         <h3 class="font-semibold text-slate-200">Match Copilot — {{ copilotJob.title }}</h3>
-        <p v-if="aiLoading" class="mt-4 text-slate-400">Analyzing…</p>
-        <div v-else-if="copilot?.analysis" class="mt-4 space-y-3 text-sm">
-          <p class="text-teal-300">{{ copilot.analysis.oneLiner }}</p>
-          <p><span class="text-slate-500">Verdict:</span> {{ copilot.analysis.verdict }} ({{ copilot.analysis.matchPct }}%)</p>
-          <p><span class="text-slate-500">Strengths:</span> {{ copilot.analysis.strengths?.join(', ') }}</p>
-          <p><span class="text-slate-500">Gaps:</span> {{ copilot.analysis.gaps?.join(', ') }}</p>
-          <ul class="list-disc pl-5 text-slate-400">
-            <li v-for="(p, i) in copilot.analysis.talkingPoints" :key="i">{{ p }}</li>
-          </ul>
-        </div>
+        <MatchCopilotBrief v-if="copilotJob" :job-id="copilotJob.jobId" />
         <button class="btn-secondary mt-4" @click="copilotJob = null">Close</button>
       </div>
     </div>

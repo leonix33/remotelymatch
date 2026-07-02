@@ -63,6 +63,10 @@ const profileSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    jobBoardSelections: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   { timestamps: true }
 );

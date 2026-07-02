@@ -65,6 +65,7 @@ const updateSchema = z.object({
       })
     )
     .optional(),
+  jobBoardSelections: z.record(z.boolean()).optional(),
 });
 
 const parseResumeSchema = z

@@ -2,6 +2,7 @@ const openaiService = require('./openaiService');
 const env = require('../config/env');
 const profileService = require('./profileService');
 const jobService = require('./jobService');
+const applicationKitService = require('./applicationKitService');
 
 function requireMongo() {
   if (!env.mongoUri) throw new Error('MongoDB is required');
@@ -29,15 +30,13 @@ Nice-to-have: ${(profile.niceToHaveSkills || []).join(', ')}
 Resume highlights: ${(profile.resumeText || '').slice(0, 800)}`;
 }
 
-async function findJob(jobId) {
-  const jobs = jobService.readJobsFromSqlite(5000);
-  return jobs.find((j) => j.jobId === jobId);
+async function findJob(userId, jobId) {
+  return applicationKitService.findJob(userId, jobId);
 }
 
 async function matchCopilot(userId, jobId) {
-  requireMongo();
   const profile = await profileService.getOrCreate(userId);
-  const job = await findJob(jobId);
+  const job = await findJob(userId, jobId);
   if (!job) throw new Error('Job not found');
 
   const system = `You are Match Copilot. Analyze job fit. Respond in JSON only:

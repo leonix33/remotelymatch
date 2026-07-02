@@ -40,6 +40,7 @@ const DEFAULT = {
   openaiKeyHint: '',
   savedJobs: [],
   linkedinSavedSearches: [],
+  jobBoardSelections: {},
 };
 
 function storePath() {

@@ -3,6 +3,7 @@ const applicationService = require('./applicationService');
 const jobService = require('./jobService');
 const localApprovalService = require('./localApprovalService');
 const applicationKitStore = require('./applicationKitStore');
+const { buildKitSummary } = require('./kitReadinessService');
 const jobDescriptionService = require('./jobDescriptionService');
 const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
@@ -385,19 +386,13 @@ async function setKitPreference(userId, jobId, { useForApply, tailorFocus, suppl
 
 async function kitSummary(userId, jobId) {
   const kit = await applicationKitStore.get(userId, jobId);
-  if (!kit?.tailored) {
-    return { hasKit: false, useForApply: null, pageCount: 0, applied: false };
-  }
+  const meta = await applicationMetaForJob(userId, jobId);
+  const base = buildKitSummary(kit, meta.approvalStatus || meta.applicationStatus);
+  if (!base.hasKit) return base;
   return {
-    hasKit: true,
-    useForApply: kit.useForApply !== false,
-    pageCount: kit.pageCount || 0,
-    supplementPagesTarget: kit.supplementPagesTarget || kit.pageCount,
-    tailorMode: kit.tailorMode || 'balanced',
-    estimatedMatchPct: kit.estimatedMatchPct || null,
-    generatedAt: kit.generatedAt,
+    ...base,
     tailorFocus: kit.tailorFocus || '',
-    ...(await applicationMetaForJob(userId, jobId)),
+    ...meta,
   };
 }
 

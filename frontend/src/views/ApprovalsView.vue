@@ -6,6 +6,13 @@ import { formatApplyEmailNotice } from '../utils/applyEmailMessage';
 import ApplyWorkflowBanner from '../components/ApplyWorkflowBanner.vue';
 import ApplicationKitPanel from '../components/ApplicationKitPanel.vue';
 import JobScoreBadges from '../components/JobScoreBadges.vue';
+import KitReadinessBadges from '../components/KitReadinessBadges.vue';
+import MatchCopilotBrief from '../components/MatchCopilotBrief.vue';
+import {
+  isKitReadyToApply,
+  summaryFromKitPayload,
+  READY_ATS_TARGET,
+} from '../utils/kitReadiness';
 import { useProfileStore } from '../stores/profile';
 import { useAuthStore } from '../stores/auth';
 import { buildLinkedInSearchFromJob, isLinkedInJob, isLinkedInUrl, openLinkedIn } from '../utils/linkedin';
@@ -41,11 +48,31 @@ const ats = ref('all');
 const page = ref(1);
 const pageSize = 25;
 const selected = ref(new Set());
+const polishing = ref('');
+const polishMsg = ref('');
+const applyAnywayIds = ref(new Set());
+const MAX_POLISH_PASSES = 4;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 const allSelected = computed(
   () => items.value.length > 0 && items.value.every((j) => selected.value.has(j.jobId))
 );
+function canApplyJob(job, force = false) {
+  if (force || applyAnywayIds.value.has(job.jobId)) return true;
+  if (applyResumeMode.value === 'base') return true;
+  return isKitReadyToApply(job.kit);
+}
+
+const approvedReadyCount = computed(() => {
+  if (status.value !== 'approved') return 0;
+  return items.value.filter((j) => j.status === 'approved' && canApplyJob(j)).length;
+});
+
+const approvedNotReadyCount = computed(() => {
+  if (status.value !== 'approved') return 0;
+  return items.value.filter((j) => j.status === 'approved' && !canApplyJob(j)).length;
+});
+
 
 function toggleSelect(jobId) {
   const next = new Set(selected.value);
@@ -117,17 +144,39 @@ async function load() {
   }
 }
 
-async function applyApproved() {
+async function fetchApprovedItems() {
+  const { data } = await http.get('/approvals', {
+    params: { status: 'approved', search: '', minMatch: 0, sort: 'match', limit: 200, offset: 0 },
+  });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+async function submitApply({ jobIds, force = false } = {}) {
   applying.value = true;
   applyMessage.value = '';
   applyEmailNotice.value = '';
   error.value = '';
   try {
+    let ids = jobIds;
+    if (!ids?.length) {
+      const approved = status.value === 'approved' ? items.value : await fetchApprovedItems();
+      ids = approved
+        .filter((j) => force || canApplyJob(j, force))
+        .map((j) => j.jobId);
+    }
+    if (!ids.length) {
+      applyMessage.value =
+        applyResumeMode.value === 'tailored'
+          ? 'No approved jobs with a ready tailored kit. Use Polish until ready or Apply anyway.'
+          : 'No approved jobs to apply.';
+      return;
+    }
     const { data } = await http.post('/agent/apply-approved', {
+      jobIds: ids,
       useTailoredResume: applyResumeMode.value === 'tailored',
       autoApply: true,
     });
-    applyMessage.value = data.message || `Applied to ${data.count} jobs`;
+    applyMessage.value = data.message || `Applied to ${data.count ?? ids.length} job(s)`;
     applyEmailNotice.value = formatApplyEmailNotice(data.emailNotification);
     await load();
   } catch (e) {
@@ -137,6 +186,70 @@ async function applyApproved() {
     if (d?.hint) error.value = d.hint;
   } finally {
     applying.value = false;
+  }
+}
+
+async function applyApproved({ force = false } = {}) {
+  await submitApply({ force });
+}
+
+async function applyOneJob(job, { force = false } = {}) {
+  if (!force && !canApplyJob(job, force)) return;
+  await submitApply({ jobIds: [job.jobId], force });
+}
+
+function markApplyAnyway(jobId) {
+  const next = new Set(applyAnywayIds.value);
+  next.add(jobId);
+  applyAnywayIds.value = next;
+}
+
+function patchJobKit(jobId, data) {
+  const idx = items.value.findIndex((j) => j.jobId === jobId);
+  if (idx < 0) return;
+  const job = items.value[idx];
+  items.value[idx] = {
+    ...job,
+    kit: { ...(job.kit || {}), ...summaryFromKitPayload(data) },
+  };
+}
+
+async function polishUntilReady(job) {
+  polishing.value = job.jobId;
+  polishMsg.value = '';
+  error.value = '';
+  const profile = profileStore.profile || {};
+  let lastAts = -1;
+  let lastJd = -1;
+  try {
+    for (let attempt = 0; attempt < MAX_POLISH_PASSES; attempt += 1) {
+      const { data } = await http.post(`/applications/kit/${encodeURIComponent(job.jobId)}/generate`, {
+        tailorResume: true,
+        force: true,
+        tailorMode: 'high_match',
+        supplementPages: profile.defaultSupplementPages || 3,
+        highMatchTarget: READY_ATS_TARGET,
+        tailorFocus: job.kit?.tailorFocus || '',
+      });
+      patchJobKit(job.jobId, data);
+      const kit = items.value.find((j) => j.jobId === job.jobId)?.kit;
+      polishMsg.value = `Pass ${attempt + 1}: ATS ${kit?.atsScore ?? '—'}% · Fit ${kit?.jdMatchPct ?? '—'}%`;
+      if (isKitReadyToApply(kit)) {
+        polishMsg.value = `Ready to apply — ATS ${kit.atsScore}% · Fit ${kit?.jdMatchPct ?? '—'}%`;
+        return;
+      }
+      const ats = kit?.atsScore ?? 0;
+      const jd = kit?.jdMatchPct ?? 0;
+      if (attempt > 0 && ats <= lastAts && jd <= lastJd) break;
+      lastAts = ats;
+      lastJd = jd;
+    }
+    const kit = items.value.find((j) => j.jobId === job.jobId)?.kit;
+    polishMsg.value = `Best achieved: ATS ${kit?.atsScore ?? '—'}% — open Application kit to review or apply anyway once approved.`;
+  } catch (e) {
+    error.value = e.response?.data?.message || 'Polish until ready failed';
+  } finally {
+    polishing.value = '';
   }
 }
 
@@ -355,9 +468,18 @@ onMounted(() => {
           <button
             class="btn-primary px-4 py-2 text-sm"
             :disabled="applying"
-            @click="applyApproved"
+            @click="applyApproved()"
           >
-            {{ applying ? 'Applying…' : `Apply ${counts.approved} approved` }}
+            {{ applying ? 'Applying…' : (applyResumeMode === 'tailored' ? (status === 'approved' && approvedReadyCount ? `Apply ${approvedReadyCount} ready` : 'Apply ready jobs') : `Apply ${counts.approved} approved`) }}
+          </button>
+          <button
+            v-if="applyResumeMode === 'tailored'"
+            type="button"
+            class="btn-secondary px-4 py-2 text-sm"
+            :disabled="applying"
+            @click="applyApproved({ force: true })"
+          >
+            Apply anyway (all {{ counts.approved }})
           </button>
         </div>
       </div>
@@ -371,7 +493,7 @@ onMounted(() => {
     >
       <p class="font-medium text-amber-200">Before you submit</p>
       <p class="mt-1 text-xs text-amber-100/80">
-        Open <strong>Application kit</strong> on each role → <strong>ATS</strong> tab. Aim for ~95% keyword match.
+        Use <strong>Polish until ready</strong> on each role (targets 95% ATS). <strong>Apply</strong> unlocks when the kit is ready — or use <strong>Apply anyway</strong> if you have reviewed it.
         After applying, use <RouterLink to="/follow-ups" class="text-violet-300 hover:underline">Follow-ups</RouterLink> for recruiter drafts and day-5 reminders.
       </p>
     </div>
@@ -434,6 +556,7 @@ onMounted(() => {
     >
       {{ applyEmailNotice }}
     </p>
+    <p v-if="polishMsg" class="mt-4 rounded-lg bg-violet-500/10 px-3 py-2 text-sm text-violet-200">{{ polishMsg }}</p>
     <p v-if="queueBanner" class="mt-4 rounded-lg bg-sky-500/10 px-3 py-2 text-sm text-sky-200">{{ queueBanner }}</p>
 
     <div v-if="whisper.length && status === 'pending' && isAdmin" class="mt-6 card p-4">
@@ -486,6 +609,10 @@ onMounted(() => {
                   Gaps: {{ job.gaps.slice(0, 3).join(' · ') }}
                 </p>
                 <p v-if="job.source === 'chrome-extension'" class="mt-1 text-xs text-sky-400">Queued from browser (often LinkedIn)</p>
+                <div class="mt-2">
+                  <KitReadinessBadges :kit="job.kit" />
+                </div>
+                <MatchCopilotBrief :job-id="job.jobId" />
               </div>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -514,6 +641,33 @@ onMounted(() => {
             <button type="button" class="btn-secondary" @click="openKit(job)">
               {{ job.kit?.hasKit ? 'View tailored resume' : 'Application kit' }}
             </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              :disabled="polishing === job.jobId"
+              @click="polishUntilReady(job)"
+            >
+              {{ polishing === job.jobId ? 'Polishing…' : (job.kit?.hasKit ? 'Polish until ready' : 'Generate & polish') }}
+            </button>
+            <template v-if="job.status === 'approved' || status === 'approved'">
+              <button
+                type="button"
+                class="btn-primary"
+                :disabled="applying || !canApplyJob(job)"
+                @click="applyOneJob(job)"
+              >
+                Apply
+              </button>
+              <button
+                v-if="applyResumeMode === 'tailored' && !canApplyJob(job)"
+                type="button"
+                class="text-xs text-amber-300 underline min-h-[44px]"
+                :disabled="applying"
+                @click="applyOneJob(job, { force: true })"
+              >
+                Apply anyway
+              </button>
+            </template>
             <template v-if="status === 'pending' || job.status === 'pending'">
               <button class="btn-primary" :disabled="acting === job.jobId" @click="approve(job.jobId)">
                 Approve
