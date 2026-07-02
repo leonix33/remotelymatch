@@ -471,7 +471,11 @@ const APPLIED_STATUSES = new Set([
 ]);
 
 async function buildFollowUpBoard(userId, authEmail = '') {
-  await followUpScheduleService.processDueReminders(userId);
+  try {
+    await followUpScheduleService.processDueReminders(userId);
+  } catch (err) {
+    console.warn('follow-up reminders deferred:', err.message);
+  }
 
   const profile = await profileService.getOrCreate(userId);
   const apps = await applicationService.listForUser(userId, { limit: 500 });

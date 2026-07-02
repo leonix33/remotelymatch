@@ -21,7 +21,31 @@ function setEmitter(fn) {
   emitToUser = fn;
 }
 
-async function create(userId, payload) {
+async function hasRecentFollowUp(userId, jobId, withinMs = 14 * 86400000) {
+  if (!jobId) return false;
+  if (!env.mongoUri) {
+    return localNotificationStore
+      .list(userId)
+      .some(
+        (n) =>
+          n.type === 'follow_up' &&
+          String(n.meta?.jobId) === String(jobId) &&
+          new Date(n.createdAt) > new Date(Date.now() - withinMs)
+      );
+  }
+  requireMongo();
+  const found = await Notification.findOne({
+    userId,
+    type: 'follow_up',
+    'meta.jobId': String(jobId),
+    createdAt: { $gte: new Date(Date.now() - withinMs) },
+  })
+    .select('_id')
+    .lean();
+  return Boolean(found);
+}
+
+async function create(userId, payload, options = {}) {
   if (!env.mongoUri) {
     const n = localNotificationStore.create(userId, payload);
     emitToUser(userId.toString(), 'notification', n);
@@ -32,7 +56,7 @@ async function create(userId, payload) {
   emitToUser(userId.toString(), 'notification', n);
 
   try {
-    if (payload.type === 'high_match' && payload.meta?.jobId) {
+    if (!options.skipEmail && payload.type === 'high_match' && payload.meta?.jobId) {
       const parts = payload.title?.match(/(\d+)% match: (.+)/);
       await emailService.notifyHighMatch(userId, {
         matchPct: parts?.[1] || '',
@@ -40,7 +64,7 @@ async function create(userId, payload) {
         company: payload.body?.split(' — ')[0] || '',
       });
     }
-    if (payload.type === 'chat_request') {
+    if (!options.skipEmail && payload.type === 'chat_request') {
       await emailService.sendToUser(
         userId,
         payload.title,
@@ -52,14 +76,16 @@ async function create(userId, payload) {
     /* email optional */
   }
 
-  try {
-    await pushService.sendToUser(userId, {
-      title: payload.title || env.appName,
-      body: payload.body || '',
-      url: payload.link || '/',
-    });
-  } catch {
-    /* push optional */
+  if (!options.skipPush) {
+    try {
+      await pushService.sendToUser(userId, {
+        title: payload.title || env.appName,
+        body: payload.body || '',
+        url: payload.link || '/',
+      });
+    } catch {
+      /* push optional */
+    }
   }
 
   return n;
@@ -237,4 +263,4 @@ async function notifyApplyBatch(userId, { jobs = [], companies = [], queued = fa
   });
 }
 
-module.exports = { create, list, markRead, markAllRead, unreadCount, scanAndNotify, notifyApplyBatch, setEmitter };
+module.exports = { create, hasRecentFollowUp, list, markRead, markAllRead, unreadCount, scanAndNotify, notifyApplyBatch, setEmitter };
