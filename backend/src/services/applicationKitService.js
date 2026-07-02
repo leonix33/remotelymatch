@@ -3,7 +3,7 @@ const applicationService = require('./applicationService');
 const jobService = require('./jobService');
 const localApprovalService = require('./localApprovalService');
 const applicationKitStore = require('./applicationKitStore');
-const { buildKitSummary } = require('./kitReadinessService');
+const { buildKitSummary, isKitReadyToApply, READY_ATS_MIN } = require('./kitReadinessService');
 const jobDescriptionService = require('./jobDescriptionService');
 const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
@@ -146,6 +146,114 @@ async function generateForJob(userId, jobId, options = {}) {
     tailorMode,
     highMatchTarget,
   });
+}
+
+async function polishUntilReady(userId, jobId, options = {}) {
+  const { authEmail, tailorFocus: initialFocus } = options;
+  const profile = await profileService.getOrCreate(userId);
+  const highMatchTarget = options.highMatchTarget ?? profile.highMatchTarget ?? 100;
+  const supplementPages = resumeTailorService.clampPageCount(
+    options.supplementPages ?? profile.defaultSupplementPages ?? 3
+  );
+  const maxRounds = Math.min(5, Math.max(1, Number(options.maxRounds) || 3));
+
+  const job = options.job || (await findJob(userId, jobId));
+  if (!job) {
+    const err = new Error('Job not found');
+    err.status = 404;
+    throw err;
+  }
+
+  let kit = await applicationKitStore.get(userId, jobId);
+  const passes = [];
+
+  if (!kit?.tailored) {
+    kit = await generateForJob(userId, jobId, {
+      tailorResume: true,
+      force: true,
+      authEmail,
+      highMatchTarget,
+      supplementPages,
+      tailorMode: 'high_match',
+      tailorFocus: initialFocus || '',
+      job,
+    });
+    passes.push({ round: 0, phase: 'generate', atsScore: kit.atsScore ?? null, jdMatchPct: kit.jdMatchPct ?? null });
+    if (isKitReadyToApply({ tailored: true, hasKit: true, atsScore: kit.atsScore, useForApply: kit.useForApply !== false })) {
+      return { kit, passes, ready: true };
+    }
+  }
+
+  const jobDescription = await jobDescriptionService.resolveJobDescription(job);
+  const contact = await applicantContactService.resolveApplicantContact(userId, profile, authEmail);
+  let tailorFocus = initialFocus || kit.tailorFocus || '';
+  let lastAts = kit.atsScore ?? 0;
+  let plateau = 0;
+
+  for (let round = 1; round <= maxRounds; round += 1) {
+    const { getRedTerms } = require('./atsKeywordService');
+    const scored = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
+    const focusParts = [
+      ...(scored.uncoveredRequirements || []),
+      ...getRedTerms(scored, 12),
+    ].filter(Boolean);
+    if (focusParts.length) tailorFocus = focusParts.slice(0, 12).join(', ');
+
+    const polished = await resumeTailorService.polishExistingKit({
+      userId,
+      profile,
+      job,
+      jobDescription,
+      contact,
+      kit: scored,
+      tailorFocus,
+      highMatchTarget,
+      maxPasses: 8,
+    });
+
+    kit = await applicationKitStore.set(userId, jobId, {
+      ...polished,
+      jobId,
+      jobTitle: job.title,
+      company: job.company,
+      jobUrl: job.url,
+      formatted: resumeTailorService.formatKitAsText(polished),
+      generatedAt: new Date().toISOString(),
+      useForApply: kit.useForApply !== false,
+      tailorFocus,
+      supplementPagesTarget: supplementPages,
+      tailorMode: 'high_match',
+      highMatchTarget,
+    });
+
+    passes.push({ round, phase: 'refine', atsScore: kit.atsScore ?? null, jdMatchPct: kit.jdMatchPct ?? null });
+
+    const ready = isKitReadyToApply({
+      tailored: true,
+      hasKit: true,
+      atsScore: kit.atsScore,
+      useForApply: kit.useForApply !== false,
+    });
+    if (ready) return { kit, passes, ready: true };
+
+    const ats = kit.atsScore ?? 0;
+    if (ats <= lastAts) plateau += 1;
+    else plateau = 0;
+    if (plateau >= 2 && ats >= READY_ATS_MIN) break;
+    if (plateau >= 2) break;
+    lastAts = ats;
+  }
+
+  return {
+    kit,
+    passes,
+    ready: isKitReadyToApply({
+      tailored: true,
+      hasKit: true,
+      atsScore: kit.atsScore,
+      useForApply: kit.useForApply !== false,
+    }),
+  };
 }
 
 async function generateOnApprove(userId, jobId, tailorResume, options = {}) {
@@ -408,6 +516,7 @@ async function getKitsForJobIds(userId, jobIds = []) {
 module.exports = {
   getKit,
   generateForJob,
+  polishUntilReady,
   generateOnApprove,
   attachKitToApplyItem,
   prepareApplyItems,

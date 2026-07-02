@@ -61,6 +61,21 @@ async function generateKit(req, res, next) {
   }
 }
 
+async function polishKit(req, res, next) {
+  try {
+    const result = await applicationKitService.polishUntilReady(req.user.sub, req.params.jobId, {
+      authEmail: req.user.email,
+      highMatchTarget: req.body?.highMatchTarget,
+      supplementPages: req.body?.supplementPages,
+      tailorFocus: req.body?.tailorFocus || '',
+      maxRounds: req.body?.maxRounds,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function atsScore(req, res, next) {
   try {
     const jobId = req.params.jobId;
@@ -81,4 +96,4 @@ async function atsScore(req, res, next) {
   }
 }
 
-module.exports = { listKits, getKit, generateKit, updatePreference, atsScore };
+module.exports = { listKits, getKit, generateKit, polishKit, updatePreference, atsScore };

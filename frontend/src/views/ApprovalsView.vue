@@ -13,8 +13,6 @@ import {
   summaryFromKitPayload,
   READY_ATS_TARGET,
   READY_ATS_MIN,
-  buildTailorFocus,
-  shouldStopPolish,
 } from '../utils/kitReadiness';
 import { useProfileStore } from '../stores/profile';
 import { useAuthStore } from '../stores/auth';
@@ -54,7 +52,6 @@ const selected = ref(new Set());
 const polishing = ref('');
 const polishMsg = ref('');
 const applyAnywayIds = ref(new Set());
-const MAX_POLISH_PASSES = 8;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 const allSelected = computed(
@@ -222,41 +219,23 @@ async function polishUntilReady(job) {
   polishMsg.value = '';
   error.value = '';
   const profile = profileStore.profile || {};
-  let lastAts = -1;
-  let lastJd = -1;
-  let plateauCount = 0;
-  let tailorFocus = job.kit?.tailorFocus || '';
   try {
-    for (let attempt = 0; attempt < MAX_POLISH_PASSES; attempt += 1) {
-      const { data } = await http.post(`/applications/kit/${encodeURIComponent(job.jobId)}/generate`, {
-        tailorResume: true,
-        force: true,
-        tailorMode: 'high_match',
-        supplementPages: profile.defaultSupplementPages || 3,
-        highMatchTarget: READY_ATS_TARGET,
-        tailorFocus,
-      });
-      patchJobKit(job.jobId, data);
-      const kit = items.value.find((j) => j.jobId === job.jobId)?.kit;
-      polishMsg.value = `Pass ${attempt + 1}: ATS ${kit?.atsScore ?? '—'}% · Fit ${kit?.jdMatchPct ?? '—'}% (target ${READY_ATS_TARGET}%, min ${READY_ATS_MIN}%)`;
-      const ats = kit?.atsScore ?? 0;
-      const jd = kit?.jdMatchPct ?? 0;
-      if (isKitReadyToApply(kit)) {
-        polishMsg.value = `Ready to apply — ATS ${kit.atsScore}% · Fit ${kit?.jdMatchPct ?? '—'}%`;
-        return;
-      }
-      tailorFocus = buildTailorFocus(data, tailorFocus);
-      if (attempt > 0 && ats <= lastAts && jd <= lastJd) {
-        plateauCount += 1;
-      } else {
-        plateauCount = 0;
-      }
-      if (shouldStopPolish({ ats, jd, lastAts, lastJd, attempt, plateauCount })) break;
-      lastAts = ats;
-      lastJd = jd;
-    }
+    polishMsg.value = `Polishing on server (target ${READY_ATS_TARGET}%, min ${READY_ATS_MIN}%)…`;
+    const { data } = await http.post(`/applications/kit/${encodeURIComponent(job.jobId)}/polish`, {
+      highMatchTarget: READY_ATS_TARGET,
+      supplementPages: profile.defaultSupplementPages || 3,
+    }, { timeout: 300000 });
+    patchJobKit(job.jobId, data.kit);
     const kit = items.value.find((j) => j.jobId === job.jobId)?.kit;
-    polishMsg.value = `Best achieved: ATS ${kit?.atsScore ?? '—'}% — need ${READY_ATS_MIN}%+ to apply with tailored resume.`;
+    const last = data.passes?.[data.passes.length - 1];
+    const passLine = data.passes?.length
+      ? `ATS ${last?.atsScore ?? kit?.atsScore ?? '—'}% · Fit ${last?.jdMatchPct ?? kit?.jdMatchPct ?? '—'}% after ${data.passes.length} step(s)`
+      : `ATS ${kit?.atsScore ?? '—'}%`;
+    if (data.ready || isKitReadyToApply(kit)) {
+      polishMsg.value = `Ready to apply — ${passLine}`;
+      return;
+    }
+    polishMsg.value = `Best achieved: ${passLine} — need ${READY_ATS_MIN}%+ to apply with tailored resume.`;
   } catch (e) {
     error.value = e.response?.data?.message || 'Polish until ready failed';
   } finally {

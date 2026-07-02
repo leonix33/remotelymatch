@@ -421,7 +421,7 @@ async function perfectKitForJob({
   const structure = parseResumeStructure(profile?.resumeText || '');
   let result = applyAtsMetadata(kit, jobDescription, job);
   const threshold = options.highMatchTarget || 100;
-  const maxPasses = 6;
+  const maxPasses = options.maxPasses || 6;
 
   for (let pass = 0; pass < maxPasses; pass += 1) {
     const needsAts = !result.atsReady || (result.atsScore ?? 0) < threshold;
@@ -575,6 +575,41 @@ function enrichKitForDisplay(kit) {
   if (!raw.trim()) return kit;
   const pageTarget = clampPageCount(kit.supplementPagesTarget || kit.pageCount || DEFAULT_SUPPLEMENT_PAGES);
   return finalizeNormalizedKit({ ...kit, tailoredResumeText: raw }, pageTarget);
+}
+
+async function polishExistingKit({
+  userId,
+  profile,
+  job,
+  jobDescription,
+  contact = {},
+  kit,
+  tailorFocus = '',
+  highMatchTarget = 100,
+  maxPasses = 8,
+  tailorMode = 'high_match',
+}) {
+  if (!kit?.tailored && !kit?.tailoredResumeText) return kit;
+  const client = userId ? await getClient(userId) : null;
+  if (!client) return kit;
+
+  const pageTarget = inferResumePageTarget(profile?.resumeText, kit.supplementPagesTarget || kit.pageCount);
+  const options = { supplementPages: pageTarget, tailorMode, highMatchTarget, maxPasses };
+  const missingKeywords = kit.missingKeywords || inferMissingKeywords(profile, jobDescription);
+  const fullJd = String(jobDescription || '').slice(0, 14000);
+  const working = applyAtsMetadata(enrichKitForDisplay(kit), fullJd, job);
+
+  return perfectKitForJob({
+    client,
+    kit: working,
+    profile,
+    job,
+    jobDescription: fullJd,
+    contact,
+    options,
+    missingKeywords,
+    tailorFocus,
+  });
 }
 
 async function generateAdditiveKit({
@@ -749,6 +784,7 @@ module.exports = {
   finalizeNormalizedKit,
   applyAtsMetadata,
   perfectKitForJob,
+  polishExistingKit,
   TECH_KEYWORDS,
   extractJdRequirements,
   MIN_SUPPLEMENT_PAGES,
