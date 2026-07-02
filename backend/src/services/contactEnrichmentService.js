@@ -2,6 +2,7 @@ const env = require('../config/env');
 const profileService = require('./profileService');
 const { decryptApiKey } = require('./openaiKeyCrypto');
 const recruiterContactService = require('./recruiterContactService');
+const { rankContacts, resolveEnrichmentDomain } = require('./contactRankingService');
 
 async function resolveHunterKey(userId) {
   if (env.hunterApiKey) return env.hunterApiKey;
@@ -147,7 +148,10 @@ async function apolloPeopleSearch(company, domain, apiKey) {
 
 async function enrichContacts({ userId, job = {}, jobDescription = '', baseContacts = null } = {}) {
   const base = baseContacts || recruiterContactService.discoverContacts({ job, jobDescription });
-  const domain = base.companyDomain || recruiterContactService.domainFromUrl(job.url || job.applyUrl || job.jobUrl);
+  const domain =
+    resolveEnrichmentDomain(job) ||
+    base.companyDomain ||
+    recruiterContactService.domainFromUrl(job.url || job.applyUrl || job.jobUrl);
   const hunterKey = await resolveHunterKey(userId);
   const apolloKey = await resolveApolloKey(userId);
 
@@ -197,13 +201,10 @@ async function enrichContacts({ userId, job = {}, jobDescription = '', baseConta
     }
   }
 
-  const seen = new Set();
-  enriched.verifiedContacts = enriched.verifiedContacts.filter((c) => {
-    const key = (c.email || c.name || '').toLowerCase();
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  enriched.companyDomain = domain || enriched.companyDomain || null;
+  enriched.verifiedContacts = rankContacts(enriched.verifiedContacts);
+  enriched.recommendedContacts = enriched.verifiedContacts.filter((c) => c.recommended && c.email);
+  enriched.otherContacts = enriched.verifiedContacts.filter((c) => c.email && !c.recommended);
 
   return enriched;
 }

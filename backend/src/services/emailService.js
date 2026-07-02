@@ -207,16 +207,21 @@ async function getEmailDiagnostics() {
   };
 }
 
-async function sendViaGmail({ to, subject, html, text }) {
+async function sendViaGmail({ to, subject, html, text, replyTo, attachments = [] }) {
   const transport = getGmailTransport();
   if (!transport) return { sent: false, reason: 'Gmail SMTP not configured', provider: 'gmail' };
   try {
     const info = await transport.sendMail({
       from: `"${env.appName}" <${env.gmailSmtpUser}>`,
       to,
+      replyTo: replyTo || undefined,
       subject,
       html,
       text: text || undefined,
+      attachments: attachments.map((a) => ({
+        filename: a.filename,
+        content: Buffer.from(a.content, 'base64'),
+      })),
     });
     return { sent: true, id: info.messageId || null, provider: 'gmail' };
   } catch (err) {
@@ -225,7 +230,7 @@ async function sendViaGmail({ to, subject, html, text }) {
   }
 }
 
-async function sendViaResend({ to, subject, html, text }) {
+async function sendViaResend({ to, subject, html, text, replyTo, attachments = [] }) {
   if (!hasResend()) return { sent: false, reason: 'Resend not configured', provider: 'resend' };
 
   const payload = {
@@ -235,6 +240,13 @@ async function sendViaResend({ to, subject, html, text }) {
     html,
   };
   if (text) payload.text = text;
+  if (replyTo) payload.reply_to = replyTo;
+  if (attachments.length) {
+    payload.attachments = attachments.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+    }));
+  }
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -262,7 +274,7 @@ async function sendViaResend({ to, subject, html, text }) {
   return { sent: true, id, provider: 'resend' };
 }
 
-async function sendEmail({ to, subject, html, text }) {
+async function sendEmail({ to, subject, html, text, replyTo, attachments = [] }) {
   if (!to) return { sent: false, reason: 'No recipient email' };
   if (!isEmailConfigured()) {
     return {
@@ -277,7 +289,7 @@ async function sendEmail({ to, subject, html, text }) {
 
   const errors = [];
   for (const attempt of attempts) {
-    const result = await attempt({ to, subject, html, text });
+    const result = await attempt({ to, subject, html, text, replyTo, attachments });
     if (result.sent) return result;
     errors.push(`${result.provider}: ${result.reason}`);
   }

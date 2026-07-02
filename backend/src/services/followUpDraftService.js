@@ -6,27 +6,19 @@ const recruiterContactService = require('./recruiterContactService');
 const contactEnrichmentService = require('./contactEnrichmentService');
 const followUpKitStore = require('./followUpKitStore');
 const jobService = require('./jobService');
+const { pickBestRecipient } = require('./contactRankingService');
 
 function firstName(name = '') {
   return String(name || '').trim().split(/\s+/)[0] || 'there';
 }
 
 function pickRecipient(contacts = {}) {
-  const verified = (contacts.verifiedContacts || []).find((c) => c.email && c.verified);
-  if (verified?.email) {
-    return { email: verified.email, name: verified.name || '', source: verified.source, phone: verified.phone || '' };
-  }
-  const anyVerified = (contacts.verifiedContacts || []).find((c) => c.email);
-  if (anyVerified?.email) {
-    return { email: anyVerified.email, name: anyVerified.name || '', source: anyVerified.source, phone: anyVerified.phone || '' };
-  }
-  const fromJd = (contacts.emails || []).find((e) => e.confidence === 'high');
-  if (fromJd?.email) return { email: fromJd.email, name: fromJd.name || '', source: 'job_posting' };
-  const person = (contacts.people || [])[0];
-  if (person?.name) return { email: '', name: person.name, source: 'job_posting_name' };
-  const guessed = (contacts.guessedEmails || [])[0];
-  if (guessed?.email) return { email: guessed.email, name: '', source: 'guessed_inbox' };
-  return { email: '', name: '', source: 'linkedin_search' };
+  const pool = [
+    ...(contacts.recommendedContacts || []),
+    ...(contacts.verifiedContacts || []),
+    ...(contacts.emails || []),
+  ];
+  return pickBestRecipient(pool);
 }
 
 function buildEmailDraft({ contact, job, kit, recipient, daysSinceApply = 5 }) {
@@ -138,7 +130,11 @@ async function generateFollowUpKit(userId, jobId, options = {}) {
     keywordsAddressed: (kit?.missingKeywords || []).slice(0, 12),
     companyPhone: contacts.companyPhone || null,
     recipient,
-    contacts,
+    contacts: {
+      ...contacts,
+      recommendedContacts: contacts.recommendedContacts || [],
+      otherContacts: contacts.otherContacts || [],
+    },
     emailSubject: emailDraft.subject,
     emailBody: emailDraft.body,
     emailTo: emailDraft.to,

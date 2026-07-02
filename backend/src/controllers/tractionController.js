@@ -1,6 +1,7 @@
 const tractionService = require('../services/tractionService');
 const contactEnrichmentService = require('../services/contactEnrichmentService');
 const followUpDraftService = require('../services/followUpDraftService');
+const followUpSendService = require('../services/followUpSendService');
 
 async function trace(req, res, next) {
   try {
@@ -80,6 +81,23 @@ async function enrichFollowUp(req, res, next) {
   }
 }
 
+async function sendFollowUp(req, res, next) {
+  try {
+    const { recipientEmail, recipientName } = req.body || {};
+    const result = await followUpSendService.sendFollowUpOutreach(req.user.sub, req.params.jobId, {
+      authEmail: req.user.email,
+      recipientEmail: recipientEmail ? String(recipientEmail).trim() : '',
+      recipientName: recipientName ? String(recipientName).trim() : '',
+    });
+    res.json(result);
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    next(err);
+  }
+}
+
 async function enrichmentTest(req, res, next) {
   try {
     const domain = String(req.body?.domain || req.query?.domain || 'stripe.com').trim();
@@ -91,4 +109,4 @@ async function enrichmentTest(req, res, next) {
   }
 }
 
-module.exports = { trace, previewDigest, sendDigest, scan, markDone, followUpKit, followUpBoard, enrichFollowUp, enrichmentTest };
+module.exports = { trace, previewDigest, sendDigest, scan, markDone, followUpKit, followUpBoard, enrichFollowUp, sendFollowUp, enrichmentTest };

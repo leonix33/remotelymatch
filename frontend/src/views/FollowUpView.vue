@@ -26,6 +26,7 @@ const enriching = ref('');
 const generating = ref('');
 const polishing = ref('');
 const reapplying = ref('');
+const sending = ref('');
 const kitErrors = ref({});
 const polishMsgs = ref({});
 const actionMsgs = ref({});
@@ -250,6 +251,29 @@ async function reapplyJob(job) {
   }
 }
 
+async function sendFollowUp(job, contact = null) {
+  const jobId = job.jobId;
+  sending.value = jobId;
+  clearJobMsg(jobId);
+  try {
+    const { data } = await http.post(`/traction/follow-up/${encodeURIComponent(jobId)}/send`, {
+      recipientEmail: contact?.email || undefined,
+      recipientName: contact?.name || undefined,
+    });
+    actionMsgs.value = {
+      ...actionMsgs.value,
+      [jobId]: `Sent to ${data.to} · replies to ${data.replyTo} · attached ${(data.attachments || []).join(', ')}`,
+    };
+  } catch (e) {
+    kitErrors.value = {
+      ...kitErrors.value,
+      [jobId]: e.response?.data?.message || 'Could not send follow-up email',
+    };
+  } finally {
+    sending.value = '';
+  }
+}
+
 async function enrichContacts(job) {
   enriching.value = job.jobId;
   try {
@@ -436,6 +460,7 @@ onMounted(() => {
         :generating="generating === job.jobId"
         :polishing="polishing === job.jobId"
         :reapplying="reapplying === job.jobId"
+        :sending="sending === job.jobId"
         :kit-error="kitErrors[job.jobId] || ''"
         :polish-msg="polishMsgs[job.jobId] || ''"
         :action-msg="actionMsgs[job.jobId] || ''"
@@ -447,6 +472,7 @@ onMounted(() => {
         @generate="generateKit"
         @polish="polishKit"
         @reapply="reapplyJob"
+        @send-follow-up="sendFollowUp"
       />
 
       <div v-if="hasMoreJobs" class="text-center">

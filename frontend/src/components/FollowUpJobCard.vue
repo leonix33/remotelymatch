@@ -10,6 +10,7 @@ const props = defineProps({
   generating: { type: Boolean, default: false },
   polishing: { type: Boolean, default: false },
   reapplying: { type: Boolean, default: false },
+  sending: { type: Boolean, default: false },
   kitError: { type: String, default: '' },
   polishMsg: { type: String, default: '' },
   actionMsg: { type: String, default: '' },
@@ -24,7 +25,18 @@ const emit = defineEmits([
   'generate',
   'polish',
   'reapply',
+  'send-follow-up',
 ]);
+
+const recommendedContacts = (job) =>
+  job.followUpKit?.contacts?.recommendedContacts?.length
+    ? job.followUpKit.contacts.recommendedContacts
+    : (job.followUpKit?.contacts?.verifiedContacts || []).filter((c) => c.recommended && c.email);
+
+const otherContacts = (job) =>
+  job.followUpKit?.contacts?.otherContacts?.length
+    ? job.followUpKit.contacts.otherContacts
+    : (job.followUpKit?.contacts?.verifiedContacts || []).filter((c) => c.email && !c.recommended);
 
 const canReapply = (job) => isKitReadyToApply(job.kit);
 
@@ -137,14 +149,12 @@ function formatDate(iso) {
         </section>
 
         <section class="follow-up-section">
-          <h4 class="follow-up-section__title">Contacts</h4>
-          <p v-if="job.followUpKit.companyPhone" class="mt-2 text-sm text-slate-300">
-            Company:
-            <a :href="`tel:${job.followUpKit.companyPhone}`" class="text-teal-300 hover:underline">{{ job.followUpKit.companyPhone }}</a>
+          <h4 class="follow-up-section__title">Trusted contacts</h4>
+          <p class="mt-1 text-xs text-slate-500">
+            Apollo + Hunter ranked by verified recruiter fit. Send one follow-up per person — includes cover letter + resume attachments.
           </p>
-          <p v-if="job.followUpKit.applicantPhone" class="mt-1 text-sm text-slate-400">
-            Your number:
-            <a :href="`tel:${job.followUpKit.applicantPhone}`" class="text-teal-300 hover:underline">{{ job.followUpKit.applicantPhone }}</a>
+          <p v-if="job.followUpKit.applicantEmail" class="mt-2 text-xs text-slate-400">
+            Replies go to: <span class="text-teal-300">{{ job.followUpKit.applicantEmail }}</span>
           </p>
           <ul v-if="job.followUpKit.contacts?.enrichmentProviders?.length" class="mt-2 flex flex-wrap gap-1">
             <li
@@ -152,52 +162,79 @@ function formatDate(iso) {
               :key="provider"
               class="badge badge-teal text-[10px] capitalize"
             >
-              {{ provider }} verified
+              {{ provider }}
             </li>
           </ul>
-          <ul class="mt-3 space-y-2 text-sm">
+          <ul v-if="recommendedContacts(job).length" class="mt-3 space-y-2 text-sm">
             <li
-              v-for="(c, i) in job.followUpKit.contacts?.verifiedContacts || []"
-              :key="`v-${i}`"
-              class="rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2"
+              v-for="(c, i) in recommendedContacts(job)"
+              :key="`rec-${i}`"
+              class="rounded-lg border border-teal-900/50 bg-teal-950/25 px-3 py-3"
             >
-              <p class="font-medium text-slate-200">{{ c.name || 'Contact' }}</p>
-              <p class="text-xs text-slate-400">{{ c.role }} · {{ c.source }}</p>
-              <p v-if="c.email" class="mt-1 text-teal-300">{{ c.email }}</p>
-              <p v-if="c.phone" class="text-xs text-slate-400">{{ c.phone }}</p>
-              <span v-if="c.verified" class="mt-1 inline-block text-xs text-teal-400">Verified</span>
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p class="font-medium text-slate-100">{{ c.name || 'Contact' }}</p>
+                  <p class="text-xs text-slate-400">{{ c.role }} · {{ c.source }}</p>
+                  <p v-if="c.email" class="mt-1 text-teal-300">{{ c.email }}</p>
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    <span v-if="c.recommended" class="badge badge-teal text-[10px]">Recommended</span>
+                    <span v-if="c.verified" class="badge badge-teal text-[10px]">Verified</span>
+                    <span v-if="c.trustScore != null" class="text-[10px] text-slate-500">Trust {{ c.trustScore }}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="btn-primary text-xs shrink-0"
+                  :disabled="sending || !c.email"
+                  @click.stop="emit('send-follow-up', job, c)"
+                >
+                  {{ sending ? 'Sending…' : 'Send follow-up' }}
+                </button>
+              </div>
             </li>
-            <li
-              v-for="(e, i) in job.followUpKit.contacts?.emails || []"
-              :key="`e-${i}`"
-              class="text-slate-300"
-            >{{ e.email }} <span class="text-slate-500">({{ e.role }})</span></li>
           </ul>
+          <p v-else class="mt-3 text-sm text-amber-200/80">No trusted recruiter emails yet — refresh contacts.</p>
+          <details v-if="otherContacts(job).length" class="mt-4">
+            <summary class="cursor-pointer text-xs text-slate-500">Other inboxes ({{ otherContacts(job).length }})</summary>
+            <ul class="mt-2 space-y-2 text-sm">
+              <li
+                v-for="(c, i) in otherContacts(job)"
+                :key="`other-${i}`"
+                class="rounded-lg border border-slate-800 px-3 py-2"
+              >
+                <p class="font-medium text-slate-300">{{ c.name || c.email }}</p>
+                <p class="text-xs text-slate-500">{{ c.role }}</p>
+                <button
+                  type="button"
+                  class="btn-secondary mt-2 text-xs"
+                  :disabled="sending"
+                  @click.stop="emit('send-follow-up', job, c)"
+                >
+                  Send anyway
+                </button>
+              </li>
+            </ul>
+          </details>
           <div class="mt-3 flex flex-wrap gap-2">
-            <a
-              v-if="job.followUpKit.contacts?.linkedInSearchUrl"
-              :href="job.followUpKit.contacts.linkedInSearchUrl"
-              target="_blank"
-              rel="noopener"
-              class="btn-secondary text-xs"
-              @click.stop
-            >Find on LinkedIn</a>
-            <button type="button" class="btn-secondary text-xs" @click.stop="emit('enrich', job)">Refresh contacts (Hunter/Apollo)</button>
+            <button
+              type="button"
+              class="btn-primary text-xs"
+              :disabled="sending || !recommendedContacts(job).length"
+              @click.stop="emit('send-follow-up', job)"
+            >
+              {{ sending ? 'Sending…' : 'Send to best contact' }}
+            </button>
+            <button type="button" class="btn-secondary text-xs" @click.stop="emit('enrich', job)">Refresh contacts</button>
           </div>
         </section>
 
         <section class="follow-up-section">
           <h4 class="follow-up-section__title">Pre-drafted follow-up email</h4>
-          <p class="mt-1 text-xs text-slate-500">To: {{ job.followUpKit.emailTo || job.followUpKit.recipient?.email || 'Find contact above' }}</p>
+          <p class="mt-1 text-xs text-slate-500">To: {{ job.followUpKit.emailTo || job.followUpKit.recipient?.email || 'Best verified contact' }}</p>
           <p class="text-xs font-medium text-slate-400">Subject: {{ job.followUpKit.emailSubject }}</p>
+          <p class="mt-2 text-xs text-slate-500">Attachments: tailored resume + cover letter (.txt)</p>
           <pre class="follow-up-draft mt-3">{{ job.followUpKit.emailBody }}</pre>
           <div class="mt-3 flex flex-wrap gap-2">
-            <a
-              v-if="job.followUpKit.emailTo || job.followUpKit.recipient?.email"
-              :href="mailtoLink(job.followUpKit)"
-              class="btn-primary text-xs"
-              @click.stop
-            >Send email</a>
             <button type="button" class="btn-secondary text-xs" @click.stop="emit('copy', job.followUpKit.emailBody, 'email')">
               {{ copied === 'email' ? 'Copied' : 'Copy email' }}
             </button>
