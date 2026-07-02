@@ -107,6 +107,14 @@ Default login (from `.env`):
    - `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (long random strings)
    - `ADMIN_EMAIL` / `ADMIN_PASSWORD`
    - `OPENAI_API_KEY` (optional)
+   - Or use **HashiCorp Vault** (open source, self-hosted):
+     - `SECRETS_PROVIDER=hashicorp-vault`
+     - `VAULT_ADDR=https://vault.example.com`
+     - `VAULT_TOKEN=<app-token>`
+     - `VAULT_SECRET_PATH=remotelymatch`
+   - Or **Azure Key Vault**:
+     - `SECRETS_PROVIDER=azure-key-vault`
+     - `AZURE_KEY_VAULT_URL=https://<your-vault>.vault.azure.net/`
 6. Deploy — first build takes ~5 minutes
 7. Open **https://remotematch.onrender.com** and log in
 
@@ -136,6 +144,53 @@ docker run --env-file backend/.env -p 5100:5100 remotelymatch
 | `OPENAI_API_KEY` | Cover letter generation |
 | `AGENT_HOME` | Path to job-event-agent folder |
 | `CLIENT_ORIGIN` | CORS origin (Render URL in production) |
+| `SECRETS_PROVIDER` | `env` (default), `hashicorp-vault`, or `azure-key-vault` |
+| `VAULT_ADDR` | HashiCorp Vault URL (open source) |
+| `VAULT_TOKEN` | Vault token with read access to app secrets |
+| `VAULT_SECRET_PATH` | KV path holding all app secrets (default `remotelymatch`) |
+| `AZURE_KEY_VAULT_URL` | Azure vault URL (optional alternative) |
+
+### Key vault (open source — recommended)
+
+Use **HashiCorp Vault** (or [OpenBao](https://openbao.org/), the open-source fork) to keep API keys out of Render env vars.
+
+1. Run Vault (dev example):
+   ```bash
+   docker run --cap-add=IPC_LOCK -e VAULT_DEV_ROOT_TOKEN_ID=dev-token -p 8200:8200 hashicorp/vault server -dev
+   ```
+2. Enable KV v2 and write one secret object:
+   ```bash
+   export VAULT_ADDR=http://127.0.0.1:8200
+   export VAULT_TOKEN=dev-token
+   vault kv put secret/remotelymatch \
+     OPENAI_API_KEY=sk-... \
+     APOLLO_API_KEY=... \
+     HUNTER_API_KEY=... \
+     RESEND_API_KEY=...
+   ```
+3. Set on Render:
+   - `SECRETS_PROVIDER=hashicorp-vault`
+   - `VAULT_ADDR=https://your-vault-host`
+   - `VAULT_TOKEN=<least-privilege-token>`
+   - `VAULT_SECRET_PATH=remotelymatch`
+
+The backend loads vault secrets at startup before reading config. Existing env vars win if already set (handy for local dev).
+
+### Azure Key Vault (optional)
+
+The backend can hydrate secrets from Azure Key Vault before app boot.
+
+1. Create secrets in Azure Key Vault (defaults use env names lowercased with `-`, e.g. `openai-api-key`, `apollo-api-key`, `hunter-api-key`).
+2. Grant your runtime identity access to `get` secrets.
+3. Set:
+   - `SECRETS_PROVIDER=azure-key-vault`
+   - `AZURE_KEY_VAULT_URL=https://<your-vault>.vault.azure.net/`
+4. Keep local `.env` values blank for keys managed in vault.
+
+If a vault secret has a different name, map it with:
+- `AZURE_KV_OPENAI_API_KEY_NAME`
+- `AZURE_KV_APOLLO_API_KEY_NAME`
+- `AZURE_KV_HUNTER_API_KEY_NAME`
 
 ## Ports
 

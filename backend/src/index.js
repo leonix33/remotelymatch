@@ -1,18 +1,9 @@
 const http = require('http');
 const { Server } = require('socket.io');
 const bcrypt = require('bcryptjs');
-const connectDb = require('./config/db');
-const env = require('./config/env');
-const createApp = require('./app');
-const User = require('./models/User');
-const jobService = require('./services/jobService');
-const { initSocket } = require('./socket');
-const conferenceService = require('./services/conferenceService');
-const { startReminderCron } = require('./services/reminderService');
-const { startWeeklyPulseCron } = require('./services/weeklyPulseService');
-const teamService = require('./services/teamService');
+const { loadKeyVaultSecrets } = require('./config/keyVault');
 
-async function ensureAdmin() {
+async function ensureAdmin({ env, User, teamService }) {
   if (!env.mongoUri) return;
   if (!env.adminEmail || !env.adminPassword) return;
   const email = env.adminEmail.toLowerCase();
@@ -37,9 +28,9 @@ async function ensureAdmin() {
   console.log('Admin user created');
 }
 
-async function bootstrapData() {
+async function bootstrapData({ env, conferenceService, jobService, User, teamService }) {
   if (!env.mongoUri) return;
-  await ensureAdmin();
+  await ensureAdmin({ env, User, teamService });
   try {
     const synced = await jobService.syncJobsToMongo();
     console.log(`Synced ${synced} jobs from agent SQLite`);
@@ -50,6 +41,24 @@ async function bootstrapData() {
 }
 
 async function start() {
+  const secretLoad = await loadKeyVaultSecrets();
+  if (secretLoad.provider && secretLoad.provider !== 'env') {
+    console.log(
+      `Secrets loaded from ${secretLoad.provider}: ${secretLoad.loaded}`
+    );
+  }
+
+  const connectDb = require('./config/db');
+  const env = require('./config/env');
+  const createApp = require('./app');
+  const User = require('./models/User');
+  const jobService = require('./services/jobService');
+  const { initSocket } = require('./socket');
+  const conferenceService = require('./services/conferenceService');
+  const { startReminderCron } = require('./services/reminderService');
+  const { startWeeklyPulseCron } = require('./services/weeklyPulseService');
+  const teamService = require('./services/teamService');
+
   if (env.mongoUri) {
     await connectDb();
   } else {
@@ -68,7 +77,7 @@ async function start() {
     console.log(`${env.appName} running on port ${env.port} (HTTP + WebSocket)`);
     startReminderCron();
     startWeeklyPulseCron();
-    bootstrapData().catch((err) => {
+    bootstrapData({ env, conferenceService, jobService, User, teamService }).catch((err) => {
       console.warn('Background bootstrap failed:', err.message);
     });
   });
