@@ -4,10 +4,11 @@ const { isKitReadyToApply, buildKitSummary } = require('../services/kitReadiness
 
 test('isKitReadyToApply accepts ATS 95+', () => {
   assert.equal(isKitReadyToApply({ tailored: true, atsScore: 95, jdMatchPct: 50 }), true);
+  assert.equal(isKitReadyToApply({ tailored: true, atsScore: 100, jdMatchPct: 50 }), true);
 });
 
-test('isKitReadyToApply accepts recruiterReady', () => {
-  assert.equal(isKitReadyToApply({ tailored: true, atsScore: 86, recruiterReady: true }), true);
+test('isKitReadyToApply rejects recruiterReady below 95 ATS', () => {
+  assert.equal(isKitReadyToApply({ tailored: true, atsScore: 86, recruiterReady: true }), false);
 });
 
 test('isKitReadyToApply rejects low ATS without kit', () => {

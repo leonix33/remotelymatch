@@ -98,7 +98,7 @@ async function generateForJob(userId, jobId, options = {}) {
     options.tailorMode === 'high_match' || options.tailorMode === 'balanced'
       ? options.tailorMode
       : existing?.tailorMode || profile.defaultTailorMode || 'high_match';
-  const highMatchTarget = options.highMatchTarget ?? existing?.highMatchTarget ?? profile.highMatchTarget ?? 95;
+  const highMatchTarget = options.highMatchTarget ?? existing?.highMatchTarget ?? profile.highMatchTarget ?? 100;
 
   if (!(profile?.resumeText || '').trim() || profile.resumeText.trim().length < 50) {
     const err = new Error('Add your resume in Profile before generating a tailored application kit.');
@@ -340,7 +340,7 @@ function kitListItem(kit) {
     pageCount: display.pageCount || display.supplementPages?.length || 0,
     supplementPagesTarget: display.supplementPagesTarget || display.pageCount || 3,
     tailorMode: display.tailorMode || 'balanced',
-    highMatchTarget: display.highMatchTarget || 90,
+    highMatchTarget: display.highMatchTarget || 100,
     estimatedMatchPct: display.estimatedMatchPct || null,
     generatedAt: display.generatedAt,
     updatedAt: display.updatedAt,
@@ -380,7 +380,7 @@ async function setKitPreference(userId, jobId, { useForApply, tailorFocus, suppl
     patch.supplementPagesTarget = resumeTailorService.clampPageCount(supplementPages);
   }
   if (tailorMode === 'high_match' || tailorMode === 'balanced') patch.tailorMode = tailorMode;
-  if (highMatchTarget !== undefined) patch.highMatchTarget = Math.min(98, Math.max(80, Number(highMatchTarget) || 90));
+  if (highMatchTarget !== undefined) patch.highMatchTarget = Math.min(100, Math.max(95, Number(highMatchTarget) || 100));
   return applicationKitStore.patchMeta(userId, jobId, patch);
 }
 

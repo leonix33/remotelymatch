@@ -32,7 +32,7 @@ const profileSchema = new mongoose.Schema(
     defaultSupplementPages: { type: Number, default: 3, min: 1, max: 6 },
     defaultTailorMode: { type: String, enum: ['balanced', 'high_match'], default: 'high_match' },
     defaultQuickApplyCount: { type: Number, default: 5, min: 3, max: 50 },
-    highMatchTarget: { type: Number, default: 95, min: 80, max: 98 },
+    highMatchTarget: { type: Number, default: 100, min: 95, max: 100 },
     hunterApiKeyEncrypted: { type: String, default: '', select: false },
     apolloApiKeyEncrypted: { type: String, default: '', select: false },
     hunterKeyHint: { type: String, default: '' },

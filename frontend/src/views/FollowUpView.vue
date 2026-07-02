@@ -8,11 +8,14 @@ import {
   isKitReadyToApply,
   summaryFromKitPayload,
   READY_ATS_TARGET,
+  READY_ATS_MIN,
+  buildTailorFocus,
+  shouldStopPolish,
 } from '../utils/kitReadiness';
 import { useProfileStore } from '../stores/profile';
 
 const profileStore = useProfileStore();
-const MAX_POLISH_PASSES = 4;
+const MAX_POLISH_PASSES = 8;
 
 const loading = ref(true);
 const loadError = ref('');
@@ -173,6 +176,8 @@ async function polishKit(job) {
   const profile = profileStore.profile || {};
   let lastAts = -1;
   let lastJd = -1;
+  let plateauCount = 0;
+  let tailorFocus = '';
   try {
     for (let attempt = 0; attempt < MAX_POLISH_PASSES; attempt += 1) {
       const { data } = await http.post(`/applications/kit/${encodeURIComponent(jobId)}/generate`, {
@@ -181,13 +186,16 @@ async function polishKit(job) {
         tailorMode: 'high_match',
         supplementPages: profile.defaultSupplementPages || 3,
         highMatchTarget: READY_ATS_TARGET,
+        tailorFocus,
       }, { timeout: 180000 });
       const kit = summaryFromKitPayload(data);
       patchJobRow(jobId, { kit });
       polishMsgs.value = {
         ...polishMsgs.value,
-        [jobId]: `Pass ${attempt + 1}: ATS ${kit.atsScore ?? '—'}% · Fit ${kit.jdMatchPct ?? '—'}%`,
+        [jobId]: `Pass ${attempt + 1}: ATS ${kit.atsScore ?? '—'}% · Fit ${kit.jdMatchPct ?? '—'}% (target ${READY_ATS_TARGET}%, min ${READY_ATS_MIN}%)`,
       };
+      const ats = kit.atsScore ?? 0;
+      const jd = kit.jdMatchPct ?? 0;
       if (isKitReadyToApply(kit)) {
         polishMsgs.value = {
           ...polishMsgs.value,
@@ -196,16 +204,20 @@ async function polishKit(job) {
         await generateKit(job, true);
         return;
       }
-      const ats = kit.atsScore ?? 0;
-      const jd = kit.jdMatchPct ?? 0;
-      if (attempt > 0 && ats <= lastAts && jd <= lastJd) break;
+      tailorFocus = buildTailorFocus(data, tailorFocus);
+      if (attempt > 0 && ats <= lastAts && jd <= lastJd) {
+        plateauCount += 1;
+      } else {
+        plateauCount = 0;
+      }
+      if (shouldStopPolish({ ats, jd, lastAts, lastJd, attempt, plateauCount })) break;
       lastAts = ats;
       lastJd = jd;
     }
     const kit = board.value?.jobs?.find((j) => j.jobId === jobId)?.kit;
     polishMsgs.value = {
       ...polishMsgs.value,
-      [jobId]: `Best: ATS ${kit?.atsScore ?? '—'}% — regenerate follow-up kit or reapply when ready.`,
+      [jobId]: `Best: ATS ${kit?.atsScore ?? '—'}% — need ${READY_ATS_MIN}%+ to send or reapply. Keep polishing.`,
     };
   } catch (e) {
     kitErrors.value = {

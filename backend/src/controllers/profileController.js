@@ -42,7 +42,7 @@ const updateSchema = z.object({
   defaultSupplementPages: z.number().min(1).max(6).optional(),
   defaultTailorMode: z.enum(['balanced', 'high_match']).optional(),
   defaultQuickApplyCount: z.number().min(3).max(50).optional(),
-  highMatchTarget: z.number().min(80).max(98).optional(),
+  highMatchTarget: z.number().min(95).max(100).optional(),
   savedJobs: z
     .array(
       z.object({
@@ -343,7 +343,7 @@ async function getApplyPreview(req, res, next) {
         defaultApplyResumeMode: profile.defaultApplyResumeMode || 'base',
         defaultSupplementPages: profile.defaultSupplementPages || 3,
         defaultTailorMode: profile.defaultTailorMode || 'balanced',
-        highMatchTarget: profile.highMatchTarget || 90,
+        highMatchTarget: profile.highMatchTarget || 100,
         autoApplyEnabled: profile.autoApplyEnabled === true,
       },
       emailWarning,

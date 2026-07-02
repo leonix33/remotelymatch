@@ -157,7 +157,7 @@ async function main() {
         force: true,
         supplementPages,
         tailorMode,
-        highMatchTarget: 95,
+        highMatchTarget: 100,
       });
       ok += 1;
       const sample = bulletSample(kit.tailoredResumeText || kit.fullSupplementText || '');

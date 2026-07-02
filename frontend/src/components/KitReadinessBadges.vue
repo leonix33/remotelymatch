@@ -5,6 +5,7 @@ import {
   readinessBadgeClass,
   readinessLabel,
   READY_ATS_TARGET,
+  READY_ATS_MIN,
 } from '../utils/kitReadiness';
 
 const props = defineProps({
@@ -32,7 +33,7 @@ const badgeClass = computed(() => readinessBadgeClass(props.kit));
       v-if="kit.hasKit && !ready && !compact"
       class="text-[11px] text-slate-500"
     >
-      Target {{ kit.polishTarget || READY_ATS_TARGET }}% ATS
+      Target {{ kit.polishTarget || READY_ATS_TARGET }}% ATS · min {{ READY_ATS_MIN }}%
     </span>
   </div>
   <span v-else class="badge badge-slate text-[11px]">No kit</span>

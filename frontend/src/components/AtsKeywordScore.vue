@@ -14,8 +14,8 @@ const error = ref('');
 
 const scoreClass = computed(() => {
   const s = ats.value?.score ?? 0;
-  if (s >= 85) return 'text-teal-300';
-  if (s >= 65) return 'text-amber-300';
+  if (s >= 95) return 'text-teal-300';
+  if (s >= 80) return 'text-amber-300';
   return 'text-red-300';
 });
 

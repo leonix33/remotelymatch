@@ -171,8 +171,8 @@ function buildRecruiterTips(ats, jdCoverage) {
 }
 
 function isRecruiterReady(ats, jdCoverage) {
-  const jdOk = !jdCoverage?.jdRequirementsTotal || jdCoverage.jdMatchPct >= 70;
-  return Boolean(ats?.readyToSubmit && jdOk && (ats?.score ?? 0) >= 85);
+  const jdOk = !jdCoverage?.jdRequirementsTotal || jdCoverage.jdMatchPct >= 75;
+  return Boolean(ats?.readyToSubmit && jdOk && (ats?.score ?? 0) >= 95);
 }
 
 function termInResume(term, resumeBlob, resumeTokens) {
@@ -205,13 +205,13 @@ function scoreAtsKeywords({ resumeText = '', tailoredText = '', jobDescription =
 
   return {
     score,
-    targetScore: 95,
+    targetScore: 100,
     green,
     yellow,
     red,
     termCount,
     breakdown,
-    readyToSubmit: score >= 85 && red <= Math.max(2, Math.floor(termCount * 0.15)),
+    readyToSubmit: score >= 95 && red <= Math.max(1, Math.floor(termCount * 0.08)),
   };
 }
 

@@ -4,7 +4,7 @@ const applicationKitStore = require('./applicationKitStore');
 const followUpDraftService = require('./followUpDraftService');
 const emailService = require('./emailService');
 const { pickBestRecipient } = require('./contactRankingService');
-const { isKitReadyToApply } = require('./kitReadinessService');
+const { isKitReadyToApply, READY_ATS_MIN } = require('./kitReadinessService');
 
 function firstName(name = '') {
   return String(name || '').trim().split(/\s+/)[0] || 'there';
@@ -71,7 +71,7 @@ function assertTailoredKitReady(applicationKit) {
   };
   if (!isKitReadyToApply(summary)) {
     const err = new Error(
-      `Polish kit until ATS is job-ready (target 95%) before sending — current ATS ${summary.atsScore ?? '—'}%.`
+      `Polish kit until ATS is at least ${READY_ATS_MIN}% (target 100%) before sending — current ATS ${summary.atsScore ?? '—'}%.`
     );
     err.status = 400;
     throw err;

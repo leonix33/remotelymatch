@@ -267,7 +267,7 @@ function buildDemoKit(profile, job, jobDescription, contact = {}, options = {}) 
     demo: true,
     tailorMode,
     supplementPagesTarget: pageTarget,
-    highMatchTarget: options.highMatchTarget || 95,
+    highMatchTarget: options.highMatchTarget || 100,
     estimatedMatchPct: Math.min(
       95,
       (job?.personalMatchPct ?? job?.matchPct ?? 70) + (tailorMode === 'high_match' ? 12 : 5)
@@ -420,12 +420,12 @@ async function perfectKitForJob({
 }) {
   const structure = parseResumeStructure(profile?.resumeText || '');
   let result = applyAtsMetadata(kit, jobDescription, job);
-  const threshold = options.highMatchTarget || 90;
-  const maxPasses = 2;
+  const threshold = options.highMatchTarget || 100;
+  const maxPasses = 6;
 
   for (let pass = 0; pass < maxPasses; pass += 1) {
     const needsAts = !result.atsReady || (result.atsScore ?? 0) < threshold;
-    const needsJd = (result.jdMatchPct ?? 100) < 75 && (result.jdRequirementsTotal ?? 0) > 0;
+    const needsJd = (result.jdMatchPct ?? 100) < 80 && (result.jdRequirementsTotal ?? 0) > 0;
     if (!needsAts && !needsJd) break;
     if (!client) break;
 
@@ -457,7 +457,11 @@ async function perfectKitForJob({
     const renormalized = normalizeKit(refined, profile, job, jobDescription, missingKeywords, contact, options);
     const next = applyAtsMetadata(renormalized, jobDescription, job);
 
-    if ((next.atsScore ?? 0) <= prevScore && (next.jdMatchPct ?? 0) <= prevJd) {
+    if ((next.atsScore ?? 0) <= prevScore && (next.jdMatchPct ?? 0) <= prevJd && (next.atsScore ?? 0) >= 95) {
+      break;
+    }
+
+    if ((next.atsScore ?? 0) <= prevScore && (next.jdMatchPct ?? 0) <= prevJd && pass >= 2) {
       break;
     }
 
@@ -509,7 +513,7 @@ function normalizeKit(kit, profile, job, jobDescription, missingKeywords, contac
   const estimatedMatchPct = Math.min(
     98,
     kit.estimatedMatchPct ??
-      baseMatch + (tailorMode === 'high_match' ? Math.max(8, (options.highMatchTarget || 90) - baseMatch) : 4)
+      baseMatch + (tailorMode === 'high_match' ? Math.max(8, (options.highMatchTarget || 100) - baseMatch) : 4)
   );
 
   return finalizeNormalizedKit(
@@ -519,7 +523,7 @@ function normalizeKit(kit, profile, job, jobDescription, missingKeywords, contac
       tailored: true,
       tailorMode,
       supplementPagesTarget: pageTarget,
-      highMatchTarget: options.highMatchTarget || kit.highMatchTarget || 90,
+      highMatchTarget: options.highMatchTarget || kit.highMatchTarget || 100,
       estimatedMatchPct,
       pageCount: supplementPages.length,
       supplementPages,
@@ -582,7 +586,7 @@ async function generateAdditiveKit({
   tailorFocus = '',
   supplementPages = DEFAULT_SUPPLEMENT_PAGES,
   tailorMode = 'high_match',
-  highMatchTarget = 95,
+  highMatchTarget = 100,
 }) {
   const pageTarget = inferResumePageTarget(profile?.resumeText, supplementPages);
   const effectiveMode = tailorMode === 'balanced' ? 'balanced' : 'high_match';

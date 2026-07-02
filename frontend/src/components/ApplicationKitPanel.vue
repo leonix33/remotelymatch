@@ -55,7 +55,7 @@ async function generate() {
       tailorFocus: tailorFocus.value.trim(),
       supplementPages: supplementPages.value,
       tailorMode: tailorMode.value,
-      highMatchTarget: 95,
+      highMatchTarget: 100,
     });
     kit.value = data;
     useForApply.value = data.useForApply !== false;

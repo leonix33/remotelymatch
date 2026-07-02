@@ -128,7 +128,7 @@ async function generateFollowUpKit(userId, jobId, options = {}) {
     jobUrl: job.url || job.applyUrl || job.jobUrl || '',
     atsMatchPct: kit?.estimatedMatchPct ?? null,
     tailorMode: kit?.tailorMode || profile.defaultTailorMode || 'high_match',
-    highMatchTarget: kit?.highMatchTarget || profile.highMatchTarget || 95,
+    highMatchTarget: kit?.highMatchTarget || profile.highMatchTarget || 100,
     keywordsAddressed: (kit?.missingKeywords || []).slice(0, 12),
     companyPhone: contacts.companyPhone || null,
     recipient,

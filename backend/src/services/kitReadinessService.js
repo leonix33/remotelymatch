@@ -1,5 +1,5 @@
-const READY_ATS_TARGET = 95;
-const READY_ATS_FALLBACK = 85;
+const READY_ATS_TARGET = 100;
+const READY_ATS_MIN = 95;
 const READY_JD_MIN = 80;
 
 function isKitReadyToApply(kit) {
@@ -8,15 +8,10 @@ function isKitReadyToApply(kit) {
   if (!hasKit) return false;
   if (kit.useForApply === false) return false;
 
-  if (kit.recruiterReady) return true;
-
   const ats = Number(kit.atsScore);
-  const jd = kit.jdMatchPct == null ? null : Number(kit.jdMatchPct);
   if (!Number.isFinite(ats)) return false;
 
-  if (ats >= READY_ATS_TARGET) return true;
-  if (ats >= READY_ATS_FALLBACK && (jd == null || jd >= READY_JD_MIN)) return true;
-  return false;
+  return ats >= READY_ATS_MIN;
 }
 
 function buildKitSummary(kit, jobStatus) {
@@ -57,7 +52,7 @@ function buildKitSummary(kit, jobStatus) {
 
 module.exports = {
   READY_ATS_TARGET,
-  READY_ATS_FALLBACK,
+  READY_ATS_MIN,
   READY_JD_MIN,
   isKitReadyToApply,
   buildKitSummary,

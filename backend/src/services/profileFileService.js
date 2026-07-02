@@ -31,7 +31,7 @@ const DEFAULT = {
   defaultSupplementPages: 3,
   defaultTailorMode: 'high_match',
   defaultQuickApplyCount: 5,
-  highMatchTarget: 95,
+  highMatchTarget: 100,
   hunterApiKeyEncrypted: '',
   apolloApiKeyEncrypted: '',
   hunterKeyHint: '',
