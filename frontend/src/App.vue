@@ -14,7 +14,7 @@ import MobileMoreMenu from './components/MobileMoreMenu.vue';
 import { simpleNav } from './utils/navigation';
 import { isProduction, canonicalDomain, showAskAi } from './config';
 
-const GUEST_PATHS = ['/login', '/forgot-password', '/privacy', '/terms', '/welcome'];
+const GUEST_PATHS = ['/login', '/privacy', '/terms', '/welcome'];
 
 const route = useRoute();
 const router = useRouter();
@@ -69,7 +69,7 @@ onUnmounted(() => {
   <ShareInstallPanel />
 
   <div v-if="isGuestRoute" class="min-h-screen min-h-dvh safe-top safe-bottom safe-x">
-    <RouterView :key="route.path" />
+    <RouterView />
   </div>
   <div v-else class="mobile-app-shell flex min-h-screen min-h-dvh w-full flex-col lg:flex-row">
     <AppSidebar :on-logout="logout" />

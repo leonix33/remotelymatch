@@ -13,7 +13,9 @@ http.interceptors.response.use(
   (res) => res,
   (err) => {
     const path = window.location.pathname;
-    const onAuthPage = ['/login', '/forgot-password', '/welcome'].some((p) => path.startsWith(p));
+    const onAuthPage =
+      ['/login', '/welcome'].some((p) => path.startsWith(p)) ||
+      path.startsWith('/forgot-password');
     const url = String(err.config?.url || '');
     const isAuthRequest =
       url.includes('/auth/login') ||

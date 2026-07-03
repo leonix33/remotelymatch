@@ -34,7 +34,11 @@ function writeDismissed() {
 function isAuthPage() {
   if (typeof window === 'undefined') return false;
   const path = window.location.pathname;
-  return path === '/login' || path === '/forgot-password' || path === '/welcome';
+  const params = new URLSearchParams(window.location.search);
+  return (
+    (path === '/login' && (params.get('forgot') === '1' || params.has('reset'))) ||
+    path === '/welcome'
+  );
 }
 
 function bindInstallListeners() {

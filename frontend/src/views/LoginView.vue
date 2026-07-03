@@ -22,6 +22,8 @@ import {
   shouldPersistDevCredentials,
 } from '../utils/devAuth';
 
+const FORGOT_FLOW_KEY = 'rm-forgot-flow';
+
 const email = ref('');
 const password = ref('');
 const resetCode = ref('');
@@ -58,19 +60,24 @@ const route = useRoute();
 const auth = useAuthStore();
 const profileStore = useProfileStore();
 
+function isForgotFlow() {
+  return (
+    route.query.forgot === '1' ||
+    (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(FORGOT_FLOW_KEY) === '1')
+  );
+}
+
 function syncModeFromRoute() {
   const token = typeof route.query.reset === 'string' ? route.query.reset : '';
   if (token) {
     resetToken.value = token;
     mode.value = 'reset';
     info.value = 'Choose a new password for your account.';
+    sessionStorage.removeItem(FORGOT_FLOW_KEY);
     return;
   }
-  if (route.path === '/forgot-password') {
+  if (isForgotFlow()) {
     mode.value = 'forgot';
-    return;
-  }
-  if (route.path === '/login' && mode.value === 'forgot') {
     return;
   }
   mode.value = 'login';
@@ -116,16 +123,12 @@ onMounted(async () => {
   showBiometric.value = await supportsBiometricLogin();
 });
 
-watch(() => route.path, (path) => {
-  if (path === '/forgot-password') {
-    mode.value = 'forgot';
-    return;
+watch(
+  () => route.fullPath,
+  () => {
+    syncModeFromRoute();
   }
-  if (path === '/login' && mode.value === 'forgot') {
-    return;
-  }
-  syncModeFromRoute();
-});
+);
 
 async function submitLogin() {
   error.value = '';
@@ -135,6 +138,7 @@ async function submitLogin() {
     await auth.login(email.value.trim(), password.value);
     rememberLoginEmail(email.value);
     rememberDevCredentials(email.value, password.value);
+    sessionStorage.removeItem(FORGOT_FLOW_KEY);
     await afterAuth();
   } catch (e) {
     const status = e.response?.status;
@@ -182,26 +186,43 @@ async function finishPasswordReset(message, savedPassword) {
   newPassword.value = '';
   confirmPassword.value = '';
   resetToken.value = '';
-  await router.replace({ path: '/login' });
+  sessionStorage.removeItem(FORGOT_FLOW_KEY);
+  await router.replace({ path: '/login', query: {} });
 }
 
 async function submitForgot() {
   error.value = '';
   info.value = '';
+  if (!email.value.trim()) {
+    error.value = 'Enter your email address.';
+    return;
+  }
   loading.value = true;
   try {
     const { data } = await http.post('/auth/forgot-password', { email: email.value.trim() });
     if (data.emailSent === false && !data.devResetCode) {
-      error.value = data.message;
+      error.value = data.message || 'Could not send reset email. Try again or contact support.';
       return;
     }
     if (data.devResetCode) {
-      resetCode.value = data.devResetCode;
+      resetCode.value = String(data.devResetCode);
     }
-    info.value = data.message || 'Check your email for a 6-digit reset code.';
-    forgotStep.value = 2;
+    if (data.emailSent === true || data.devResetCode) {
+      info.value = data.message || 'Check your email for a 6-digit reset code.';
+      forgotStep.value = 2;
+      return;
+    }
+    info.value =
+      data.message ||
+      'If that email has an account, we sent a reset code. Check your inbox and spam folder.';
   } catch (e) {
-    error.value = e.response?.data?.message || 'Could not send reset code';
+    const status = e.response?.status;
+    const msg = e.response?.data?.message || 'Could not send reset code';
+    if (status === 404 || status === 0) {
+      error.value = 'API not reachable. Check your connection or try again in a minute.';
+    } else {
+      error.value = msg;
+    }
   } finally {
     loading.value = false;
   }
@@ -263,6 +284,10 @@ function goForgot() {
   forgotStep.value = 1;
   auth.logout();
   mode.value = 'forgot';
+  sessionStorage.setItem(FORGOT_FLOW_KEY, '1');
+  if (route.query.forgot !== '1') {
+    router.replace({ path: '/login', query: { forgot: '1' } }).catch(() => {});
+  }
 }
 
 function goLogin() {
@@ -270,8 +295,9 @@ function goLogin() {
   info.value = '';
   forgotStep.value = 1;
   mode.value = 'login';
-  if (route.path === '/forgot-password') {
-    router.replace('/login').catch(() => {});
+  sessionStorage.removeItem(FORGOT_FLOW_KEY);
+  if (route.query.forgot || route.query.reset) {
+    router.replace({ path: '/login', query: {} }).catch(() => {});
   }
 }
 </script>
@@ -331,13 +357,9 @@ function goLogin() {
       </form>
 
       <div v-if="mode === 'login'" class="mt-4">
-        <a
-          href="/forgot-password"
-          class="btn-secondary block w-full min-h-[44px] text-center leading-[44px] no-underline"
-          @click.prevent="goForgot"
-        >
+        <button type="button" class="btn-secondary w-full min-h-[44px]" @click="goForgot">
           Forgot password?
-        </a>
+        </button>
       </div>
 
       <!-- Forgot password -->
@@ -348,9 +370,17 @@ function goLogin() {
           </p>
           <div>
             <label class="mb-1 block text-sm text-slate-400">Email</label>
-            <input v-model="email" type="email" required class="input" placeholder="you@example.com" autocomplete="username" />
+            <input
+              v-model="email"
+              type="email"
+              required
+              class="input"
+              placeholder="you@example.com"
+              autocomplete="username"
+            />
           </div>
           <p v-if="error" class="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
+          <p v-if="info && !error" class="rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ info }}</p>
           <button type="submit" class="btn-primary w-full" :disabled="loading">
             {{ loading ? 'Sending…' : 'Send reset code' }}
           </button>
@@ -358,6 +388,9 @@ function goLogin() {
 
         <form v-else class="space-y-4" @submit.prevent="submitResetWithCode">
           <p v-if="info" class="rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ info }}</p>
+          <p v-if="isLocalDev && resetCode" class="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+            Local dev code: <strong class="tracking-widest">{{ resetCode }}</strong>
+          </p>
           <div>
             <label class="mb-1 block text-sm text-slate-400">6-digit code from email</label>
             <input
