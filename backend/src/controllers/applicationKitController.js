@@ -96,4 +96,34 @@ async function atsScore(req, res, next) {
   }
 }
 
-module.exports = { listKits, getKit, generateKit, polishKit, updatePreference, atsScore };
+async function kitCompare(req, res, next) {
+  try {
+    const jobId = req.params.jobId;
+    const kit = await applicationKitStore.get(req.user.sub, jobId);
+    const job =
+      (await applicationKitService.findJob(req.user.sub, jobId)) ||
+      jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId) ||
+      (kit ? { jobId, title: kit.jobTitle, company: kit.company, url: kit.jobUrl } : { jobId });
+    const jobDescription = await jobDescriptionService.resolveJobDescription(job);
+    const tailoredResumeText =
+      kit?.tailoredResumeText || kit?.fullSupplementText || kit?.resumeAddendum || '';
+    const ats = atsKeywordService.scoreAtsKeywords({
+      tailoredText: tailoredResumeText,
+      jobDescription,
+    });
+    res.json({
+      jobId,
+      jobTitle: kit?.jobTitle || job?.title || '',
+      company: kit?.company || job?.company || '',
+      hasKit: Boolean(kit?.tailored && tailoredResumeText),
+      jobDescription,
+      tailoredResumeText,
+      atsScore: kit?.atsScore ?? ats.score,
+      ...ats,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listKits, getKit, generateKit, polishKit, updatePreference, atsScore, kitCompare };

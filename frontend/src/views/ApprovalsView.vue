@@ -7,6 +7,7 @@ import ApplyWorkflowBanner from '../components/ApplyWorkflowBanner.vue';
 import ApplicationKitPanel from '../components/ApplicationKitPanel.vue';
 import JobScoreBadges from '../components/JobScoreBadges.vue';
 import KitReadinessBadges from '../components/KitReadinessBadges.vue';
+import KitJdComparePanel from '../components/KitJdComparePanel.vue';
 import MatchCopilotBrief from '../components/MatchCopilotBrief.vue';
 import {
   isKitReadyToApply,
@@ -51,6 +52,7 @@ const pageSize = 25;
 const selected = ref(new Set());
 const polishing = ref('');
 const polishMsg = ref('');
+const compareJobId = ref('');
 const applyAnywayIds = ref(new Set());
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
@@ -212,6 +214,10 @@ function patchJobKit(jobId, data) {
     ...job,
     kit: { ...(job.kit || {}), ...summaryFromKitPayload(data) },
   };
+}
+
+function toggleCompare(jobId) {
+  compareJobId.value = compareJobId.value === jobId ? '' : jobId;
 }
 
 async function polishUntilReady(job) {
@@ -639,6 +645,14 @@ onMounted(() => {
             >
               {{ polishing === job.jobId ? 'Polishing…' : (job.kit?.hasKit ? 'Polish until ready' : 'Generate & polish') }}
             </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              :class="compareJobId === job.jobId ? 'ring-1 ring-teal-500/50' : ''"
+              @click="toggleCompare(job.jobId)"
+            >
+              {{ compareJobId === job.jobId ? 'Hide compare' : 'Compare to JD' }}
+            </button>
             <template v-if="job.status === 'approved' || status === 'approved'">
               <button
                 type="button"
@@ -667,6 +681,12 @@ onMounted(() => {
               </button>
             </template>
           </div>
+          <KitJdComparePanel
+            v-if="compareJobId === job.jobId"
+            :job-id="job.jobId"
+            :refresh-key="`${job.kit?.atsScore ?? ''}-${job.kit?.generatedAt ?? ''}`"
+            class="mt-4"
+          />
         </div>
         <div v-if="!items.length" class="rounded-xl border border-dashed border-slate-700 bg-slate-800/30 p-8 text-center">
           <p class="font-medium text-slate-300">Your apply queue is empty</p>

@@ -2317,3 +2317,120 @@ body {
   background: rgba(239, 68, 68, 0.15);
   color: #fecaca;
 }
+
+.jd-compare-panel {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  background: rgba(2, 6, 23, 0.55);
+  padding: 1rem;
+}
+
+.jd-compare-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.jd-compare-panel__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.jd-compare-panel__meta {
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.jd-compare-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.jd-compare-loading,
+.jd-compare-error {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.jd-compare-error {
+  color: #fca5a5;
+}
+
+.jd-compare-split {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .jd-compare-split {
+    grid-template-columns: 1fr 1fr;
+    min-height: 22rem;
+  }
+}
+
+.jd-compare-pane {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  background: rgba(15, 23, 42, 0.65);
+  overflow: hidden;
+}
+
+.jd-compare-pane__title {
+  border-bottom: 1px solid rgba(51, 65, 85, 0.7);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.jd-compare-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: #cbd5e1;
+}
+
+.jd-highlight {
+  border-radius: 0.2rem;
+  padding: 0 0.1rem;
+  font-weight: 600;
+}
+
+.jd-highlight--green {
+  background: rgba(20, 184, 166, 0.28);
+  color: #ccfbf1;
+}
+
+.jd-highlight--yellow {
+  background: rgba(245, 158, 11, 0.28);
+  color: #fef3c7;
+}
+
+.jd-highlight--red {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fee2e2;
+}
+
+.jd-highlight-legend {
+  margin-left: 0.35rem;
+}
+
+.jd-highlight-legend .jd-highlight {
+  font-size: 0.65rem;
+  font-weight: 500;
+}

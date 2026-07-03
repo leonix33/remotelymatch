@@ -13,5 +13,6 @@ router.post('/kit/:jobId/polish', requireAuth, applicationKitController.polishKi
 router.post('/:jobId/reapply', requireAuth, applicationController.reapply);
 router.patch('/kit/:jobId/preference', requireAuth, applicationKitController.updatePreference);
 router.get('/kit/:jobId/ats-score', requireAuth, applicationKitController.atsScore);
+router.get('/kit/:jobId/compare', requireAuth, applicationKitController.kitCompare);
 
 module.exports = router;

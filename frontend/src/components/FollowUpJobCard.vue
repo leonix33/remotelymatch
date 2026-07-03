@@ -1,6 +1,8 @@
 <script setup>
+import { ref, watch } from 'vue';
 import JobScoreBadges from './JobScoreBadges.vue';
 import KitReadinessBadges from './KitReadinessBadges.vue';
+import KitJdComparePanel from './KitJdComparePanel.vue';
 import { isKitReadyToApply } from '../utils/kitReadiness';
 
 const props = defineProps({
@@ -27,6 +29,18 @@ const emit = defineEmits([
   'reapply',
   'send-follow-up',
 ]);
+
+const compareOpen = ref(false);
+
+watch(
+  () => props.job?.jobId,
+  () => {
+    compareOpen.value = false;
+  }
+);
+
+const compareRefreshKey = () =>
+  `${props.job?.kit?.atsScore ?? ''}-${props.job?.kit?.generatedAt ?? ''}-${props.polishing ? 'p' : ''}`;
 
 const recommendedContacts = (job) =>
   job.followUpKit?.contacts?.recommendedContacts?.length
@@ -104,6 +118,15 @@ function formatDate(iso) {
             {{ polishing ? 'Polishing…' : 'Polish kit for apply' }}
           </button>
           <button
+            type="button"
+            class="btn-secondary text-xs"
+            :class="compareOpen ? 'ring-1 ring-teal-500/50' : ''"
+            :disabled="generating"
+            @click.stop="compareOpen = !compareOpen"
+          >
+            {{ compareOpen ? 'Hide compare' : 'Compare to JD' }}
+          </button>
+          <button
             v-if="canReapply(job)"
             type="button"
             class="btn-primary text-xs"
@@ -113,6 +136,12 @@ function formatDate(iso) {
             {{ reapplying ? 'Reapplying…' : 'Reapply with tailored resume' }}
           </button>
         </div>
+        <KitJdComparePanel
+          v-if="compareOpen"
+          :job-id="job.jobId"
+          :refresh-key="compareRefreshKey()"
+          class="mt-4"
+        />
         <p v-if="actionMsg" class="mt-2 text-xs text-slate-400">{{ actionMsg }}</p>
       </section>
 
