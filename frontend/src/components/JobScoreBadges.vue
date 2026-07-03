@@ -18,10 +18,10 @@ function likelihoodClass(pct) {
 }
 
 function likelihoodLabel(tier) {
-  if (tier === 'high') return 'High reply chance';
-  if (tier === 'good') return 'Good reply chance';
-  if (tier === 'moderate') return 'Moderate';
-  return 'Low';
+  if (tier === 'high') return 'High callback chance';
+  if (tier === 'good') return 'Good callback chance';
+  if (tier === 'moderate') return 'Moderate callback';
+  return 'Low callback';
 }
 </script>
 
@@ -34,7 +34,7 @@ function likelihoodLabel(tier) {
       :class="likelihoodClass(job.interviewLikelihoodPct)"
       :title="likelihoodLabel(job.likelihoodTier)"
     >
-      {{ job.interviewLikelihoodPct }}% interview likelihood
+      {{ job.interviewLikelihoodPct }}% callback score
     </span>
   </div>
   <ul v-if="showFactors && job.likelihoodFactors?.length" class="mt-2 space-y-1 text-xs text-slate-500">

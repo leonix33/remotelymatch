@@ -3,6 +3,7 @@ const jobService = require('../services/jobService');
 const jobIngestService = require('../services/jobs/jobIngestService');
 const jobListCache = require('../services/jobListCache');
 const jobBoardCatalogService = require('../services/jobBoardCatalogService');
+const jobInterviewInsightService = require('../services/jobInterviewInsightService');
 const env = require('../config/env');
 
 function applyJobFilters(jobs, { section, minMatch, minQuality, source, freshness, search }) {
@@ -148,4 +149,13 @@ async function boardCatalog(req, res, next) {
   }
 }
 
-module.exports = { listJobs, syncJobs, importJobs, ingestJobs, ingestStatus, boardCatalog };
+async function getInterviewInsight(req, res, next) {
+  try {
+    const insight = await jobInterviewInsightService.getInterviewInsight(req.user.sub, req.params.jobId);
+    res.json(insight);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listJobs, syncJobs, importJobs, ingestJobs, ingestStatus, boardCatalog, getInterviewInsight };

@@ -3,6 +3,7 @@ const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 const jobController = require('../controllers/jobController');
 
 router.get('/', requireAuth, jobController.listJobs);
+router.get('/:jobId/interview-insight', requireAuth, jobController.getInterviewInsight);
 router.get('/boards/catalog', requireAuth, requireAdmin, jobController.boardCatalog);
 router.get('/ingest/status', requireAuth, requireAdmin, jobController.ingestStatus);
 router.post('/ingest', requireAuth, requireAdmin, jobController.ingestJobs);

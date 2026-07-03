@@ -13,6 +13,7 @@ const userMoreNavAll = [
   { to: '/jobs', label: 'Browse jobs', icon: '◎' },
   { to: '/concierge', label: 'Ask AI', icon: '✦', askAi: true },
   { to: '/tailored-resumes', label: 'Tailored resumes', icon: '📋' },
+  { to: '/outcomes', label: 'Outcomes', icon: '📈' },
   { to: '/interview', label: 'Interview prep', icon: '🎙' },
 ];
 

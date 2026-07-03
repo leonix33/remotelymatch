@@ -49,9 +49,27 @@ Everything in the next six months serves **one loop** — find the right job, ap
 
 ---
 
+## Build priority (current sprint)
+
+Ship in this order — all wired through `JobInterviewInsight.vue` + `GET /jobs/:jobId/interview-insight`:
+
+| # | Feature | Status | Code |
+|---|---------|--------|------|
+| 1 | **Recruiter Callback Score** | ✅ Shipped | `JobScoreBadges.vue` → "callback score"; `interviewLikelihoodService.js` |
+| 2 | **Why this job** | ✅ Shipped | `jobInterviewInsightService.js` → strengths + factors on match cards |
+| 3 | **Resume gap analysis** | ✅ Shipped | gaps + missing keywords in `JobInterviewInsight.vue` |
+| 4 | **Tailored resume bullets** | ✅ Shipped | bullets from kit or resume preview |
+| 5 | **Follow-up message generator** | ✅ Shipped | lazy load via `/traction/follow-up/:jobId/kit` |
+| 6 | **Outcome tracker** | ✅ Shipped | `/outcomes` in user nav; prefill from match cards |
+| 7 | **Learning loop from replies** | ✅ Shipped | `conversionStatsService.js` → callback score + outcomes insights |
+
+Surfaces: **Dashboard** (`TopMatchJobsPreview.vue`), **Queue** (`ApprovalsView.vue`).
+
+---
+
 ## Tier 0 — Trust & reliability (Week 1)
 
-- [ ] **T0-1** Forgot password works mobile + web → user resets password end-to-end
+- [x] **T0-1** Forgot password works mobile + web → user resets password end-to-end *(code shipped — verify on prod after deploy)*
 - [ ] **T0-2** PWA cache bust / "Update available" reload → no stale bundles after deploy
 - [ ] **T0-3** First-5-min smoke test documented → fresh account: resume → match → queue
 - [ ] **T0-4** Stable `npm run dev` → `npm run local:check` all green
@@ -60,10 +78,10 @@ Everything in the next six months serves **one loop** — find the right job, ap
 
 ## Tier 1 — Core loop proof (Week 2–3)
 
-- [ ] **T1-1** "Why this job" on every match card → user understands score
+- [x] **T1-1** "Why this job" on every match card → user understands score
 - [ ] **T1-2** One-tap approve from match list → &lt; 3 taps to queue
-- [ ] **T1-3** Kit preview before approve → user sees tailored snippet
-- [ ] **T1-4** Outcome tracker: Applied → Reply → Interview → Offer
+- [x] **T1-3** Kit preview before approve → user sees tailored snippet *(bullets in insight panel)*
+- [x] **T1-4** Outcome tracker: Applied → Reply → Interview → Offer *(user-facing `/outcomes`)*
 - [ ] **T1-5** Weekly digest email → "5 matches, 2 to approve, 1 follow-up due"
 - [ ] **T1-6** Chrome extension polish → LinkedIn → queue in 2 clicks
 

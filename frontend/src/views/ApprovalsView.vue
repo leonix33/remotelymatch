@@ -9,6 +9,7 @@ import JobScoreBadges from '../components/JobScoreBadges.vue';
 import KitReadinessBadges from '../components/KitReadinessBadges.vue';
 import KitJdComparePanel from '../components/KitJdComparePanel.vue';
 import MatchCopilotBrief from '../components/MatchCopilotBrief.vue';
+import JobInterviewInsight from '../components/JobInterviewInsight.vue';
 import {
   isKitReadyToApply,
   summaryFromKitPayload,
@@ -51,6 +52,11 @@ const page = ref(1);
 const pageSize = 25;
 const selected = ref(new Set());
 const polishing = ref('');
+const expandedInsightJobId = ref(null);
+
+function toggleInsight(jobId) {
+  expandedInsightJobId.value = expandedInsightJobId.value === jobId ? null : jobId;
+}
 const polishMsg = ref('');
 const compareJobId = ref('');
 const applyAnywayIds = ref(new Set());
@@ -610,6 +616,14 @@ onMounted(() => {
                   <KitReadinessBadges :kit="job.kit" />
                 </div>
                 <MatchCopilotBrief :job-id="job.jobId" />
+                <button
+                  type="button"
+                  class="mt-2 text-xs text-teal-400 hover:underline"
+                  @click="toggleInsight(job.jobId)"
+                >
+                  {{ expandedInsightJobId === job.jobId ? 'Hide callback insights' : 'Callback score & gaps' }}
+                </button>
+                <JobInterviewInsight :job="job" :expanded="expandedInsightJobId === job.jobId" />
               </div>
             </div>
             <div class="flex flex-wrap gap-2">

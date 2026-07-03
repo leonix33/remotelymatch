@@ -1,7 +1,9 @@
 <script setup>
 import { onMounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
 import http from '../api/http';
 
+const route = useRoute();
 const outcomes = ref([]);
 const insights = ref(null);
 const loading = ref(true);
@@ -14,6 +16,15 @@ const form = ref({
   matchPct: 0,
   notes: '',
 });
+
+function applyRoutePrefill() {
+  const { jobId, title, company } = route.query;
+  if (jobId || title || company) {
+    form.value.jobId = String(jobId || '');
+    form.value.title = String(title || '');
+    form.value.company = String(company || '');
+  }
+}
 
 async function load() {
   loading.value = true;
@@ -42,16 +53,22 @@ async function save() {
 
 const stages = ['applied', 'screen', 'onsite', 'offer', 'rejected', 'withdrawn'];
 
-onMounted(load);
+onMounted(() => {
+  applyRoutePrefill();
+  load();
+});
 </script>
 
 <template>
   <div>
     <h2 class="text-2xl font-bold text-slate-100">Outcome tracking</h2>
-    <p class="mt-1 text-slate-400">Log your pipeline — AI learns what works for your profile over time</p>
+    <p class="mt-1 text-slate-400">
+      Log replies and interviews — your callback scores and match rankings improve as we learn what works for you.
+    </p>
 
     <div v-if="insights" class="mt-6 card p-6">
-      <div class="grid gap-4 sm:grid-cols-4">
+      <h3 class="text-sm font-semibold text-slate-300">Learning loop</h3>
+      <div class="mt-3 grid gap-4 sm:grid-cols-4">
         <div><p class="text-sm text-slate-500">Tracked</p><p class="text-2xl font-bold text-teal-300">{{ insights.stats?.total }}</p></div>
         <div><p class="text-sm text-slate-500">Offers</p><p class="text-2xl font-bold text-amber-300">{{ insights.stats?.offers }}</p></div>
         <div><p class="text-sm text-slate-500">Onsites</p><p class="text-2xl font-bold text-teal-300">{{ insights.stats?.onsites }}</p></div>

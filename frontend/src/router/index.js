@@ -73,7 +73,7 @@ const router = createRouter({
     { path: '/interview', component: InterviewView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/conferences', component: ConferencesView, meta: { requiresAuth: true, skipOnboarding: true, adminOnly: true } },
     { path: '/social', component: SocialView, meta: { requiresAuth: true, skipOnboarding: true, adminOnly: true } },
-    { path: '/outcomes', component: OutcomesView, meta: { requiresAuth: true, skipOnboarding: true, adminOnly: true } },
+    { path: '/outcomes', component: OutcomesView, meta: { requiresAuth: true, skipOnboarding: true } },
     { path: '/swarm', component: SwarmView, meta: { requiresAuth: true, skipOnboarding: true, adminOnly: true } },
     { path: '/resumes', component: ResumesView, meta: { requiresAuth: true, skipOnboarding: true, adminOnly: true } },
     { path: '/calendar', component: CalendarView, meta: { requiresAuth: true, skipOnboarding: true, adminOnly: true } },

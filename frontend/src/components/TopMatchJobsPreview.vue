@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import http from '../api/http';
 import JobScoreBadges from './JobScoreBadges.vue';
+import JobInterviewInsight from './JobInterviewInsight.vue';
 
 const props = defineProps({
   limit: { type: Number, default: 5 },
@@ -14,6 +15,11 @@ const props = defineProps({
 const jobs = ref([]);
 const loading = ref(true);
 const error = ref('');
+const expandedJobId = ref(null);
+
+function toggleInsight(jobId) {
+  expandedJobId.value = expandedJobId.value === jobId ? null : jobId;
+}
 
 async function load() {
   loading.value = true;
@@ -69,8 +75,21 @@ defineExpose({ refresh: load });
             <p class="text-slate-400">{{ job.company }}</p>
             <p v-if="job.source && !compact" class="mt-0.5 text-xs text-slate-600">{{ job.source }}</p>
           </div>
-          <JobScoreBadges :job="job" />
+          <JobScoreBadges :job="job" :show-factors="expandedJobId === job.jobId" />
         </div>
+        <button
+          v-if="!compact"
+          type="button"
+          class="mt-2 text-xs text-teal-400 hover:underline"
+          @click="toggleInsight(job.jobId)"
+        >
+          {{ expandedJobId === job.jobId ? 'Hide insights' : 'Why this job & callback score' }}
+        </button>
+        <JobInterviewInsight
+          v-if="!compact"
+          :job="job"
+          :expanded="expandedJobId === job.jobId"
+        />
       </li>
     </ul>
 
