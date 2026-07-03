@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const PasswordResetCode = require('../models/PasswordResetCode');
 const env = require('../config/env');
 
 function signAccessToken(user) {
@@ -181,9 +182,58 @@ async function requestPasswordReset(email) {
   if (!user) {
     return { sent: true, reason: 'unknown_email' };
   }
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const codeHash = await bcrypt.hash(code, 10);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  await PasswordResetCode.deleteMany({ email: normalizedEmail });
+  await PasswordResetCode.create({ email: normalizedEmail, codeHash, expiresAt });
   const token = signPasswordResetToken(normalizedEmail);
   const resetUrl = `${env.appUrl.replace(/\/$/, '')}/login?reset=${encodeURIComponent(token)}`;
-  return { sent: true, user, token, resetUrl };
+  return { sent: true, user, token, resetUrl, code, codeExpiresMinutes: 15 };
+}
+
+async function completePasswordResetWithCode(email, code, newPassword) {
+  if (!env.mongoUri) throw new Error('MongoDB is required to reset password');
+  const normalizedEmail = email.trim().toLowerCase();
+  const cleanCode = String(code || '').trim();
+  const clean = String(newPassword || '').trim();
+  if (!/^\d{6}$/.test(cleanCode)) {
+    const err = new Error('Enter the 6-digit code from your email');
+    err.status = 400;
+    throw err;
+  }
+  if (clean.length < 8) {
+    const err = new Error('Password must be at least 8 characters');
+    err.status = 400;
+    throw err;
+  }
+  const record = await PasswordResetCode.findOne({
+    email: normalizedEmail,
+    usedAt: null,
+    expiresAt: { $gt: new Date() },
+  }).sort({ createdAt: -1 });
+  if (!record) {
+    const err = new Error('Reset code expired or not found. Request a new code.');
+    err.status = 400;
+    throw err;
+  }
+  const codeOk = await bcrypt.compare(cleanCode, record.codeHash);
+  if (!codeOk) {
+    const err = new Error('Incorrect reset code. Check your email and try again.');
+    err.status = 400;
+    throw err;
+  }
+  const user = await User.findOne({ email: normalizedEmail, active: true });
+  if (!user) {
+    const err = new Error('Account not found');
+    err.status = 404;
+    throw err;
+  }
+  user.passwordHash = await bcrypt.hash(clean, 10);
+  await user.save();
+  record.usedAt = new Date();
+  await record.save();
+  return { email: user.email, name: user.name };
 }
 
 async function completePasswordReset(token, newPassword) {
@@ -216,4 +266,5 @@ module.exports = {
   resetPassword,
   requestPasswordReset,
   completePasswordReset,
+  completePasswordResetWithCode,
 };

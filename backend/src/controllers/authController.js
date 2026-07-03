@@ -24,6 +24,12 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(8),
 });
 
+const resetPasswordCodeSchema = z.object({
+  email: z.string().email(),
+  code: z.string().min(6).max(6),
+  newPassword: z.string().min(8),
+});
+
 async function login(req, res, next) {
   const body = loginSchema.safeParse(req.body);
   if (!body.success) return next(body.error);
@@ -87,39 +93,65 @@ async function forgotPassword(req, res, next) {
   try {
     const { email } = forgotPasswordSchema.parse(req.body);
     const result = await authService.requestPasswordReset(email);
-    if (result.user && result.resetUrl) {
+    if (result.reason === 'no_database') {
+      return res.status(503).json({
+        message: 'Password reset requires MongoDB. Contact your admin.',
+        emailSent: false,
+      });
+    }
+    if (result.user && result.resetUrl && result.code) {
       const emailResult = await emailService.notifyForgotPassword({
         to: result.user.email,
         name: result.user.name,
         resetUrl: result.resetUrl,
+        code: result.code,
       });
       if (!emailResult.sent) {
         console.error('Forgot-password email failed:', emailResult.reason);
         if (env.nodeEnv !== 'production') {
-          console.log('\n[dev] Password reset link (email not configured locally):\n', result.resetUrl, '\n');
-          return res.status(503).json({
-            message:
-              'Email is not configured for local dev. Check the terminal running npm run dev for a reset link, or sign in with ADMIN_PASSWORD from backend/.env.',
+          console.log('\n[dev] Password reset code:', result.code, '\nLink:', result.resetUrl, '\n');
+          return res.json({
+            message: 'Email not configured locally. Use the reset code shown in the server terminal.',
             emailSent: false,
-            devResetAvailable: true,
+            devResetCode: result.code,
           });
         }
         return res.status(503).json({
           message:
-            'We found your account but could not send the reset email. Try again in a minute, or sign in with your Render admin password if you have access.',
+            emailResult.reason ||
+            'We found your account but could not send the reset email. Try again in a minute.',
           emailSent: false,
         });
       }
       return res.json({
-        message: 'Reset link sent! Check your inbox and spam folder for an email from remotelymatch.',
+        message: 'Reset code sent! Check your inbox and spam folder, then enter the 6-digit code below.',
         emailSent: true,
+        codeExpiresMinutes: result.codeExpiresMinutes || 15,
       });
     }
     res.json({
-      message: 'If that email has an account, we sent a reset link. Check your inbox and spam folder.',
+      message: 'If that email has an account, we sent a reset code. Check your inbox and spam folder.',
       emailSent: null,
     });
   } catch (err) {
+    next(err);
+  }
+}
+
+async function resetPasswordWithCode(req, res, next) {
+  try {
+    const body = resetPasswordCodeSchema.parse(req.body);
+    const result = await authService.completePasswordResetWithCode(
+      body.email,
+      body.code,
+      body.newPassword
+    );
+    res.json({
+      message: 'Password updated. You can sign in now.',
+      email: result.email,
+    });
+  } catch (err) {
+    if (!err.status) err.status = 400;
     next(err);
   }
 }
@@ -183,6 +215,7 @@ module.exports = {
   changePassword,
   forgotPassword,
   resetPasswordWithToken,
+  resetPasswordWithCode,
   extensionToken,
   exportData,
   deleteAccount,

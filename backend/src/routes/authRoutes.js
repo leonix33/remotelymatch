@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/authMiddleware');
 router.post('/login', authController.login);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPasswordWithToken);
+router.post('/reset-password-code', authController.resetPasswordWithCode);
 router.post('/passkey/login/options', passkeyController.loginOptions);
 router.post('/passkey/login/verify', passkeyController.loginVerify);
 router.get('/me', requireAuth, authController.me);
