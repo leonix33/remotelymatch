@@ -126,6 +126,7 @@ onUnmounted(() => clearInterval(pollTimer));
               <th class="pb-2 pr-4">User</th>
               <th class="pb-2 pr-4">Role</th>
               <th class="pb-2 pr-4">Last login</th>
+              <th class="pb-2 pr-4">Last seen</th>
               <th class="pb-2 pr-4">Logins</th>
               <th class="pb-2 pr-4">Applications</th>
               <th class="pb-2">Last activity</th>
@@ -144,6 +145,11 @@ onUnmounted(() => clearInterval(pollTimer));
               <td class="py-3 pr-4 text-xs">
                 <p>{{ formatTime(user.lastLoginAt) }}</p>
                 <p v-if="user.lastLoginMethod" class="text-slate-500">{{ user.lastLoginMethod }}</p>
+                <p v-else-if="!user.lastLoginAt" class="text-slate-500">log in again to record</p>
+              </td>
+              <td class="py-3 pr-4 text-xs">
+                <p>{{ formatTime(user.lastSeenAt || user.lastActivityAt) }}</p>
+                <p v-if="!user.lastLoginAt && (user.lastSeenAt || user.lastActivityAt)" class="text-slate-500">active session</p>
               </td>
               <td class="py-3 pr-4">{{ user.loginCount || 0 }}</td>
               <td class="py-3 pr-4">{{ user.applicationCount || 0 }}</td>

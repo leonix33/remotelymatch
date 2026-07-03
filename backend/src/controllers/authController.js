@@ -61,6 +61,7 @@ async function login(req, res, next) {
 async function me(req, res, next) {
   try {
     const user = await authService.getMe(req.user.sub);
+    await activityService.touchUserSeen(req.user.sub);
     res.json({
       id: user._id,
       name: user.name,

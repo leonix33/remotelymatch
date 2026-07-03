@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema(
     lastLoginAt: { type: Date, default: null },
     lastLoginMethod: { type: String, enum: ['password', 'passkey', ''], default: '' },
     loginCount: { type: Number, default: 0 },
+    lastSeenAt: { type: Date, default: null },
     isMentor: { type: Boolean, default: false },
     verifiedSkills: [String],
     teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', index: true },

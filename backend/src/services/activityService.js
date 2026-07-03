@@ -17,11 +17,22 @@ function getRequestMeta(req) {
 
 async function touchUserLogin(user, method) {
   if (!user?._id || !mongoReady()) return;
+  const now = new Date();
   await User.findByIdAndUpdate(user._id, {
-    lastLoginAt: new Date(),
+    lastLoginAt: now,
     lastLoginMethod: method,
+    lastSeenAt: now,
     $inc: { loginCount: 1 },
   });
+}
+
+async function touchUserSeen(userId) {
+  if (!userId || !mongoReady()) return;
+  const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+  await User.findOneAndUpdate(
+    { _id: userId, $or: [{ lastSeenAt: null }, { lastSeenAt: { $lt: fifteenMinAgo } }] },
+    { lastSeenAt: new Date() }
+  );
 }
 
 async function recordLogin({ req, email, user, method = 'password', success = true, reason = '' }) {
@@ -81,6 +92,7 @@ async function recordActivity({
     resolvedName = resolvedName || snap.userName;
   }
   try {
+    await touchUserSeen(userId);
     return await UserActivityEvent.create({
       userId,
       email: String(resolvedEmail || '').toLowerCase(),
@@ -143,7 +155,7 @@ async function getObservabilityDashboard({ days = 7, limit = 80 } = {}) {
   ] = await Promise.all([
     User.countDocuments({ active: true }),
     User.find({})
-      .select('name email role active lastLoginAt lastLoginMethod loginCount createdAt updatedAt')
+      .select('name email role active lastLoginAt lastLoginMethod loginCount lastSeenAt createdAt updatedAt')
       .sort({ lastLoginAt: -1, updatedAt: -1 })
       .limit(100)
       .lean(),
@@ -185,19 +197,38 @@ async function getObservabilityDashboard({ days = 7, limit = 80 } = {}) {
   ]);
   const lastActivityByUser = new Map(lastActivityAgg.map((row) => [String(row._id), row]));
 
+  const loginStatsAgg = await LoginEvent.aggregate([
+    { $match: { success: true, userId: { $exists: true, $ne: null } } },
+    { $sort: { occurredAt: -1 } },
+    {
+      $group: {
+        _id: '$userId',
+        loginCount: { $sum: 1 },
+        lastLoginAt: { $first: '$occurredAt' },
+        lastLoginMethod: { $first: '$method' },
+      },
+    },
+  ]);
+  const loginStatsByUser = new Map(loginStatsAgg.map((row) => [String(row._id), row]));
+
   const userRows = users.map((user) => {
     const id = String(user._id);
     const apps = appCountByUser.get(id);
     const activity = lastActivityByUser.get(id);
+    const logins = loginStatsByUser.get(id);
+    const lastLoginAt = user.lastLoginAt || logins?.lastLoginAt || null;
+    const loginCount = Math.max(user.loginCount || 0, logins?.loginCount || 0);
+    const lastLoginMethod = user.lastLoginMethod || logins?.lastLoginMethod || '';
     return {
       id,
       name: user.name,
       email: user.email,
       role: user.role,
       active: user.active !== false,
-      lastLoginAt: user.lastLoginAt,
-      lastLoginMethod: user.lastLoginMethod || '',
-      loginCount: user.loginCount || 0,
+      lastLoginAt,
+      lastLoginMethod,
+      loginCount,
+      lastSeenAt: user.lastSeenAt || activity?.lastActivityAt || null,
       applicationCount: apps?.count || 0,
       lastAppliedAt: apps?.lastApplied || null,
       lastActivityAt: activity?.lastActivityAt || null,
@@ -264,5 +295,6 @@ module.exports = {
   getRequestMeta,
   recordLogin,
   recordActivity,
+  touchUserSeen,
   getObservabilityDashboard,
 };
