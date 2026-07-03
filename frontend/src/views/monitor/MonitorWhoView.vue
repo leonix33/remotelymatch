@@ -15,6 +15,35 @@ const loginEvents = computed(() => data.value?.loginEvents || []);
 const activityFeed = computed(() => data.value?.activityFeed || []);
 const applications = computed(() => data.value?.applications || []);
 const applicationsExpanded = ref({});
+const loginExpanded = ref({});
+const activityExpanded = ref({});
+
+function groupEventsByUser(items, { nameKey = 'userName', emailKey = 'email', userIdKey = 'userId', timeKey = 'occurredAt' } = {}) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = item[userIdKey] || item[emailKey] || 'unknown';
+    if (!groups.has(key)) {
+      groups.set(key, {
+        userId: key,
+        userName: item[nameKey] || item[emailKey] || 'Unknown',
+        email: item[emailKey] || '',
+        items: [],
+      });
+    }
+    groups.get(key).items.push(item);
+  }
+  return [...groups.values()]
+    .map((group) => {
+      const sorted = [...group.items].sort(
+        (a, b) => new Date(b[timeKey] || 0) - new Date(a[timeKey] || 0)
+      );
+      return { ...group, items: sorted, latestAt: sorted[0]?.[timeKey] || null };
+    })
+    .sort((a, b) => new Date(b.latestAt || 0) - new Date(a.latestAt || 0));
+}
+
+const loginEventsByUser = computed(() => groupEventsByUser(loginEvents.value));
+const activityByUser = computed(() => groupEventsByUser(activityFeed.value));
 
 const applicationsByUser = computed(() => {
   const groups = new Map();
@@ -90,26 +119,47 @@ function formatJobLine(app) {
 }
 
 function isUserAppsExpanded(userId) {
-  return Boolean(applicationsExpanded.value[userId]);
+  return isGroupExpanded(applicationsExpanded, userId);
 }
 
 function toggleUserApps(userId) {
-  applicationsExpanded.value = {
-    ...applicationsExpanded.value,
-    [userId]: !applicationsExpanded.value[userId],
-  };
+  toggleGroup(applicationsExpanded, userId);
 }
 
 function expandAllApplications() {
-  const next = {};
-  for (const group of applicationsByUser.value) {
-    next[group.userId] = true;
-  }
-  applicationsExpanded.value = next;
+  expandAllGroups(applicationsExpanded, applicationsByUser.value);
 }
 
 function collapseAllApplications() {
-  applicationsExpanded.value = {};
+  collapseAllGroups(applicationsExpanded);
+}
+
+function isGroupExpanded(store, userId) {
+  return Boolean(store.value[userId]);
+}
+
+function toggleGroup(store, userId) {
+  store.value = { ...store.value, [userId]: !store.value[userId] };
+}
+
+function expandAllGroups(store, groups) {
+  const next = {};
+  for (const group of groups) next[group.userId] = true;
+  store.value = next;
+}
+
+function collapseAllGroups(store) {
+  store.value = {};
+}
+
+function loginFailedCount(group) {
+  return group.items.filter((event) => !event.success).length;
+}
+
+function activityTypeSummary(group) {
+  const types = new Set(group.items.map((item) => item.type));
+  if (types.size === 1) return activityLabel([...types][0]);
+  return `${group.items.length} actions`;
 }
 
 async function refresh() {
@@ -224,46 +274,114 @@ onUnmounted(() => clearInterval(pollTimer));
 
     <div class="grid gap-6 xl:grid-cols-2">
       <section class="card p-5">
-        <h2 class="text-lg font-semibold text-slate-100">Login events</h2>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-100">Login events</h2>
+            <p class="mt-1 text-xs text-slate-500">
+              {{ loginEventsByUser.length }} {{ loginEventsByUser.length === 1 ? 'user' : 'users' }}
+              · {{ loginEvents.length }} events
+            </p>
+          </div>
+          <div v-if="loginEventsByUser.length" class="flex items-center gap-2">
+            <button type="button" class="btn-secondary text-xs" @click="expandAllGroups(loginExpanded, loginEventsByUser)">Expand</button>
+            <button type="button" class="btn-secondary text-xs" @click="collapseAllGroups(loginExpanded)">Collapse</button>
+          </div>
+        </div>
         <ul class="mt-4 space-y-3">
           <li
-            v-for="event in loginEvents"
-            :key="event.id"
-            class="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-3 text-sm"
+            v-for="group in loginEventsByUser"
+            :key="group.userId"
+            class="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40"
           >
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="font-medium text-slate-200">{{ event.userName || event.email }}</p>
-              <span class="badge text-[10px]" :class="event.success ? 'badge-teal' : 'badge-red'">
-                {{ event.success ? 'success' : 'failed' }}
-              </span>
-            </div>
-            <p class="mt-1 text-xs text-slate-500">
-              {{ formatTime(event.occurredAt) }} · {{ event.method }} · {{ event.email }}
-            </p>
-            <p v-if="event.reason && !event.success" class="mt-1 text-xs text-red-300">{{ event.reason }}</p>
+            <button
+              type="button"
+              class="flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm transition hover:bg-slate-900/50"
+              @click="toggleGroup(loginExpanded, group.userId)"
+            >
+              <div class="min-w-0">
+                <p class="font-medium text-slate-200">{{ group.userName }}</p>
+                <p class="text-xs text-slate-500">{{ group.email }}</p>
+              </div>
+              <div class="flex shrink-0 items-center gap-2 text-right text-xs text-slate-400">
+                <span class="badge badge-slate text-[10px]">{{ group.items.length }} events</span>
+                <span v-if="loginFailedCount(group)" class="badge badge-red text-[10px]">{{ loginFailedCount(group) }} failed</span>
+                <span class="text-slate-500">{{ formatTime(group.latestAt) }}</span>
+                <span class="text-slate-500">{{ isGroupExpanded(loginExpanded, group.userId) ? '▾' : '▸' }}</span>
+              </div>
+            </button>
+            <ul v-show="isGroupExpanded(loginExpanded, group.userId)" class="space-y-2 border-t border-slate-800 px-3 py-3">
+              <li
+                v-for="event in group.items"
+                :key="event.id"
+                class="rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-2.5 text-sm"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-xs text-slate-500">{{ formatTime(event.occurredAt) }} · {{ event.method }}</p>
+                  <span class="badge text-[10px]" :class="event.success ? 'badge-teal' : 'badge-red'">
+                    {{ event.success ? 'success' : 'failed' }}
+                  </span>
+                </div>
+                <p v-if="event.reason && !event.success" class="mt-1 text-xs text-red-300">{{ event.reason }}</p>
+              </li>
+            </ul>
           </li>
-          <li v-if="!loginEvents.length" class="text-sm text-slate-500">No login events in this window yet.</li>
+          <li v-if="!loginEventsByUser.length" class="text-sm text-slate-500">No login events in this window yet.</li>
         </ul>
       </section>
 
       <section class="card p-5">
-        <h2 class="text-lg font-semibold text-slate-100">Activity feed</h2>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold text-slate-100">Activity feed</h2>
+            <p class="mt-1 text-xs text-slate-500">
+              {{ activityByUser.length }} {{ activityByUser.length === 1 ? 'user' : 'users' }}
+              · {{ activityFeed.length }} actions
+            </p>
+          </div>
+          <div v-if="activityByUser.length" class="flex items-center gap-2">
+            <button type="button" class="btn-secondary text-xs" @click="expandAllGroups(activityExpanded, activityByUser)">Expand</button>
+            <button type="button" class="btn-secondary text-xs" @click="collapseAllGroups(activityExpanded)">Collapse</button>
+          </div>
+        </div>
         <ul class="mt-4 space-y-3">
           <li
-            v-for="item in activityFeed"
-            :key="item.id"
-            class="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-3 text-sm"
+            v-for="group in activityByUser"
+            :key="group.userId"
+            class="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40"
           >
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="font-medium text-slate-200">{{ item.userName || item.email }}</p>
-              <span class="badge text-[10px]" :class="activityBadgeClass(item.type)">
-                {{ activityLabel(item.type) }}
-              </span>
-            </div>
-            <p class="mt-1 text-slate-300">{{ item.summary }}</p>
-            <p class="mt-1 text-xs text-slate-500">{{ formatTime(item.occurredAt) }}</p>
+            <button
+              type="button"
+              class="flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm transition hover:bg-slate-900/50"
+              @click="toggleGroup(activityExpanded, group.userId)"
+            >
+              <div class="min-w-0">
+                <p class="font-medium text-slate-200">{{ group.userName }}</p>
+                <p class="text-xs text-slate-500">{{ group.email }}</p>
+              </div>
+              <div class="flex shrink-0 items-center gap-2 text-right text-xs text-slate-400">
+                <span class="badge badge-slate text-[10px]">{{ group.items.length }} actions</span>
+                <span class="text-slate-500">{{ activityTypeSummary(group) }}</span>
+                <span class="text-slate-500">{{ formatTime(group.latestAt) }}</span>
+                <span class="text-slate-500">{{ isGroupExpanded(activityExpanded, group.userId) ? '▾' : '▸' }}</span>
+              </div>
+            </button>
+            <ul v-show="isGroupExpanded(activityExpanded, group.userId)" class="space-y-2 border-t border-slate-800 px-3 py-3">
+              <li
+                v-for="item in group.items"
+                :key="item.id"
+                class="rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-2.5 text-sm"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="font-medium text-slate-200">{{ item.summary }}</p>
+                  <span class="badge text-[10px]" :class="activityBadgeClass(item.type)">
+                    {{ activityLabel(item.type) }}
+                  </span>
+                </div>
+                <p class="mt-1 text-xs text-slate-500">{{ formatTime(item.occurredAt) }}</p>
+              </li>
+            </ul>
           </li>
-          <li v-if="!activityFeed.length" class="text-sm text-slate-500">No tracked activity yet — events appear after logins, page views, kit generation, approvals, applies, polish, and follow-up sends.</li>
+          <li v-if="!activityByUser.length" class="text-sm text-slate-500">No tracked activity yet — events appear after logins, page views, kit generation, approvals, applies, polish, and follow-up sends.</li>
         </ul>
       </section>
     </div>
@@ -278,8 +396,8 @@ onUnmounted(() => clearInterval(pollTimer));
           </p>
         </div>
         <div v-if="applicationsByUser.length" class="flex items-center gap-2">
-          <button type="button" class="btn-secondary text-xs" @click="expandAllApplications">Expand all</button>
-          <button type="button" class="btn-secondary text-xs" @click="collapseAllApplications">Collapse all</button>
+          <button type="button" class="btn-secondary text-xs" @click="expandAllApplications">Expand</button>
+          <button type="button" class="btn-secondary text-xs" @click="collapseAllApplications">Collapse</button>
         </div>
       </div>
 
