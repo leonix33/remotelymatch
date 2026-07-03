@@ -1,16 +1,16 @@
 import { showAskAi } from '../config';
 
-/** Core quality-first workflow — everyone sees these. */
+/** Core interview workflow — simple 4-step mental model. */
 export const simpleNav = [
   { to: '/', label: 'Apply', icon: '▶', exact: true },
-  { to: '/jobs', label: 'Jobs', icon: '◎' },
-  { to: '/approvals', label: 'My Queue', icon: '✓' },
+  { to: '/approvals', label: 'Queue', icon: '✓' },
   { to: '/follow-ups', label: 'Follow-ups', icon: '↻' },
   { to: '/profile', label: 'Profile', icon: '◆' },
 ];
 
-/** Optional extras for normal users — keep the sidebar simple. */
+/** Optional extras — keep the main nav focused on getting interviews. */
 const userMoreNavAll = [
+  { to: '/jobs', label: 'Browse jobs', icon: '◎' },
   { to: '/concierge', label: 'Ask AI', icon: '✦', askAi: true },
   { to: '/tailored-resumes', label: 'Tailored resumes', icon: '📋' },
   { to: '/interview', label: 'Interview prep', icon: '🎙' },
@@ -27,7 +27,7 @@ export const adminNav = [
 ];
 
 export function moreNavSections(isAdmin) {
-  const sections = [{ title: 'Helpful tools', items: userMoreNav }];
+  const sections = [{ title: 'More', items: userMoreNav }];
   if (isAdmin) {
     sections.push({ title: 'Admin', items: adminNav, adminOnly: true });
   }

@@ -422,11 +422,11 @@ onMounted(() => {
   <div>
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold text-slate-100">{{ isAdmin ? 'Apply queue' : 'My queue' }}</h2>
+        <h2 class="text-2xl font-bold text-slate-100">{{ isAdmin ? 'Apply queue' : 'Queue' }}</h2>
         <p class="mt-1 max-w-xl text-slate-400">
           {{ isAdmin
             ? 'Triage by interview likelihood — approve roles with the best chance of a human reply.'
-            : 'Approve strong fits, open Application kit for ATS keyword match, then submit.' }}
+            : 'Polish tailored resumes, apply when ready, then generate follow-up kits to reach recruiters.' }}
         </p>
       </div>
       <div class="mobile-queue-stats flex flex-wrap gap-3">
@@ -487,10 +487,11 @@ onMounted(() => {
       v-if="counts.approved > 0 || counts.pending > 0"
       class="mt-4 rounded-xl border border-amber-900/40 bg-amber-950/20 px-4 py-3 text-sm text-amber-100/90"
     >
-      <p class="font-medium text-amber-200">Before you submit</p>
+      <p class="font-medium text-amber-200">Polish &amp; follow up</p>
       <p class="mt-1 text-xs text-amber-100/80">
-        Use <strong>Polish until ready</strong> on each role (targets 95% ATS). <strong>Apply</strong> unlocks when the kit is ready — or use <strong>Apply anyway</strong> if you have reviewed it.
-        After applying, use <RouterLink to="/follow-ups" class="text-violet-300 hover:underline">Follow-ups</RouterLink> for recruiter drafts and day-5 reminders.
+        <strong>Polish until ready</strong> targets 95% ATS on each tailored resume.
+        <strong>Generate follow-up kit</strong> drafts recruiter outreach after you apply.
+        <RouterLink to="/follow-ups" class="text-violet-300 hover:underline">Follow-ups</RouterLink> tracks replies and day-5 reminders.
       </p>
     </div>
 

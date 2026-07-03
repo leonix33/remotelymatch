@@ -220,6 +220,24 @@ async function parseResume(req, res, next) {
         patch.portfolio = contact.portfolio;
       }
 
+      if (!patch.digestEmail?.trim() && !profile.digestEmail?.trim()) {
+        const accountEmail = await applicantContactService.resolveAuthEmail(req.user.sub, req.user.email);
+        if (accountEmail && !applicantContactService.isMailboxOnlyEmail(accountEmail)) {
+          patch.digestEmail = accountEmail;
+        }
+      }
+
+      const isFirstSetup = !profile.onboardingComplete;
+      if (isFirstSetup && parsed.resumeText?.length >= 50) {
+        patch.onboardingComplete = true;
+        patch.tailorResumeOnApply = true;
+        patch.defaultApplyResumeMode = 'tailored';
+        patch.defaultTailorMode = 'high_match';
+        patch.autoApplyEnabled = true;
+        patch.defaultQuickApplyCount = profile.defaultQuickApplyCount || 5;
+        if (!profile.minMatchScore) patch.minMatchScore = 50;
+      }
+
       profile = await profileService.update(req.user.sub, patch);
     }
 

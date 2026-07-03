@@ -293,7 +293,7 @@ body {
 }
 
 .monitor-content {
-  @apply space-y-6;
+  @apply min-h-[16rem] space-y-6;
 }
 
 .monitor-section-title {

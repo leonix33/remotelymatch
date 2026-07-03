@@ -1,6 +1,7 @@
 const Profile = require('../models/Profile');
 const env = require('../config/env');
 const profileFileService = require('./profileFileService');
+const jobListCache = require('./jobListCache');
 const { enrichProfileResponse } = require('./resumeParseService');
 const { encryptApiKey, maskApiKey } = require('./openaiKeyCrypto');
 
@@ -77,15 +78,17 @@ async function getOrCreate(userId) {
 }
 
 async function update(userId, data) {
+  let profile;
   if (!env.mongoUri) {
-    const profile = profileFileService.save(userId, data);
-    return toResponse(profile);
+    profile = profileFileService.save(userId, data);
+  } else {
+    profile = await Profile.findOneAndUpdate(
+      { userId },
+      { $set: data },
+      { new: true, upsert: true }
+    ).select('+openaiApiKeyEncrypted +hunterApiKeyEncrypted +apolloApiKeyEncrypted');
   }
-  const profile = await Profile.findOneAndUpdate(
-    { userId },
-    { $set: data },
-    { new: true, upsert: true }
-  ).select('+openaiApiKeyEncrypted +hunterApiKeyEncrypted +apolloApiKeyEncrypted');
+  jobListCache.invalidate(userId);
   return toResponse(profile);
 }
 

@@ -129,11 +129,13 @@ async function getObservabilityDashboard({ days = 7, limit = 80 } = {}) {
         failedLoginsToday: 0,
         applicationsToday: 0,
         activitiesToday: 0,
+        windowDays: Math.min(90, Math.max(1, Number(days) || 7)),
       },
       users: [],
       loginEvents: [],
       activityFeed: [],
       applications: [],
+      generatedAt: new Date().toISOString(),
     };
   }
 
@@ -141,154 +143,168 @@ async function getObservabilityDashboard({ days = 7, limit = 80 } = {}) {
   const today = startOfDay();
   const cap = Math.min(200, Math.max(20, Number(limit) || 80));
 
-  const [
-    totalUsers,
-    users,
-    loginEvents,
-    activityFeed,
-    applications,
-    loginsToday,
-    failedLoginsToday,
-    applicationsToday,
-    activitiesToday,
-    activeUserIds,
-  ] = await Promise.all([
-    User.countDocuments({ active: true }),
-    User.find({})
-      .select('name email role active lastLoginAt lastLoginMethod loginCount lastSeenAt createdAt updatedAt')
-      .sort({ lastLoginAt: -1, updatedAt: -1 })
-      .limit(100)
-      .lean(),
-    LoginEvent.find({ occurredAt: { $gte: since } })
-      .sort({ occurredAt: -1 })
-      .limit(cap)
-      .lean(),
-    UserActivityEvent.find({ occurredAt: { $gte: since } })
-      .sort({ occurredAt: -1 })
-      .limit(cap)
-      .lean(),
-    Application.find({ lastAttempted: { $gte: since } })
-      .sort({ lastAttempted: -1 })
-      .limit(cap)
-      .populate('userId', 'name email role')
-      .lean(),
-    LoginEvent.countDocuments({ success: true, occurredAt: { $gte: today } }),
-    LoginEvent.countDocuments({ success: false, occurredAt: { $gte: today } }),
-    Application.countDocuments({ lastAttempted: { $gte: today } }),
-    UserActivityEvent.countDocuments({ occurredAt: { $gte: today } }),
-    UserActivityEvent.distinct('userId', { occurredAt: { $gte: since } }),
-  ]);
-
-  const applicationCounts = await Application.aggregate([
-    { $group: { _id: '$userId', count: { $sum: 1 }, lastApplied: { $max: '$lastAttempted' } } },
-  ]);
-  const appCountByUser = new Map(applicationCounts.map((row) => [String(row._id), row]));
-
-  const lastActivityAgg = await UserActivityEvent.aggregate([
-    { $sort: { occurredAt: -1 } },
-    {
-      $group: {
-        _id: '$userId',
-        lastActivityAt: { $first: '$occurredAt' },
-        lastType: { $first: '$type' },
-        lastSummary: { $first: '$summary' },
-      },
-    },
-  ]);
-  const lastActivityByUser = new Map(lastActivityAgg.map((row) => [String(row._id), row]));
-
-  const loginStatsAgg = await LoginEvent.aggregate([
-    { $match: { success: true, userId: { $exists: true, $ne: null } } },
-    { $sort: { occurredAt: -1 } },
-    {
-      $group: {
-        _id: '$userId',
-        loginCount: { $sum: 1 },
-        lastLoginAt: { $first: '$occurredAt' },
-        lastLoginMethod: { $first: '$method' },
-      },
-    },
-  ]);
-  const loginStatsByUser = new Map(loginStatsAgg.map((row) => [String(row._id), row]));
-
-  const userRows = users.map((user) => {
-    const id = String(user._id);
-    const apps = appCountByUser.get(id);
-    const activity = lastActivityByUser.get(id);
-    const logins = loginStatsByUser.get(id);
-    const lastLoginAt = user.lastLoginAt || logins?.lastLoginAt || null;
-    const loginCount = Math.max(user.loginCount || 0, logins?.loginCount || 0);
-    const lastLoginMethod = user.lastLoginMethod || logins?.lastLoginMethod || '';
-    return {
-      id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      active: user.active !== false,
-      lastLoginAt,
-      lastLoginMethod,
-      loginCount,
-      lastSeenAt: user.lastSeenAt || activity?.lastActivityAt || null,
-      applicationCount: apps?.count || 0,
-      lastAppliedAt: apps?.lastApplied || null,
-      lastActivityAt: activity?.lastActivityAt || null,
-      lastActivityType: activity?.lastType || '',
-      lastActivitySummary: activity?.lastSummary || '',
-      createdAt: user.createdAt,
-    };
-  });
-
-  return {
-    mongoRequired: false,
-    summary: {
+  try {
+    const [
       totalUsers,
-      activeUsers: activeUserIds.filter(Boolean).length,
+      users,
+      loginEvents,
+      activityFeed,
+      applications,
       loginsToday,
       failedLoginsToday,
       applicationsToday,
       activitiesToday,
-      windowDays: Math.min(90, Math.max(1, Number(days) || 7)),
-    },
-    users: userRows,
-    loginEvents: loginEvents.map((row) => ({
-      id: String(row._id),
-      userId: row.userId ? String(row.userId) : '',
-      email: row.email,
-      userName: row.userName,
-      role: row.role,
-      method: row.method,
-      success: row.success,
-      reason: row.reason,
-      ip: row.ip,
-      occurredAt: row.occurredAt,
-    })),
-    activityFeed: activityFeed.map((row) => ({
-      id: String(row._id),
-      userId: row.userId ? String(row.userId) : '',
-      email: row.email,
-      userName: row.userName,
-      type: row.type,
-      entityType: row.entityType,
-      entityId: row.entityId,
-      summary: row.summary,
-      meta: row.meta || {},
-      occurredAt: row.occurredAt,
-    })),
-    applications: applications.map((row) => ({
-      id: String(row._id),
-      userId: row.userId?._id ? String(row.userId._id) : String(row.userId || ''),
-      userName: row.userId?.name || '',
-      email: row.userId?.email || '',
-      jobId: row.jobId,
-      title: row.title,
-      company: row.company,
-      status: row.status,
-      source: row.source,
-      matchPct: row.matchPct,
-      submittedAt: row.submittedAt,
-      lastAttempted: row.lastAttempted,
-    })),
-  };
+      activeUserIds,
+    ] = await Promise.all([
+      User.countDocuments({ active: true }),
+      User.find({})
+        .select('name email role active lastLoginAt lastLoginMethod loginCount lastSeenAt createdAt updatedAt')
+        .sort({ lastLoginAt: -1, updatedAt: -1 })
+        .limit(100)
+        .lean(),
+      LoginEvent.find({ occurredAt: { $gte: since } })
+        .sort({ occurredAt: -1 })
+        .limit(cap)
+        .lean(),
+      UserActivityEvent.find({ occurredAt: { $gte: since } })
+        .sort({ occurredAt: -1 })
+        .limit(cap)
+        .lean(),
+      Application.find({ lastAttempted: { $gte: since } })
+        .sort({ lastAttempted: -1 })
+        .limit(cap)
+        .populate('userId', 'name email role')
+        .lean(),
+      LoginEvent.countDocuments({ success: true, occurredAt: { $gte: today } }),
+      LoginEvent.countDocuments({ success: false, occurredAt: { $gte: today } }),
+      Application.countDocuments({ lastAttempted: { $gte: today } }),
+      UserActivityEvent.countDocuments({ occurredAt: { $gte: today } }),
+      UserActivityEvent.distinct('userId', { occurredAt: { $gte: since } }),
+    ]);
+
+    let applicationCounts = [];
+    let lastActivityAgg = [];
+    let loginStatsAgg = [];
+    try {
+      [applicationCounts, lastActivityAgg, loginStatsAgg] = await Promise.all([
+        Application.aggregate([
+          { $group: { _id: '$userId', count: { $sum: 1 }, lastApplied: { $max: '$lastAttempted' } } },
+        ]),
+        UserActivityEvent.aggregate([
+          { $sort: { occurredAt: -1 } },
+          {
+            $group: {
+              _id: '$userId',
+              lastActivityAt: { $first: '$occurredAt' },
+              lastType: { $first: '$type' },
+              lastSummary: { $first: '$summary' },
+            },
+          },
+        ]),
+        LoginEvent.aggregate([
+          { $match: { success: true, userId: { $exists: true, $ne: null } } },
+          { $sort: { occurredAt: -1 } },
+          {
+            $group: {
+              _id: '$userId',
+              loginCount: { $sum: 1 },
+              lastLoginAt: { $first: '$occurredAt' },
+              lastLoginMethod: { $first: '$method' },
+            },
+          },
+        ]),
+      ]);
+    } catch (aggErr) {
+      console.warn('Observability aggregate partial failure:', aggErr.message);
+    }
+
+    const appCountByUser = new Map(applicationCounts.map((row) => [String(row._id), row]));
+    const lastActivityByUser = new Map(lastActivityAgg.map((row) => [String(row._id), row]));
+    const loginStatsByUser = new Map(loginStatsAgg.map((row) => [String(row._id), row]));
+
+    const userRows = users.map((user) => {
+      const id = String(user._id);
+      const apps = appCountByUser.get(id);
+      const activity = lastActivityByUser.get(id);
+      const logins = loginStatsByUser.get(id);
+      const lastLoginAt = user.lastLoginAt || logins?.lastLoginAt || null;
+      const loginCount = Math.max(user.loginCount || 0, logins?.loginCount || 0);
+      const lastLoginMethod = user.lastLoginMethod || logins?.lastLoginMethod || '';
+      return {
+        id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        active: user.active !== false,
+        lastLoginAt,
+        lastLoginMethod,
+        loginCount,
+        lastSeenAt: user.lastSeenAt || activity?.lastActivityAt || null,
+        applicationCount: apps?.count || 0,
+        lastAppliedAt: apps?.lastApplied || null,
+        lastActivityAt: activity?.lastActivityAt || null,
+        lastActivityType: activity?.lastType || '',
+        lastActivitySummary: activity?.lastSummary || '',
+        createdAt: user.createdAt,
+      };
+    });
+
+    return {
+      mongoRequired: false,
+      summary: {
+        totalUsers,
+        activeUsers: activeUserIds.filter(Boolean).length,
+        loginsToday,
+        failedLoginsToday,
+        applicationsToday,
+        activitiesToday,
+        windowDays: Math.min(90, Math.max(1, Number(days) || 7)),
+      },
+      users: userRows,
+      loginEvents: loginEvents.map((row) => ({
+        id: String(row._id),
+        userId: row.userId ? String(row.userId) : '',
+        email: row.email,
+        userName: row.userName,
+        role: row.role,
+        method: row.method,
+        success: row.success,
+        reason: row.reason,
+        ip: row.ip,
+        occurredAt: row.occurredAt,
+      })),
+      activityFeed: activityFeed.map((row) => ({
+        id: String(row._id),
+        userId: row.userId ? String(row.userId) : '',
+        email: row.email,
+        userName: row.userName,
+        type: row.type,
+        entityType: row.entityType,
+        entityId: row.entityId,
+        summary: row.summary,
+        meta: row.meta || {},
+        occurredAt: row.occurredAt,
+      })),
+      applications: applications.map((row) => ({
+        id: String(row._id),
+        userId: row.userId?._id ? String(row.userId._id) : String(row.userId || ''),
+        userName: row.userId?.name || '',
+        email: row.userId?.email || '',
+        jobId: row.jobId,
+        title: row.title,
+        company: row.company,
+        status: row.status,
+        source: row.source,
+        matchPct: row.matchPct,
+        submittedAt: row.submittedAt,
+        lastAttempted: row.lastAttempted,
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.error('Observability dashboard failed:', err);
+    throw err;
+  }
 }
 
 module.exports = {

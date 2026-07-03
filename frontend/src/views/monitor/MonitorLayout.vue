@@ -44,7 +44,7 @@ function isActive(tab) {
     </header>
 
     <div class="monitor-content">
-      <RouterView />
+      <RouterView :key="route.fullPath" />
     </div>
   </div>
 </template>
