@@ -2,6 +2,14 @@
 
 A full-stack remote job dashboard built with the **Vue → Express → MongoDB** pattern from the Business Dashboard Master Guide — wired to your existing Python job agent.
 
+## Planning & docs
+
+| Doc | Purpose |
+|-----|---------|
+| [ROADMAP.md](ROADMAP.md) | Tracked checklist — Tier 0→3, 30-day build order |
+| [docs/PROJECT_MASTER.md](docs/PROJECT_MASTER.md) | Full architecture + ChatGPT project brief |
+| [GitHub milestone](https://github.com/leonix33/remotelymatch/milestone/1) | **30-Day PMF** issues #2–#22 |
+
 ## Product naming
 
 | What | Value |
