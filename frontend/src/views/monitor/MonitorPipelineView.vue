@@ -108,8 +108,7 @@ onMounted(async () => {
         <div>
           <h2 class="monitor-section-title">Configured job sources</h2>
           <p class="monitor-section-desc">
-            Pulled from repo env <code class="text-teal-400">JOB_SOURCES_ENABLED</code>
-            · {{ ingestSources.length }} sources
+            All live boards are searched by default · {{ ingestSources.filter((s) => s.enabled).length }} active
           </p>
         </div>
         <span class="text-slate-500">{{ sourcesExpanded ? '▾' : '▸' }}</span>
@@ -121,7 +120,7 @@ onMounted(async () => {
             v-for="source in ingestSources"
             :key="source.name"
             class="badge text-[10px]"
-            :class="source.configured ? 'badge-teal' : 'badge-slate'"
+            :class="source.enabled && source.configured ? 'badge-teal' : 'badge-slate'"
             :title="source.apiKeyPresent === false ? 'API key missing' : ''"
           >
             {{ source.name }}
@@ -129,8 +128,8 @@ onMounted(async () => {
           <p v-if="!ingestSources.length" class="text-sm text-slate-500">No sources configured.</p>
         </div>
         <p class="mt-3 text-xs text-slate-600">
-          Edit <code class="text-slate-400">backend/src/config/jobSources.js</code> or set
-          <code class="text-slate-400">JOB_SOURCES_ENABLED</code> on Render.
+          Searches all boards in <code class="text-slate-400">backend/src/config/jobSources.js</code> automatically.
+          Optional: set <code class="text-slate-400">JOB_SOURCES_ENABLED</code> on Render to limit sources.
         </p>
       </div>
     </section>

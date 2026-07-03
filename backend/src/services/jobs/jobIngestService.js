@@ -18,11 +18,22 @@ function getIngestStatus() {
   return lastIngest;
 }
 
-async function fetchFromSources(sourceNames = jobSourcesConfig.enabledSources) {
+function allFetcherSources() {
+  return Object.keys(SOURCE_FETCHERS);
+}
+
+function resolveSourceNames(explicit) {
+  if (explicit?.length) return explicit;
+  const configured = jobSourcesConfig.enabledSources || [];
+  return configured.length ? configured : allFetcherSources();
+}
+
+async function fetchFromSources(sourceNames) {
+  const names = resolveSourceNames(sourceNames);
   const results = {};
   const errors = [];
 
-  for (const name of sourceNames) {
+  for (const name of names) {
     const fetcher = SOURCE_FETCHERS[name];
     if (!fetcher) {
       errors.push({ source: name, message: 'Unknown source' });
@@ -41,7 +52,7 @@ async function fetchFromSources(sourceNames = jobSourcesConfig.enabledSources) {
 }
 
 async function ingestJobs({ sources, persist = true, dryRun = false } = {}) {
-  const sourceNames = sources?.length ? sources : jobSourcesConfig.enabledSources;
+  const sourceNames = resolveSourceNames(sources);
   lastIngest = {
     startedAt: new Date().toISOString(),
     finishedAt: null,
@@ -94,11 +105,18 @@ async function ingestJobs({ sources, persist = true, dryRun = false } = {}) {
 }
 
 function listConfiguredSources() {
-  return jobSourcesConfig.enabledSources.map((name) => ({
+  const active = new Set(resolveSourceNames());
+  return allFetcherSources().map((name) => ({
     name,
+    enabled: active.has(name),
     configured: Boolean(SOURCE_FETCHERS[name]),
-    requiresApiKey: name === 'usajobs',
-    apiKeyPresent: name === 'usajobs' ? Boolean(jobSourcesConfig.usajobsApiKey) : true,
+    requiresApiKey: name === 'usajobs' || name === 'adzuna',
+    apiKeyPresent:
+      name === 'usajobs'
+        ? Boolean(jobSourcesConfig.usajobsApiKey)
+        : name === 'adzuna'
+          ? Boolean(jobSourcesConfig.adzunaAppId && jobSourcesConfig.adzunaAppKey)
+          : true,
     lastFetched: lastIngest.sources[name]?.fetched ?? null,
   }));
 }

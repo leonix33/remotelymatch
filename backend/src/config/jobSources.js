@@ -61,7 +61,8 @@ module.exports = {
   adzunaWhat: process.env.ADZUNA_WHAT || 'remote',
   adzunaWhere: process.env.ADZUNA_WHERE || 'remote',
   adzunaMaxDaysOld: process.env.ADZUNA_MAX_DAYS_OLD || '7',
-  enabledSources: parseList(process.env.JOB_SOURCES_ENABLED, [
+  // All live fetchers by default — set JOB_SOURCES_ENABLED only to limit (comma-separated)
+  allSources: [
     'remoteok',
     'remotive',
     'jobicy',
@@ -86,5 +87,9 @@ module.exports = {
     'ycombinator',
     'workatastartup',
     'usajobs',
-  ]),
+  ],
+  get enabledSources() {
+    const explicit = parseList(process.env.JOB_SOURCES_ENABLED, []);
+    return explicit.length ? explicit : this.allSources;
+  },
 };
