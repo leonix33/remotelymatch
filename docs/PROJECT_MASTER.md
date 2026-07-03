@@ -234,6 +234,27 @@ npm run dev
 
 ---
 
+---
+
+## 6-month strategy (north star)
+
+For the next six months, build **almost exclusively** on these six pillars. Each maps to existing services in the repo.
+
+| Pillar | Goal | Key services / views |
+|--------|------|----------------------|
+| **1. Job matching** | Fewer bad matches, clear "why" | `jobScoringService`, `TopMatchJobsPreview`, `JobsView` |
+| **2. Resume tailoring** | ATS-safe, human-sounding per-job kits | `resumeTailorService`, `applicationKitService`, `atsKeywordService` |
+| **3. Recruiter targeting** | Right person, ranked contacts | `contactEnrichmentService`, `contactRankingService`, `recruiterContactService` |
+| **4. Follow-up automation** | Timed drafts, one-tap send | `followUpDraftService`, `followUpSendService`, `weeklyPulseService` |
+| **5. Interview preparation** | Per-job prep pack | `interviewService`, `InterviewView` |
+| **6. Outcome learning** | Reply/interview/offer → better match + tailor | `outcomeService`, `conversionStatsService`, `OutcomesView` |
+
+**Month 1–3:** Pillars 1–2 + Tier 0 trust. **Month 2–4:** Pillars 3–4. **Month 3–5:** Pillars 5–6. **Month 6:** Case study, beta users, then growth (Tier 3).
+
+See [ROADMAP.md](../ROADMAP.md) for the full 6-month calendar.
+
+---
+
 ## 5. PMF Build Roadmap — Tier 0 → Tier 3
 
 **Rule:** If it doesn't help get an interview in 7 days, it waits.

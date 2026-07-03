@@ -8,14 +8,44 @@
 
 ---
 
-## Progress
+## 6-month strategy (primary focus)
 
-| Tier | Focus | Status |
-|------|--------|--------|
-| **0** | Trust & reliability | Week 1 — in progress |
-| **1** | Core loop proof | Week 2–3 |
-| **2** | Differentiation | Week 3–4 |
-| **3** | Growth | Month 2+ |
+Everything in the next six months serves **one loop** — find the right job, apply well, reach the right person, follow up, prep for the interview, learn what worked.
+
+| # | Pillar | What "better" means | Code today | Roadmap / issues |
+|---|--------|---------------------|------------|------------------|
+| **1** | **Job matching** | Explainable scores, fewer false positives, re-rank from outcomes | `jobScoringService.js`, `TopMatchJobsPreview.vue` | T1-1 [#8](https://github.com/leonix33/remotelymatch/issues/8) |
+| **2** | **Resume tailoring** | Per-job kits that pass ATS and sound human | `resumeTailorService.js`, `applicationKitService.js`, `atsKeywordService.js` | T1-3 [#10](https://github.com/leonix33/remotelymatch/issues/10) |
+| **3** | **Recruiter targeting** | Right contact, right channel, ranked by reply likelihood | `contactEnrichmentService.js`, `contactRankingService.js`, Hunter/Apollo | T2-3 [#16](https://github.com/leonix33/remotelymatch/issues/16) |
+| **4** | **Follow-up automation** | Timed drafts, one-tap send, weekly nudges | `followUpDraftService.js`, `followUpSendService.js`, `weeklyPulseService.js` | T2-1 [#14](https://github.com/leonix33/remotelymatch/issues/14), T1-5 [#12](https://github.com/leonix33/remotelymatch/issues/12) |
+| **5** | **Interview preparation** | Per-job prep: resume + company + likely questions | `interviewService.js`, `InterviewView.vue` | T2-2 [#15](https://github.com/leonix33/remotelymatch/issues/15) |
+| **6** | **Outcome learning** | Log reply/interview/offer; feed back into match + tailor | `outcomeService.js`, `conversionStatsService.js` | T1-4 [#11](https://github.com/leonix33/remotelymatch/issues/11) |
+
+**Do not build** (until pillars 1–6 move metrics): Swarm, Conferences, Social admin, deep Monitor tabs, generic Ask AI concierge, pricing/signup (Tier 3).
+
+### 6-month calendar
+
+| Month | Focus | Ship |
+|-------|--------|------|
+| **1** | Trust (Tier 0) + matching + tailoring | T0-* done; T1-1, T1-2, T1-3 live; you approve 40 real jobs |
+| **2** | Recruiter targeting + follow-ups | T2-3, T2-1, T1-5; first recruiter replies logged |
+| **3** | Interview prep + outcome loop | T2-2, T1-4; match scores use outcome data |
+| **4** | Polish pillars 1–4 from real data | Higher reply rate; kit quality from A/B on outcomes |
+| **5** | Double down on what converts | Drop low-yield sources; enrich winners |
+| **6** | Case study + 2 beta users | T2-5; only then Tier 3 (signup/pricing) |
+
+**Success by month 6:** Stable weekly loop, documented reply/interview rates, product story backed by your numbers.
+
+---
+
+## Progress (30-day bootstrap → 6-month pillars)
+
+| Phase | Focus | Status |
+|-------|--------|--------|
+| **Tier 0** | Trust & reliability | Week 1 — in progress |
+| **Tier 1** | Core loop → pillars **1, 2, 6** | Week 2–3 |
+| **Tier 2** | Differentiation → pillars **3, 4, 5** | Week 3–4 |
+| **Tier 3** | Growth (month 6+) | Deferred |
 
 ---
 
@@ -78,15 +108,16 @@
 
 ---
 
-## De-scope until Tier 1 is proven
+## De-scope (6-month rule)
 
-Do **not** build until core loop works:
+Do **not** build until pillars 1–6 improve reply/interview rates:
 
 - Monitor sub-tabs beyond overview
 - Swarm, Conferences, Social admin
-- Ask AI concierge (unless interview-focused)
+- Ask AI concierge (unless interview prep — pillar 5)
 - LinkedIn admin workflow
 - Deep analytics dashboards
+- Tier 3 (signup, pricing, App Store) until month 6
 
 ---
 
