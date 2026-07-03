@@ -2,7 +2,7 @@
   "name": "remotelymatch",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev": "node scripts/start-dev.js",
     "local:up": "docker compose up -d mongo",
     "local:setup": "node scripts/sync-dev-credentials.js",
     "local:check": "node scripts/local-preflight.js",

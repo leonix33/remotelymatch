@@ -88,12 +88,13 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
 
-  if (import.meta.env.DEV && !auth.accessToken) {
+  const skipDevAutoLogin = to.path === '/forgot-password';
+  if (import.meta.env.DEV && !auth.accessToken && !skipDevAutoLogin) {
     await tryDevAutoLogin(auth);
   }
 
   if (to.meta.requiresAuth && !auth.accessToken) return '/login';
-  if (to.meta.guest && auth.accessToken && !['/welcome', '/privacy', '/terms', '/forgot-password'].includes(to.path)) return '/';
+  if (to.meta.guest && auth.accessToken && !['/welcome', '/privacy', '/terms', '/login', '/forgot-password'].includes(to.path)) return '/';
   if (!showAskAi && to.path === '/concierge') return '/';
   if (to.matched.some((record) => record.meta.adminOnly) && auth.user?.role !== 'admin') return '/';
 

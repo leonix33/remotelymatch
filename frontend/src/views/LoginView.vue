@@ -84,6 +84,10 @@ async function afterAuth() {
 onMounted(async () => {
   syncModeFromRoute();
   email.value = recalledLoginEmail();
+  if (mode.value === 'forgot' || mode.value === 'reset') {
+    showBiometric.value = false;
+    return;
+  }
   const devCreds = recalledDevCredentials();
   if (devCreds?.email) email.value = devCreds.email;
   if (devCreds?.password) password.value = devCreds.password;
@@ -110,7 +114,9 @@ onMounted(async () => {
 });
 
 watch(() => route.fullPath, () => {
+  const prevMode = mode.value;
   syncModeFromRoute();
+  if (prevMode === 'forgot' && mode.value === 'login' && info.value) return;
 });
 
 async function submitLogin() {
@@ -158,6 +164,19 @@ async function submitBiometric() {
   }
 }
 
+async function finishPasswordReset(message, savedPassword) {
+  info.value = message || 'Password updated. Sign in with your new password.';
+  error.value = '';
+  password.value = savedPassword || '';
+  mode.value = 'login';
+  forgotStep.value = 1;
+  resetCode.value = '';
+  newPassword.value = '';
+  confirmPassword.value = '';
+  resetToken.value = '';
+  await router.replace({ path: '/login' });
+}
+
 async function submitForgot() {
   error.value = '';
   info.value = '';
@@ -189,19 +208,13 @@ async function submitResetWithCode() {
   }
   loading.value = true;
   try {
+    const savedPassword = newPassword.value.trim();
     const { data } = await http.post('/auth/reset-password-code', {
       email: email.value.trim(),
       code: resetCode.value.trim(),
-      newPassword: newPassword.value.trim(),
+      newPassword: savedPassword,
     });
-    info.value = data.message;
-    mode.value = 'login';
-    forgotStep.value = 1;
-    resetCode.value = '';
-    newPassword.value = '';
-    confirmPassword.value = '';
-    password.value = '';
-    await router.replace({ path: '/login' });
+    await finishPasswordReset(data.message, savedPassword);
   } catch (e) {
     error.value = e.response?.data?.message || 'Could not reset password';
   } finally {
@@ -218,20 +231,32 @@ async function submitReset() {
   }
   loading.value = true;
   try {
+    const savedPassword = newPassword.value.trim();
     const { data } = await http.post('/auth/reset-password', {
       token: resetToken.value,
-      newPassword: newPassword.value.trim(),
+      newPassword: savedPassword,
     });
-    info.value = data.message;
-    mode.value = 'login';
-    resetToken.value = '';
-    newPassword.value = '';
-    confirmPassword.value = '';
-    router.replace({ path: '/login', query: {} });
+    await finishPasswordReset(data.message, savedPassword);
   } catch (e) {
     error.value = e.response?.data?.message || 'Could not reset password';
   } finally {
     loading.value = false;
+  }
+}
+
+async function resendCode() {
+  error.value = '';
+  await submitForgot();
+}
+
+function goForgot() {
+  error.value = '';
+  info.value = '';
+  forgotStep.value = 1;
+  auth.logout();
+  mode.value = 'forgot';
+  if (route.path !== '/forgot-password') {
+    router.replace('/forgot-password').catch(() => {});
   }
 }
 
@@ -240,7 +265,9 @@ function goLogin() {
   info.value = '';
   forgotStep.value = 1;
   mode.value = 'login';
-  router.push('/login');
+  if (route.path !== '/login') {
+    router.replace('/login').catch(() => {});
+  }
 }
 </script>
 
@@ -283,9 +310,6 @@ function goLogin() {
         <button type="submit" class="btn-primary w-full" :disabled="loading || bioLoading">
           {{ loading ? 'Signing in…' : 'Sign in' }}
         </button>
-        <RouterLink to="/forgot-password" class="btn-secondary block w-full text-center">
-          Forgot password?
-        </RouterLink>
         <button
           v-if="showBiometric"
           type="button"
@@ -300,6 +324,12 @@ function goLogin() {
           Set up {{ bioLabel }} in Profile after your first password sign-in.
         </p>
       </form>
+
+      <div v-if="mode === 'login'" class="mt-4">
+        <button type="button" class="btn-secondary w-full min-h-[44px]" @click.prevent.stop="goForgot">
+          Forgot password?
+        </button>
+      </div>
 
       <!-- Forgot password -->
       <div v-else-if="mode === 'forgot'" class="mt-8 space-y-4">
@@ -339,7 +369,7 @@ function goLogin() {
           <button type="submit" class="btn-primary w-full" :disabled="loading">
             {{ loading ? 'Saving…' : 'Save new password' }}
           </button>
-          <button type="button" class="btn-secondary w-full" :disabled="loading" @click="forgotStep = 1; error = ''">
+          <button type="button" class="btn-secondary w-full" :disabled="loading" @click="resendCode">
             Resend code
           </button>
         </form>

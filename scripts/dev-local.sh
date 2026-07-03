@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "→ remotelymatch local dev"
+echo "  Folder: $(pwd)"
 echo "  App:    http://localhost:5173"
 echo "  API:    http://localhost:5100/api/health"
 echo ""

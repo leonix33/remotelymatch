@@ -14,10 +14,14 @@ import MobileMoreMenu from './components/MobileMoreMenu.vue';
 import { simpleNav } from './utils/navigation';
 import { isProduction, canonicalDomain, showAskAi } from './config';
 
+const GUEST_PATHS = ['/login', '/forgot-password', '/privacy', '/terms', '/welcome'];
+
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const showMoreMenu = ref(false);
+
+const isGuestRoute = computed(() => GUEST_PATHS.includes(route.path));
 
 const mobileNav = computed(() => simpleNav.map((item) => ({ ...item, to: item.to })));
 
@@ -47,7 +51,7 @@ onMounted(async () => {
   navigator.serviceWorker?.addEventListener('message', onSwMessage);
   const auth = useAuthStore();
   const profileStore = useProfileStore();
-  if (auth.accessToken && !profileStore.loaded) {
+  if (auth.accessToken && !profileStore.loaded && !GUEST_PATHS.includes(route.path)) {
     profileStore.hydrateFromCache();
     await profileStore.fetch().catch(() => {});
   }
@@ -64,7 +68,7 @@ onUnmounted(() => {
   <ShareInstallTab />
   <ShareInstallPanel />
 
-  <div v-if="route.path === '/login' || route.path === '/privacy' || route.path === '/terms'" class="min-h-screen min-h-dvh safe-top safe-bottom safe-x">
+  <div v-if="isGuestRoute" class="min-h-screen min-h-dvh safe-top safe-bottom safe-x">
     <RouterView />
   </div>
   <div v-else class="mobile-app-shell flex min-h-screen min-h-dvh w-full flex-col lg:flex-row">
@@ -137,7 +141,7 @@ onUnmounted(() => {
     </div>
 
     <AppConcierge
-      v-if="showAskAi && auth.isAdmin && route.path !== '/login' && route.path !== '/onboarding' && route.path !== '/welcome'"
+      v-if="showAskAi && auth.isAdmin && !isGuestRoute && route.path !== '/onboarding'"
     />
   </div>
 </template>

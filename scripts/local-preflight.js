@@ -50,6 +50,19 @@ async function main() {
   let pass = true;
   console.log('Local preflight\n');
 
+  const pkgPath = path.join(ROOT, 'package.json');
+  if (!fs.existsSync(pkgPath)) {
+    console.log('  ✗ Wrong folder — cd to the remotelymatch app:');
+    console.log('      cd /Users/user/job-event-agent/remotelymatch');
+    process.exit(1);
+  }
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  if (pkg.name !== 'remotelymatch') {
+    console.log('  ✗ This is not the remotelymatch app folder.');
+    console.log('      cd /Users/user/job-event-agent/remotelymatch');
+    process.exit(1);
+  }
+
   // Mongo
   try {
     execSync('docker ps --filter name=remotelymatch-mongo --format "{{.Status}}"', {
@@ -74,7 +87,7 @@ async function main() {
   if (health.ok) {
     ok(`Backend ${APP_URL}/api/health`);
   } else {
-    pass = fail('Backend not running', 'run: npm run dev (keep terminal open)');
+    pass = fail('Backend not running', 'run: npm run dev (keep Terminal open — do not close)');
   }
 
   const fe = await fetchStatus(FRONTEND_URL);
