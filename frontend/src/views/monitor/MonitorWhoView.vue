@@ -14,6 +14,35 @@ const users = computed(() => data.value?.users || []);
 const loginEvents = computed(() => data.value?.loginEvents || []);
 const activityFeed = computed(() => data.value?.activityFeed || []);
 const applications = computed(() => data.value?.applications || []);
+const applicationsExpanded = ref({});
+
+const applicationsByUser = computed(() => {
+  const groups = new Map();
+  for (const app of applications.value) {
+    const key = app.userId || app.email || 'unknown';
+    if (!groups.has(key)) {
+      groups.set(key, {
+        userId: key,
+        userName: app.userName || app.email || 'Unknown',
+        email: app.email || '',
+        apps: [],
+      });
+    }
+    groups.get(key).apps.push(app);
+  }
+  return [...groups.values()]
+    .map((group) => {
+      const apps = [...group.apps].sort(
+        (a, b) =>
+          new Date(b.lastAttempted || b.submittedAt || 0) - new Date(a.lastAttempted || a.submittedAt || 0)
+      );
+      const latestAt = apps[0]?.lastAttempted || apps[0]?.submittedAt || null;
+      return { ...group, apps, latestAt };
+    })
+    .sort((a, b) => new Date(b.latestAt || 0) - new Date(a.latestAt || 0));
+});
+
+const totalApplicationCount = computed(() => applications.value.length);
 
 const kpis = computed(() => [
   { label: 'Total users', value: summary.value.totalUsers ?? 0, tone: 'sky' },
@@ -51,6 +80,36 @@ function activityBadgeClass(type = '') {
   if (tone === 'violet') return 'badge-gold';
   if (tone === 'emerald') return 'badge-teal';
   return 'badge-slate';
+}
+
+function formatJobLine(app) {
+  const title = String(app.title || '').trim();
+  const company = String(app.company || '').trim();
+  if (title && company && title !== company) return `${title} · ${company}`;
+  return title || company || 'Unknown role';
+}
+
+function isUserAppsExpanded(userId) {
+  return Boolean(applicationsExpanded.value[userId]);
+}
+
+function toggleUserApps(userId) {
+  applicationsExpanded.value = {
+    ...applicationsExpanded.value,
+    [userId]: !applicationsExpanded.value[userId],
+  };
+}
+
+function expandAllApplications() {
+  const next = {};
+  for (const group of applicationsByUser.value) {
+    next[group.userId] = true;
+  }
+  applicationsExpanded.value = next;
+}
+
+function collapseAllApplications() {
+  applicationsExpanded.value = {};
 }
 
 async function refresh() {
@@ -210,23 +269,60 @@ onUnmounted(() => clearInterval(pollTimer));
     </div>
 
     <section class="card p-5">
-      <h2 class="text-lg font-semibold text-slate-100">Applications by user</h2>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-100">Applications by user</h2>
+          <p class="mt-1 text-xs text-slate-500">
+            {{ applicationsByUser.length }} {{ applicationsByUser.length === 1 ? 'user' : 'users' }}
+            · {{ totalApplicationCount }} applications
+          </p>
+        </div>
+        <div v-if="applicationsByUser.length" class="flex items-center gap-2">
+          <button type="button" class="btn-secondary text-xs" @click="expandAllApplications">Expand all</button>
+          <button type="button" class="btn-secondary text-xs" @click="collapseAllApplications">Collapse all</button>
+        </div>
+      </div>
+
       <ul class="mt-4 space-y-3">
         <li
-          v-for="app in applications"
-          :key="app.id"
-          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-3 text-sm"
+          v-for="group in applicationsByUser"
+          :key="group.userId"
+          class="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/40"
         >
-          <div>
-            <p class="font-medium text-slate-200">{{ app.title }} · {{ app.company }}</p>
-            <p class="text-xs text-slate-500">{{ app.userName || app.email }} · {{ app.source || 'source unknown' }}</p>
-          </div>
-          <div class="text-right text-xs text-slate-400">
-            <p class="badge badge-slate text-[10px]">{{ app.status }}</p>
-            <p class="mt-1">{{ formatTime(app.lastAttempted || app.submittedAt) }}</p>
-          </div>
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm transition hover:bg-slate-900/50"
+            @click="toggleUserApps(group.userId)"
+          >
+            <div class="min-w-0">
+              <p class="font-medium text-slate-200">{{ group.userName }}</p>
+              <p class="text-xs text-slate-500">{{ group.email }}</p>
+            </div>
+            <div class="flex shrink-0 items-center gap-3 text-right text-xs text-slate-400">
+              <span class="badge badge-slate text-[10px]">{{ group.apps.length }} applied</span>
+              <span class="text-slate-500">Latest {{ formatTime(group.latestAt) }}</span>
+              <span class="text-slate-500">{{ isUserAppsExpanded(group.userId) ? '▾' : '▸' }}</span>
+            </div>
+          </button>
+
+          <ul v-show="isUserAppsExpanded(group.userId)" class="space-y-2 border-t border-slate-800 px-3 py-3">
+            <li
+              v-for="app in group.apps"
+              :key="app.id"
+              class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-2.5 text-sm"
+            >
+              <div class="min-w-0">
+                <p class="font-medium text-slate-200">{{ formatJobLine(app) }}</p>
+                <p class="text-xs text-slate-500">{{ app.source || 'source unknown' }}</p>
+              </div>
+              <div class="text-right text-xs text-slate-400">
+                <p class="badge badge-slate text-[10px]">{{ app.status }}</p>
+                <p class="mt-1">{{ formatTime(app.lastAttempted || app.submittedAt) }}</p>
+              </div>
+            </li>
+          </ul>
         </li>
-        <li v-if="!applications.length" class="text-sm text-slate-500">No applications recorded in this window.</li>
+        <li v-if="!applicationsByUser.length" class="text-sm text-slate-500">No applications recorded in this window.</li>
       </ul>
     </section>
   </div>
