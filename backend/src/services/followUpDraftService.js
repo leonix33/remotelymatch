@@ -5,6 +5,7 @@ const applicationKitStore = require('./applicationKitStore');
 const recruiterContactService = require('./recruiterContactService');
 const contactEnrichmentService = require('./contactEnrichmentService');
 const followUpKitStore = require('./followUpKitStore');
+const activityService = require('./activityService');
 const jobService = require('./jobService');
 const { pickBestRecipient } = require('./contactRankingService');
 
@@ -148,7 +149,23 @@ async function generateFollowUpKit(userId, jobId, options = {}) {
     generatedAt: new Date().toISOString(),
   };
 
-  return followUpKitStore.set(userId, jobId, payload);
+  const saved = followUpKitStore.set(userId, jobId, payload);
+
+  await activityService.recordActivity({
+    req: options.req,
+    userId,
+    type: 'generate_follow_up_kit',
+    entityType: 'job',
+    entityId: jobId,
+    summary: `Generated follow-up kit — ${job.title} · ${job.company}`,
+    meta: {
+      company: job.company,
+      title: job.title,
+      recipientEmail: recipient?.email || '',
+    },
+  });
+
+  return saved;
 }
 
 async function generateForJobs(userId, jobs = [], options = {}) {

@@ -38,6 +38,12 @@ async function buildHealthBase() {
     hunterConfigured: Boolean(env.hunterApiKey),
     apolloConfigured: Boolean(env.apolloApiKey),
     pushConfigured: Boolean(env.vapidPublicKey && env.vapidPrivateKey),
+    secretsProvider: String(process.env.SECRETS_PROVIDER || 'env').trim() || 'env',
+    vaultConfigured: Boolean(
+      String(process.env.SECRETS_PROVIDER || '').includes('vault') &&
+        String(process.env.VAULT_ADDR || '').trim() &&
+        String(process.env.VAULT_TOKEN || '').trim()
+    ),
     customDomain: env.customDomain || null,
     clientOrigins: env.clientOrigins,
     time: new Date().toISOString(),

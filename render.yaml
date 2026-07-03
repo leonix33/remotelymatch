@@ -76,3 +76,14 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         value: mailto:team@remotelymatch.app
+      # HashiCorp Vault (open source secrets) — optional; use configure-hashicorp-vault-render.sh
+      - key: SECRETS_PROVIDER
+        sync: false
+      - key: VAULT_ADDR
+        sync: false
+      - key: VAULT_TOKEN
+        sync: false
+      - key: VAULT_MOUNT
+        value: secret
+      - key: VAULT_SECRET_PATH
+        value: remotelymatch

@@ -34,6 +34,8 @@ function activityLabel(type = '') {
 }
 
 function activityTone(type = '') {
+  if (type === 'page_view') return 'sky';
+  if (type.includes('generate')) return 'emerald';
   if (type.includes('login') || type === 'apply_jobs' || type === 'reapply_job') return 'teal';
   if (type.includes('follow_up')) return 'violet';
   if (type.includes('polish')) return 'amber';
@@ -47,6 +49,7 @@ function activityBadgeClass(type = '') {
   if (tone === 'teal') return 'badge-teal';
   if (tone === 'amber') return 'badge-gold';
   if (tone === 'violet') return 'badge-gold';
+  if (tone === 'emerald') return 'badge-teal';
   return 'badge-slate';
 }
 
@@ -195,7 +198,7 @@ onUnmounted(() => clearInterval(pollTimer));
             <p class="mt-1 text-slate-300">{{ item.summary }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ formatTime(item.occurredAt) }}</p>
           </li>
-          <li v-if="!activityFeed.length" class="text-sm text-slate-500">No tracked activity yet — events appear after logins, approvals, applies, polish, and follow-up sends.</li>
+          <li v-if="!activityFeed.length" class="text-sm text-slate-500">No tracked activity yet — events appear after logins, page views, kit generation, approvals, applies, polish, and follow-up sends.</li>
         </ul>
       </section>
     </div>

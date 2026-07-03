@@ -54,6 +54,7 @@ async function generateKit(req, res, next) {
       supplementPages: req.body?.supplementPages,
       tailorMode: req.body?.tailorMode,
       highMatchTarget: req.body?.highMatchTarget,
+      req,
     });
     res.json(kit);
   } catch (err) {

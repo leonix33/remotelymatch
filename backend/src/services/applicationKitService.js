@@ -133,7 +133,7 @@ async function generateForJob(userId, jobId, options = {}) {
     highMatchTarget,
   });
 
-  return applicationKitStore.set(userId, jobId, {
+  const saved = await applicationKitStore.set(userId, jobId, {
     ...kit,
     jobId,
     jobTitle: job.title,
@@ -147,6 +147,25 @@ async function generateForJob(userId, jobId, options = {}) {
     tailorMode,
     highMatchTarget,
   });
+
+  if (options.recordActivity !== false) {
+    await activityService.recordActivity({
+      req: options.req,
+      userId,
+      type: 'generate_kit',
+      entityType: 'job',
+      entityId: jobId,
+      summary: `Generated kit — ${job.title} · ${job.company}`,
+      meta: {
+        atsScore: saved?.atsScore ?? kit?.atsScore ?? null,
+        company: job.company,
+        title: job.title,
+        tailorMode,
+      },
+    });
+  }
+
+  return saved;
 }
 
 async function polishUntilReady(userId, jobId, options = {}) {
@@ -178,6 +197,7 @@ async function polishUntilReady(userId, jobId, options = {}) {
       tailorMode: 'high_match',
       tailorFocus: initialFocus || '',
       job,
+      recordActivity: false,
     });
     passes.push({ round: 0, phase: 'generate', atsScore: kit.atsScore ?? null, jdMatchPct: kit.jdMatchPct ?? null });
     if (isKitReadyToApply({ tailored: true, hasKit: true, atsScore: kit.atsScore, useForApply: kit.useForApply !== false })) {

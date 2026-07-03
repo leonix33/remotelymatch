@@ -53,6 +53,7 @@ async function followUpKit(req, res, next) {
     const kit = await followUpDraftService.getOrGenerate(req.user.sub, req.params.jobId, {
       authEmail: req.user.email,
       force: req.query.regenerate === '1',
+      req,
     });
     res.json(kit);
   } catch (err) {
@@ -74,6 +75,7 @@ async function enrichFollowUp(req, res, next) {
     const kit = await followUpDraftService.getOrGenerate(req.user.sub, req.params.jobId, {
       authEmail: req.user.email,
       force: true,
+      req,
     });
     res.json(kit);
   } catch (err) {

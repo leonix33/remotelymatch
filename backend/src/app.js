@@ -34,6 +34,7 @@ const tractionRoutes = require('./routes/tractionRoutes');
 const conciergeRoutes = require('./routes/conciergeRoutes');
 const setupRoutes = require('./routes/setupRoutes');
 const observabilityRoutes = require('./routes/observabilityRoutes');
+const activityRoutes = require('./routes/activityRoutes');
 const { buildHealthBase } = require('./controllers/setupController');
 const { CANONICAL_DOMAIN, LEGACY_REDIRECT_HOSTS } = require('./config/domains');
 
@@ -104,6 +105,7 @@ function createApp() {
   app.use('/api/concierge', conciergeRoutes);
   app.use('/api/setup', setupRoutes);
   app.use('/api/admin/observability', observabilityRoutes);
+  app.use('/api/activity', activityRoutes);
 
   const distPath = path.join(__dirname, '../../frontend/dist');
   app.use(express.static(distPath));

@@ -36,6 +36,7 @@ import MonitorApplicationsView from '../views/monitor/MonitorApplicationsView.vu
 import MonitorWhoView from '../views/monitor/MonitorWhoView.vue';
 import ConciergeView from '../views/ConciergeView.vue';
 import { showAskAi } from '../config';
+import { trackPageView } from '../utils/pageActivity';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -115,6 +116,13 @@ router.beforeEach(async (to) => {
     ) {
       return '/onboarding';
     }
+  }
+});
+
+router.afterEach((to) => {
+  if (to.meta.requiresAuth) {
+    const label = String(to.name || to.path).replace(/^\//, '');
+    trackPageView(to.fullPath, label);
   }
 });
 
