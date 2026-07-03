@@ -4,6 +4,7 @@ const jobService = require('./jobService');
 const { filterJobsByBoardSelections } = require('./jobBoardCatalogService');
 const env = require('../config/env');
 const Job = require('../models/Job');
+const jobSources = require('../config/jobSources');
 
 const CACHE_MS = 90_000;
 const cache = new Map();
@@ -12,8 +13,8 @@ function cacheKey(userId, profile) {
   const resumeLen = (profile?.resumeText || '').length;
   const titles = (profile?.targetTitles || []).length;
   const skills = (profile?.mustHaveSkills || []).length;
-  const boards = JSON.stringify(profile?.jobBoardSelections || {});
-  return `${userId}:${profile?.minMatchScore || 0}:${resumeLen}:${titles}:${skills}:${boards}`;
+  const sources = jobSources.enabledSources.join(',');
+  return `${userId}:${profile?.minMatchScore || 0}:${resumeLen}:${titles}:${skills}:${sources}`;
 }
 
 async function loadRawJobs() {
@@ -36,7 +37,7 @@ async function listScoredForUser(userId) {
   }
 
   let jobs = await loadRawJobs();
-  jobs = filterJobsByBoardSelections(jobs, profile);
+  jobs = filterJobsByBoardSelections(jobs);
   jobs = scoreJobsForProfile(jobs, profile, userId);
   cache.set(key, { at: Date.now(), jobs });
   return { jobs, profile };

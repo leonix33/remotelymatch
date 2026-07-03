@@ -8,7 +8,6 @@ import { appUrl } from '../config';
 import ResumeUpload from '../components/ResumeUpload.vue';
 import ResumePreview from '../components/ResumePreview.vue';
 import TailorApplySettings from '../components/TailorApplySettings.vue';
-import JobBoardPicker from '../components/JobBoardPicker.vue';
 import { useProfileAutosave } from '../composables/useProfileAutosave';
 import {
   biometricLabel,
@@ -87,8 +86,6 @@ const form = ref({
   defaultTailorMode: 'balanced',
 });
 
-const jobBoardSelections = ref({});
-
 function loadForm(p) {
   form.value = {
     displayName: p.displayName || '',
@@ -115,7 +112,6 @@ function loadForm(p) {
     defaultSupplementPages: p.defaultSupplementPages || 3,
     defaultTailorMode: p.defaultTailorMode === 'high_match' ? 'high_match' : 'balanced',
   };
-  jobBoardSelections.value = { ...(p.jobBoardSelections || {}) };
 }
 
 async function exportData() {
@@ -203,14 +199,8 @@ function profilePayload() {
     niceToHaveSkills: form.value.niceToHaveSkills.split('\n').filter(Boolean),
     targetCompanies: form.value.targetCompanies.split('\n').filter(Boolean),
     onboardingComplete: profileStore.profile?.onboardingComplete ?? true,
-    jobBoardSelections: { ...jobBoardSelections.value },
   };
 }
-
-watch(jobBoardSelections, () => {
-  if (!autosaveEnabled.value || !profileStore.loaded) return;
-  schedule(profilePayload());
-}, { deep: true });
 
 watch(form, () => {
   if (!autosaveEnabled.value || !profileStore.loaded) return;
@@ -616,12 +606,6 @@ async function removeApolloKey() {
         <router-link to="/follow-ups" class="mt-4 inline-block text-sm text-teal-400 hover:underline">
           Open traction trace & send digest →
         </router-link>
-      </div>
-
-      <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-        <h3 class="font-semibold text-slate-200">Job boards to search</h3>
-        <p class="mt-1 text-sm text-slate-500">Pick where we pull and match roles — browse filtered results on the Jobs page.</p>
-        <JobBoardPicker v-model="jobBoardSelections" class="mt-4" />
       </div>
 
       <div class="rounded-xl border border-slate-800 bg-slate-950/40 p-4">

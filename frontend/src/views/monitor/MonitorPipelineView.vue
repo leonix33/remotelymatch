@@ -1,9 +1,14 @@
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import http from '../../api/http';
 import { useMonitorData } from '../../composables/useMonitorData';
 
 const { loading, analytics, queue, recentJobs, refresh } = useMonitorData();
+
+const sourcesExpanded = ref(false);
+const ingestSources = ref([]);
+const ingestLoading = ref(false);
 
 const funnel = computed(() => {
   const a = analytics.value || {};
@@ -23,7 +28,18 @@ const sections = computed(() => {
   return Object.entries(by).map(([key, count]) => ({ key, count }));
 });
 
-onMounted(refresh);
+onMounted(async () => {
+  refresh();
+  ingestLoading.value = true;
+  try {
+    const { data } = await http.get('/jobs/ingest/status');
+    ingestSources.value = data.sources || [];
+  } catch {
+    ingestSources.value = [];
+  } finally {
+    ingestLoading.value = false;
+  }
+});
 </script>
 
 <template>
@@ -82,6 +98,42 @@ onMounted(refresh);
         </div>
       </section>
     </div>
+
+    <section class="monitor-panel">
+      <button
+        type="button"
+        class="flex w-full items-center justify-between gap-3 text-left"
+        @click="sourcesExpanded = !sourcesExpanded"
+      >
+        <div>
+          <h2 class="monitor-section-title">Configured job sources</h2>
+          <p class="monitor-section-desc">
+            Pulled from repo env <code class="text-teal-400">JOB_SOURCES_ENABLED</code>
+            · {{ ingestSources.length }} sources
+          </p>
+        </div>
+        <span class="text-slate-500">{{ sourcesExpanded ? '▾' : '▸' }}</span>
+      </button>
+      <div v-show="sourcesExpanded" class="mt-4">
+        <p v-if="ingestLoading" class="text-sm text-slate-500">Loading sources…</p>
+        <div v-else class="flex flex-wrap gap-2">
+          <span
+            v-for="source in ingestSources"
+            :key="source.name"
+            class="badge text-[10px]"
+            :class="source.configured ? 'badge-teal' : 'badge-slate'"
+            :title="source.apiKeyPresent === false ? 'API key missing' : ''"
+          >
+            {{ source.name }}
+          </span>
+          <p v-if="!ingestSources.length" class="text-sm text-slate-500">No sources configured.</p>
+        </div>
+        <p class="mt-3 text-xs text-slate-600">
+          Edit <code class="text-slate-400">backend/src/config/jobSources.js</code> or set
+          <code class="text-slate-400">JOB_SOURCES_ENABLED</code> on Render.
+        </p>
+      </div>
+    </section>
 
     <!-- Recent queue — card strip -->
     <section class="monitor-panel">
