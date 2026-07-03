@@ -189,6 +189,18 @@ function activityTypeSummary(group) {
   return `${group.items.length} actions`;
 }
 
+function collapseAllLogin() {
+  loginExpanded.value = {};
+}
+
+function collapseAllActivity() {
+  activityExpanded.value = {};
+}
+
+function collapseAllApplications() {
+  applicationsExpanded.value = {};
+}
+
 async function refresh() {
   const isFirstLoad = !data.value;
   if (isFirstLoad) loading.value = true;
@@ -351,7 +363,7 @@ onUnmounted(() => clearInterval(pollTimer));
             </div>
             <div v-if="loginEventsByUser.length" class="flex items-center gap-2">
               <button type="button" class="btn-secondary text-xs" @click="expandAllLogin">Expand</button>
-              <button type="button" class="btn-secondary text-xs" @click="loginExpanded = {}">Collapse</button>
+              <button type="button" class="btn-secondary text-xs" @click="collapseAllLogin">Collapse</button>
             </div>
           </div>
           <ul class="mt-4 space-y-3">
@@ -406,7 +418,7 @@ onUnmounted(() => clearInterval(pollTimer));
             </div>
             <div v-if="activityByUser.length" class="flex items-center gap-2">
               <button type="button" class="btn-secondary text-xs" @click="expandAllActivity">Expand</button>
-              <button type="button" class="btn-secondary text-xs" @click="activityExpanded = {}">Collapse</button>
+              <button type="button" class="btn-secondary text-xs" @click="collapseAllActivity">Collapse</button>
             </div>
           </div>
           <ul class="mt-4 space-y-3">
@@ -464,7 +476,7 @@ onUnmounted(() => clearInterval(pollTimer));
           </div>
           <div v-if="applicationsByUser.length" class="flex items-center gap-2">
             <button type="button" class="btn-secondary text-xs" @click="expandAllApplications">Expand</button>
-            <button type="button" class="btn-secondary text-xs" @click="applicationsExpanded = {}">Collapse</button>
+            <button type="button" class="btn-secondary text-xs" @click="collapseAllApplications">Collapse</button>
           </div>
         </div>
 

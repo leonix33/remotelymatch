@@ -64,7 +64,10 @@ async function start() {
   const teamService = require('./services/teamService');
 
   if (env.mongoUri) {
-    await connectDb();
+    const mongoConnected = await connectDb();
+    if (!mongoConnected) {
+      env.mongoUri = '';
+    }
   } else {
     console.warn('MONGODB_URI not set — running in SQLite-only mode (read-only from agent DBs)');
   }

@@ -44,7 +44,10 @@ function isActive(tab) {
     </header>
 
     <div class="monitor-content">
-      <RouterView :key="route.fullPath" />
+      <RouterView v-slot="{ Component }">
+        <component :is="Component" v-if="Component" :key="route.fullPath" />
+        <p v-else class="py-12 text-center text-slate-500">Loading monitor view…</p>
+      </RouterView>
     </div>
   </div>
 </template>
