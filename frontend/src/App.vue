@@ -69,7 +69,7 @@ onUnmounted(() => {
   <ShareInstallPanel />
 
   <div v-if="isGuestRoute" class="min-h-screen min-h-dvh safe-top safe-bottom safe-x">
-    <RouterView />
+    <RouterView :key="route.path" />
   </div>
   <div v-else class="mobile-app-shell flex min-h-screen min-h-dvh w-full flex-col lg:flex-row">
     <AppSidebar :on-logout="logout" />

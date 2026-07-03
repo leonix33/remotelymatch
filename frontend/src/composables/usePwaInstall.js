@@ -31,6 +31,12 @@ function writeDismissed() {
   }
 }
 
+function isAuthPage() {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  return path === '/login' || path === '/forgot-password' || path === '/welcome';
+}
+
 function bindInstallListeners() {
   if (listenersBound || typeof window === 'undefined') return;
   listenersBound = true;
@@ -38,15 +44,15 @@ function bindInstallListeners() {
   beforeInstallHandler = (e) => {
     e.preventDefault();
     deferredPrompt.value = e;
-    if (!readDismissed() && !isStandalonePwa()) {
+    if (!readDismissed() && !isStandalonePwa() && !isAuthPage()) {
       showSheet.value = true;
     }
   };
   window.addEventListener('beforeinstallprompt', beforeInstallHandler);
 
-  if (!isStandalonePwa() && isMobileDevice() && !readDismissed()) {
+  if (!isStandalonePwa() && isMobileDevice() && !readDismissed() && !isAuthPage()) {
     openTimer = window.setTimeout(() => {
-      if (!isStandalonePwa() && !readDismissed() && isMobileDevice()) {
+      if (!isStandalonePwa() && !readDismissed() && isMobileDevice() && !isAuthPage()) {
         showSheet.value = true;
       }
     }, 1200);

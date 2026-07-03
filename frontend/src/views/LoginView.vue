@@ -70,6 +70,9 @@ function syncModeFromRoute() {
     mode.value = 'forgot';
     return;
   }
+  if (route.path === '/login' && mode.value === 'forgot') {
+    return;
+  }
   mode.value = 'login';
 }
 
@@ -113,10 +116,15 @@ onMounted(async () => {
   showBiometric.value = await supportsBiometricLogin();
 });
 
-watch(() => route.fullPath, () => {
-  const prevMode = mode.value;
+watch(() => route.path, (path) => {
+  if (path === '/forgot-password') {
+    mode.value = 'forgot';
+    return;
+  }
+  if (path === '/login' && mode.value === 'forgot') {
+    return;
+  }
   syncModeFromRoute();
-  if (prevMode === 'forgot' && mode.value === 'login' && info.value) return;
 });
 
 async function submitLogin() {
@@ -255,9 +263,6 @@ function goForgot() {
   forgotStep.value = 1;
   auth.logout();
   mode.value = 'forgot';
-  if (route.path !== '/forgot-password') {
-    router.replace('/forgot-password').catch(() => {});
-  }
 }
 
 function goLogin() {
@@ -265,7 +270,7 @@ function goLogin() {
   info.value = '';
   forgotStep.value = 1;
   mode.value = 'login';
-  if (route.path !== '/login') {
+  if (route.path === '/forgot-password') {
     router.replace('/login').catch(() => {});
   }
 }
@@ -326,9 +331,13 @@ function goLogin() {
       </form>
 
       <div v-if="mode === 'login'" class="mt-4">
-        <button type="button" class="btn-secondary w-full min-h-[44px]" @click.prevent.stop="goForgot">
+        <a
+          href="/forgot-password"
+          class="btn-secondary block w-full min-h-[44px] text-center leading-[44px] no-underline"
+          @click.prevent="goForgot"
+        >
           Forgot password?
-        </button>
+        </a>
       </div>
 
       <!-- Forgot password -->
