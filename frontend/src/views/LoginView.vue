@@ -64,6 +64,8 @@ onMounted(async () => {
     resetToken.value = token;
     mode.value = 'reset';
     info.value = 'Choose a new password for your account.';
+  } else if (route.path === '/forgot-password' || route.query.forgot === '1') {
+    mode.value = 'forgot';
   }
   email.value = recalledLoginEmail();
   const devCreds = recalledDevCredentials();
@@ -142,12 +144,11 @@ async function submitForgot() {
   loading.value = true;
   try {
     const { data } = await http.post('/auth/forgot-password', { email: email.value.trim() });
-    info.value = data.message;
     if (data.emailSent === false) {
       error.value = data.message;
-      info.value = '';
+      return;
     }
-    mode.value = 'login';
+    info.value = data.message || 'If that email has an account, we sent a reset link. Check your inbox and spam folder.';
   } catch (e) {
     error.value = e.response?.data?.message || 'Could not send reset email';
   } finally {
@@ -185,8 +186,8 @@ async function submitReset() {
 <template>
   <div class="flex min-h-screen min-h-dvh items-center justify-center safe-top safe-bottom safe-x p-4">
     <div class="card w-full max-w-md p-6 sm:p-8">
-      <AppLogo size="lg" />
-      <p class="mt-4 text-sm text-slate-400">{{ brand.tagline }}</p>
+      <AppLogo size="lg" :show-tagline="false" />
+      <p class="mt-4 text-sm text-slate-400">Sign in to your account</p>
 
       <!-- Login -->
       <form v-if="mode === 'login'" class="mt-8 space-y-4" @submit.prevent="submitLogin">
@@ -204,12 +205,7 @@ async function submitReset() {
           />
         </div>
         <div>
-          <div class="mb-1 flex items-center justify-between">
-            <label class="text-sm text-slate-400">Password</label>
-            <button type="button" class="text-xs text-teal-400 hover:underline" @click="mode = 'forgot'; error = ''; info = ''">
-              Forgot password?
-            </button>
-          </div>
+          <label class="mb-1 block text-sm text-slate-400">Password</label>
           <PasswordInput
             v-model="password"
             required
@@ -225,6 +221,14 @@ async function submitReset() {
         <p v-if="info" class="rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ info }}</p>
         <button type="submit" class="btn-primary w-full" :disabled="loading || bioLoading">
           {{ loading ? 'Signing in…' : 'Sign in' }}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary w-full"
+          :disabled="loading || bioLoading"
+          @click="mode = 'forgot'; error = ''; info = ''; router.replace({ path: '/forgot-password' })"
+        >
+          Forgot password?
         </button>
         <button
           v-if="showBiometric"
@@ -253,10 +257,17 @@ async function submitReset() {
           <input v-model="email" type="email" required class="input" placeholder="you@example.com" autocomplete="username" />
         </div>
         <p v-if="error" class="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
+        <p v-if="info" class="rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ info }}</p>
         <button type="submit" class="btn-primary w-full" :disabled="loading">
           {{ loading ? 'Sending…' : 'Email reset link' }}
         </button>
-        <button type="button" class="btn-secondary w-full" @click="mode = 'login'; error = ''">Back to sign in</button>
+        <button type="button" class="btn-secondary w-full" @click="mode = 'login'; error = ''; info = ''; router.replace({ path: '/login' })">
+          Back to sign in
+        </button>
+        <p class="text-center text-xs text-slate-500">
+          No email? Check spam, or contact
+          <a :href="`mailto:${brand.supportEmail}`" class="text-teal-400 hover:underline">{{ brand.supportEmail }}</a>
+        </p>
       </form>
 
       <!-- New password from email link -->

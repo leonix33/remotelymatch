@@ -7,6 +7,12 @@ const props = defineProps({
   size: { type: String, default: 'md' },
   showText: { type: Boolean, default: true },
   variant: { type: String, default: 'sidebar' }, // sidebar | compact | hero
+  showTagline: { type: Boolean, default: undefined },
+});
+
+const showTaglineLine = computed(() => {
+  if (props.showTagline !== undefined) return props.showTagline;
+  return props.variant === 'sidebar';
 });
 
 const markSize = computed(() => {
@@ -30,7 +36,7 @@ const textClass = computed(() => {
         <span class="text-teal-400">{{ brand.nameTop }}</span><span class="text-amber-300">{{ brand.nameBottom }}</span>
       </p>
       <p
-        v-if="variant === 'sidebar'"
+        v-if="showTaglineLine"
         class="mt-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500"
       >
         {{ brand.tagline }}

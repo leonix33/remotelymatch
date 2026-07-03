@@ -7,7 +7,7 @@ export const brand = {
   name: import.meta.env.VITE_APP_NAME || 'remotelymatch',
   nameTop: import.meta.env.VITE_BRAND_NAME_TOP || 'remotely',
   nameBottom: import.meta.env.VITE_BRAND_NAME_BOTTOM || 'match',
-  tagline: import.meta.env.VITE_BRAND_TAGLINE || 'AI-powered remote job intelligence',
+  tagline: import.meta.env.VITE_BRAND_TAGLINE || 'Remote jobs · team workflow',
   heroEyebrow: import.meta.env.VITE_BRAND_HERO_EYEBROW || 'All remote roles · any industry',
   heroTitle: import.meta.env.VITE_BRAND_HERO_TITLE || 'Find roles. Review matches. Apply as a squad.',
   heroSubtitle:

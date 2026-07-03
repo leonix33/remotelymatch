@@ -8,11 +8,15 @@ async function ensureAdmin({ env, User, teamService }) {
   if (!env.adminEmail || !env.adminPassword) return;
   const email = env.adminEmail.toLowerCase();
   const passwordHash = await bcrypt.hash(env.adminPassword, 10);
+  const forcePasswordSync = process.env.ADMIN_PASSWORD_FORCE_SYNC === '1';
   const existing = await User.findOne({ email });
   if (existing) {
-    existing.passwordHash = passwordHash;
     existing.role = 'admin';
     existing.active = true;
+    if (forcePasswordSync) {
+      existing.passwordHash = passwordHash;
+      console.log('Admin password synced from environment (ADMIN_PASSWORD_FORCE_SYNC=1)');
+    }
     await existing.save();
     await teamService.ensureTeamForUser(existing);
     console.log('Admin user synced from environment');

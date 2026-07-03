@@ -43,6 +43,7 @@ const router = createRouter({
   routes: [
     { path: '/welcome', component: LandingView, meta: { guest: true } },
     { path: '/login', component: LoginView, meta: { guest: true } },
+    { path: '/forgot-password', component: LoginView, meta: { guest: true } },
     { path: '/privacy', component: LegalView, meta: { guest: true } },
     { path: '/terms', component: LegalView, meta: { guest: true } },
     { path: '/onboarding', component: OnboardingView, meta: { requiresAuth: true, skipOnboarding: true } },
@@ -92,7 +93,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !auth.accessToken) return '/login';
-  if (to.meta.guest && auth.accessToken && !['/welcome', '/privacy', '/terms'].includes(to.path)) return '/';
+  if (to.meta.guest && auth.accessToken && !['/welcome', '/privacy', '/terms', '/forgot-password'].includes(to.path)) return '/';
   if (!showAskAi && to.path === '/concierge') return '/';
   if (to.matched.some((record) => record.meta.adminOnly) && auth.user?.role !== 'admin') return '/';
 
