@@ -88,6 +88,7 @@ async function sendFollowUp(req, res, next) {
       authEmail: req.user.email,
       recipientEmail: recipientEmail ? String(recipientEmail).trim() : '',
       recipientName: recipientName ? String(recipientName).trim() : '',
+      req,
     });
     res.json(result);
   } catch (err) {

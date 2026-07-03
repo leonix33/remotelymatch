@@ -69,6 +69,7 @@ async function polishKit(req, res, next) {
       supplementPages: req.body?.supplementPages,
       tailorFocus: req.body?.tailorFocus || '',
       maxRounds: req.body?.maxRounds,
+      req,
     });
     res.json(result);
   } catch (err) {

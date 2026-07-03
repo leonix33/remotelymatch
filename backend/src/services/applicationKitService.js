@@ -4,6 +4,7 @@ const jobService = require('./jobService');
 const localApprovalService = require('./localApprovalService');
 const applicationKitStore = require('./applicationKitStore');
 const { buildKitSummary, isKitReadyToApply, READY_ATS_MIN } = require('./kitReadinessService');
+const activityService = require('./activityService');
 const jobDescriptionService = require('./jobDescriptionService');
 const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
@@ -180,7 +181,17 @@ async function polishUntilReady(userId, jobId, options = {}) {
     });
     passes.push({ round: 0, phase: 'generate', atsScore: kit.atsScore ?? null, jdMatchPct: kit.jdMatchPct ?? null });
     if (isKitReadyToApply({ tailored: true, hasKit: true, atsScore: kit.atsScore, useForApply: kit.useForApply !== false })) {
-      return { kit, passes, ready: true };
+      const result = { kit, passes, ready: true };
+      await activityService.recordActivity({
+        req: options.req,
+        userId,
+        type: 'polish_kit',
+        entityType: 'job',
+        entityId: jobId,
+        summary: `Polished kit — ATS ${kit.atsScore ?? '—'}%`,
+        meta: { ready: true, passes: passes.length, atsScore: kit.atsScore ?? null, company: kit.company, title: kit.jobTitle },
+      });
+      return result;
     }
   }
 
@@ -234,7 +245,25 @@ async function polishUntilReady(userId, jobId, options = {}) {
       atsScore: kit.atsScore,
       useForApply: kit.useForApply !== false,
     });
-    if (ready) return { kit, passes, ready: true };
+    if (ready) {
+      const result = { kit, passes, ready: true };
+      await activityService.recordActivity({
+        req: options.req,
+        userId,
+        type: 'polish_kit',
+        entityType: 'job',
+        entityId: jobId,
+        summary: `Polished kit — ATS ${kit.atsScore ?? '—'}%`,
+        meta: {
+          ready: true,
+          passes: passes.length,
+          atsScore: kit.atsScore ?? null,
+          company: kit.company,
+          title: kit.jobTitle,
+        },
+      });
+      return result;
+    }
 
     const ats = kit.atsScore ?? 0;
     if (ats <= lastAts) plateau += 1;
@@ -244,7 +273,7 @@ async function polishUntilReady(userId, jobId, options = {}) {
     lastAts = ats;
   }
 
-  return {
+  const result = {
     kit,
     passes,
     ready: isKitReadyToApply({
@@ -254,6 +283,22 @@ async function polishUntilReady(userId, jobId, options = {}) {
       useForApply: kit.useForApply !== false,
     }),
   };
+  await activityService.recordActivity({
+    req: options.req,
+    userId,
+    type: 'polish_kit',
+    entityType: 'job',
+    entityId: jobId,
+    summary: `Polished kit — ATS ${kit.atsScore ?? '—'}%`,
+    meta: {
+      ready: result.ready,
+      passes: passes.length,
+      atsScore: kit.atsScore ?? null,
+      company: kit.company,
+      title: kit.jobTitle,
+    },
+  });
+  return result;
 }
 
 async function generateOnApprove(userId, jobId, tailorResume, options = {}) {

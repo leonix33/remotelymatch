@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const authService = require('../services/authService');
+const activityService = require('../services/activityService');
 const userDataService = require('../services/userDataService');
 const emailService = require('../services/emailService');
 const env = require('../config/env');
@@ -24,9 +25,18 @@ const resetPasswordSchema = z.object({
 });
 
 async function login(req, res, next) {
+  const body = loginSchema.safeParse(req.body);
+  if (!body.success) return next(body.error);
+  const email = body.data.email;
   try {
-    const body = loginSchema.parse(req.body);
-    const result = await authService.login(body.email, body.password);
+    const result = await authService.login(email, body.data.password);
+    await activityService.recordLogin({
+      req,
+      email,
+      user: result.user,
+      method: 'password',
+      success: true,
+    });
     res.json({
       accessToken: result.accessToken,
       user: {
@@ -37,6 +47,13 @@ async function login(req, res, next) {
       },
     });
   } catch (err) {
+    await activityService.recordLogin({
+      req,
+      email,
+      method: 'password',
+      success: false,
+      reason: err.message || 'Login failed',
+    });
     next(err);
   }
 }

@@ -5,6 +5,7 @@ const followUpDraftService = require('./followUpDraftService');
 const emailService = require('./emailService');
 const { pickBestRecipient } = require('./contactRankingService');
 const { isKitReadyToApply, READY_ATS_MIN } = require('./kitReadinessService');
+const activityService = require('./activityService');
 
 function firstName(name = '') {
   return String(name || '').trim().split(/\s+/)[0] || 'there';
@@ -164,6 +165,22 @@ async function sendFollowUpOutreach(userId, jobId, options = {}) {
     err.status = 502;
     throw err;
   }
+
+  await activityService.recordActivity({
+    req: options.req,
+    userId,
+    type: 'follow_up_send',
+    entityType: 'job',
+    entityId: jobId,
+    summary: `Follow-up sent to ${picked.email}`,
+    meta: {
+      to: picked.email,
+      recipientName,
+      company: kit.company,
+      title: kit.title,
+      atsScore: applicationKit.atsScore ?? null,
+    },
+  });
 
   return {
     sent: true,

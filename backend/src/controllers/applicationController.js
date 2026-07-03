@@ -69,6 +69,7 @@ async function reapply(req, res, next) {
     const result = await applicationService.reapplyForJob(req.user.sub, req.params.jobId, {
       authEmail: req.user.email,
       useTailoredResume: req.body?.useTailoredResume !== false,
+      req,
     });
     res.json(result);
   } catch (err) {

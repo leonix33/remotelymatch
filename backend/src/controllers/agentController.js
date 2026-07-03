@@ -188,6 +188,7 @@ async function applyApproved(req, res, next) {
           authEmail: req.user.email,
           useTailoredResume,
           queued: false,
+          req,
         })
       ).emailNotification;
       await approvalService.markApplied(
@@ -227,6 +228,7 @@ async function applyApproved(req, res, next) {
           authEmail: req.user.email,
           useTailoredResume,
           queued: true,
+          req,
         });
         await approvalService.markApplied(
           req.user.sub,

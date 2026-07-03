@@ -1,6 +1,7 @@
 const Application = require('../models/Application');
 const env = require('../config/env');
 const localApplicationService = require('./localApplicationService');
+const activityService = require('./activityService');
 
 function normalizeApp(doc) {
   if (!doc) return null;
@@ -140,6 +141,23 @@ async function recordApplicationsFromJobs(userId, jobs = [], options = {}) {
     }
   }
 
+  if (results.length) {
+    await activityService.recordActivity({
+      req: options.req,
+      userId,
+      type: 'apply_jobs',
+      entityType: 'batch',
+      entityId: String(results.length),
+      summary: `Applied to ${results.length} role${results.length === 1 ? '' : 's'}`,
+      meta: {
+        count: results.length,
+        status,
+        jobs: jobs.slice(0, 8).map((job) => ({ jobId: job.jobId, title: job.title, company: job.company })),
+        useTailoredResume: Boolean(options.useTailoredResume),
+      },
+    });
+  }
+
   return { applications: results, emailNotification };
 }
 
@@ -245,6 +263,15 @@ async function reapplyForJob(userId, jobId, options = {}) {
   }
 
   const modeLabel = useTailoredResume ? 'tailored resume' : 'base resume';
+  await activityService.recordActivity({
+    req: options.req,
+    userId,
+    type: 'reapply_job',
+    entityType: 'job',
+    entityId: jobId,
+    summary: `Reapplied to ${app.title} at ${app.company}`,
+    meta: { status, queued, useTailoredResume, company: app.company, title: app.title },
+  });
   return {
     message: queued
       ? `Reapply queued for ${app.title} — submit via Chrome extension or local agent`

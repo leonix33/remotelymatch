@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const passkeyService = require('../services/passkeyService');
 const authService = require('../services/authService');
+const activityService = require('../services/activityService');
 
 const emailSchema = z.object({
   email: z.string().email(),
@@ -50,14 +51,21 @@ async function loginOptions(req, res, next) {
 }
 
 async function loginVerify(req, res, next) {
+  const payload = { ...req.body };
+  const email = payload.email;
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ message: 'Email is required' });
+  }
+  delete payload.email;
   try {
-    const payload = { ...req.body };
-    const email = payload.email;
-    if (!email || typeof email !== 'string') {
-      return res.status(400).json({ message: 'Email is required' });
-    }
-    delete payload.email;
     const result = await passkeyService.verifyLogin(req, email, payload);
+    await activityService.recordLogin({
+      req,
+      email,
+      user: result.user,
+      method: 'passkey',
+      success: true,
+    });
     res.json({
       accessToken: result.accessToken,
       user: {
@@ -68,6 +76,13 @@ async function loginVerify(req, res, next) {
       },
     });
   } catch (err) {
+    await activityService.recordLogin({
+      req,
+      email,
+      method: 'passkey',
+      success: false,
+      reason: err.message || 'Passkey login failed',
+    });
     next(err);
   }
 }

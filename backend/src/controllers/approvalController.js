@@ -85,6 +85,7 @@ async function approve(req, res, next) {
     const item = await approvalService.setStatus(req.user.sub, req.params.jobId, 'approved', req.body.notes, {
       tailorResume: req.body.tailorResume,
       authEmail: req.user.email,
+      req,
     });
     res.json(item);
   } catch (err) {
@@ -94,7 +95,7 @@ async function approve(req, res, next) {
 
 async function reject(req, res, next) {
   try {
-    const item = await approvalService.setStatus(req.user.sub, req.params.jobId, 'rejected', req.body.notes);
+    const item = await approvalService.setStatus(req.user.sub, req.params.jobId, 'rejected', req.body.notes, { req });
     res.json(item);
   } catch (err) {
     next(err);
@@ -111,6 +112,7 @@ async function bulkApprove(req, res, next) {
       tailorResume: req.body.tailorResume,
       authEmail: req.user.email,
       skipKitGeneration: Boolean(req.body.skipKitGeneration),
+      req,
     });
     res.json({ count: results.length, message: `Approved ${results.length} job(s)` });
   } catch (err) {
@@ -124,7 +126,7 @@ async function bulkReject(req, res, next) {
     if (!Array.isArray(jobIds) || !jobIds.length) {
       return res.status(400).json({ message: 'jobIds array required' });
     }
-    const results = await approvalService.bulkSetStatus(req.user.sub, jobIds, 'rejected');
+    const results = await approvalService.bulkSetStatus(req.user.sub, jobIds, 'rejected', { req });
     res.json({ count: results.length, message: `Skipped ${results.length} job(s)` });
   } catch (err) {
     next(err);

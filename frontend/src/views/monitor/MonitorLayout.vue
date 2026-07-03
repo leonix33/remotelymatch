@@ -10,6 +10,7 @@ const tabs = [
   { to: '/monitor/agent', label: 'Agent', shape: 'circle' },
   { to: '/monitor/swarm', label: 'Swarm', shape: 'pill' },
   { to: '/monitor/applications', label: 'Applications', shape: 'square' },
+  { to: '/monitor/who', label: 'Who', shape: 'pill' },
 ];
 
 function isActive(tab) {

@@ -358,6 +358,7 @@ body {
 .monitor-kpi-sky .monitor-kpi-ring { @apply border-sky-500/40 bg-sky-500/5; }
 .monitor-kpi-violet .monitor-kpi-ring { @apply border-violet-500/40 bg-violet-500/5; }
 .monitor-kpi-emerald .monitor-kpi-ring { @apply border-emerald-500/40 bg-emerald-500/5; }
+.monitor-kpi-red .monitor-kpi-ring { @apply border-red-500/40 bg-red-500/5; }
 .monitor-kpi-slate .monitor-kpi-ring { @apply border-slate-500/40 bg-slate-500/5; }
 
 /* Timeline */

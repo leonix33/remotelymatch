@@ -33,6 +33,7 @@ import MonitorPipelineView from '../views/monitor/MonitorPipelineView.vue';
 import MonitorAgentView from '../views/monitor/MonitorAgentView.vue';
 import MonitorSwarmView from '../views/monitor/MonitorSwarmView.vue';
 import MonitorApplicationsView from '../views/monitor/MonitorApplicationsView.vue';
+import MonitorWhoView from '../views/monitor/MonitorWhoView.vue';
 import ConciergeView from '../views/ConciergeView.vue';
 import { showAskAi } from '../config';
 
@@ -56,6 +57,7 @@ const router = createRouter({
         { path: 'agent', component: MonitorAgentView },
         { path: 'swarm', component: MonitorSwarmView },
         { path: 'applications', component: MonitorApplicationsView },
+        { path: 'who', component: MonitorWhoView },
       ],
     },
     { path: '/profile', component: ProfileView, meta: { requiresAuth: true, skipOnboarding: true } },

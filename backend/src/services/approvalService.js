@@ -11,6 +11,7 @@ const applicationKitService = require('./applicationKitService');
 const applicationKitStore = require('./applicationKitStore');
 const { profileResumeAlignment } = require('./resumeParseService');
 const { buildKitSummary } = require('./kitReadinessService');
+const activityService = require('./activityService');
 
 const JOB_LIST_CACHE_MS = 120_000;
 const jobListCache = new Map();
@@ -338,6 +339,15 @@ async function setStatus(userId, jobId, status, notes = '', options = {}) {
         });
       }
     }
+    await activityService.recordActivity({
+      req: options.req,
+      userId,
+      type: status === 'approved' ? 'approve_job' : status === 'rejected' ? 'reject_job' : 'queue_update',
+      entityType: 'job',
+      entityId: jobId,
+      summary: `${status} ${row.title || jobId} at ${row.company || 'company'}`,
+      meta: { status, title: row.title, company: row.company },
+    });
     invalidateJobListCache(userId);
     return row;
   }
@@ -379,6 +389,15 @@ async function setStatus(userId, jobId, status, notes = '', options = {}) {
       });
     }
   }
+  await activityService.recordActivity({
+    req: options.req,
+    userId,
+    type: status === 'approved' ? 'approve_job' : status === 'rejected' ? 'reject_job' : 'queue_update',
+    entityType: 'job',
+    entityId: jobId,
+    summary: `${status} ${approval.title || jobId} at ${approval.company || 'company'}`,
+    meta: { status, title: approval.title, company: approval.company },
+  });
   return approval;
 }
 
