@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 
 const props = defineProps({
@@ -8,6 +8,10 @@ const props = defineProps({
   total: { type: Number, default: 0 },
   loading: { type: Boolean, default: false },
 });
+
+const expanded = ref(false);
+const COMPANY_CHIP_LIMIT = 10;
+const JOB_PREVIEW_LIMIT = 8;
 
 const statusLabel = (status) => {
   const map = {
@@ -38,32 +42,62 @@ function formatDate(iso) {
 
 const companyInitial = (name) => (name || '?').charAt(0).toUpperCase();
 
-const hasData = computed(() => props.jobs.length > 0 || props.companies.length > 0);
+const hasData = computed(() => props.jobs.length > 0 || props.companies.length > 0 || props.total > 0);
+
+const visibleCompanies = computed(() => props.companies.slice(0, COMPANY_CHIP_LIMIT));
+const hiddenCompanyCount = computed(() => Math.max(0, props.companies.length - COMPANY_CHIP_LIMIT));
+
+const visibleJobs = computed(() => props.jobs.slice(0, JOB_PREVIEW_LIMIT));
+const hiddenJobCount = computed(() => Math.max(0, (props.total || props.jobs.length) - visibleJobs.value.length));
+
+const latestAppliedLabel = computed(() => {
+  const latest = props.jobs[0]?.submittedAt || props.jobs[0]?.lastAttempted;
+  if (!latest) return '';
+  return `Latest ${formatDate(latest)}`;
+});
+
+function toggleExpanded() {
+  expanded.value = !expanded.value;
+}
 </script>
 
 <template>
   <div>
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h2 class="font-semibold text-slate-200">Jobs applied</h2>
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <button
+        v-if="hasData"
+        type="button"
+        class="min-w-0 flex-1 text-left"
+        @click="toggleExpanded"
+      >
+        <div class="flex items-center gap-2">
+          <h2 class="font-semibold text-slate-200">Jobs applied</h2>
+          <span class="text-slate-500">{{ expanded ? '▾' : '▸' }}</span>
+        </div>
         <p class="mt-1 text-sm text-slate-500">
           {{ total }} application{{ total === 1 ? '' : 's' }}
           <span v-if="companies.length"> · {{ companies.length }} compan{{ companies.length === 1 ? 'y' : 'ies' }}</span>
+          <span v-if="!expanded && latestAppliedLabel"> · {{ latestAppliedLabel }}</span>
         </p>
+        <p v-if="!expanded" class="mt-2 text-xs text-slate-500">
+          Tap to expand · follow-ups track replies and recruiter outreach
+        </p>
+      </button>
+      <div v-else>
+        <h2 class="font-semibold text-slate-200">Jobs applied</h2>
+        <p class="mt-1 text-sm text-slate-500">No applications yet</p>
       </div>
+
       <RouterLink
         v-if="hasData"
         to="/follow-ups"
-        class="btn-primary px-4 py-2 text-sm"
+        class="btn-primary shrink-0 px-4 py-2 text-sm"
+        @click.stop
       >
         Open follow-up command center →
       </RouterLink>
       <RouterLink v-else to="/follow-ups" class="text-sm text-teal-400 hover:underline">Follow-ups →</RouterLink>
     </div>
-
-    <p v-if="hasData" class="mt-3 rounded-lg border border-violet-900/40 bg-violet-950/20 px-3 py-2 text-xs text-violet-200/90">
-      Replies come from follow-ups — each role gets ATS score, recruiter contacts, and a day-5 reminder.
-    </p>
 
     <div v-if="loading" class="mt-4 text-sm text-slate-500">Loading applications…</div>
 
@@ -71,12 +105,16 @@ const hasData = computed(() => props.jobs.length > 0 || props.companies.length >
       No applications yet — use Start applying above.
     </div>
 
-    <template v-else>
+    <template v-else-if="expanded">
+      <p class="mt-3 rounded-lg border border-violet-900/40 bg-violet-950/20 px-3 py-2 text-xs text-violet-200/90">
+        Replies come from follow-ups — each role gets ATS score, recruiter contacts, and a day-5 reminder.
+      </p>
+
       <div v-if="companies.length" class="mt-5">
         <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Companies</p>
         <div class="flex flex-wrap gap-2">
           <a
-            v-for="c in companies"
+            v-for="c in visibleCompanies"
             :key="`${c.name}-${c.jobId}`"
             :href="c.url || undefined"
             :target="c.url ? '_blank' : undefined"
@@ -89,12 +127,18 @@ const hasData = computed(() => props.jobs.length > 0 || props.companies.length >
             </span>
             {{ c.name }}
           </a>
+          <span
+            v-if="hiddenCompanyCount"
+            class="flex items-center rounded-full border border-slate-700/80 bg-slate-900/60 px-3 py-1 text-xs text-slate-400"
+          >
+            +{{ hiddenCompanyCount }} more
+          </span>
         </div>
       </div>
 
       <div v-if="jobs.length" class="mt-5">
         <div class="mobile-applied-cards md:hidden">
-          <div v-for="job in jobs" :key="`card-${job.jobId}`" class="mobile-applied-card">
+          <div v-for="job in visibleJobs" :key="`card-${job.jobId}`" class="mobile-applied-card">
             <div class="flex items-start gap-3">
               <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-teal-300">
                 {{ companyInitial(job.company) }}
@@ -121,50 +165,59 @@ const hasData = computed(() => props.jobs.length > 0 || props.companies.length >
         </div>
 
         <div class="mobile-table-wrap hidden overflow-x-auto rounded-xl border border-slate-800 md:block">
-        <table class="w-full min-w-[32rem] text-left text-sm">
-          <thead>
-            <tr class="border-b border-slate-800 bg-slate-900/60 text-xs uppercase tracking-wide text-slate-500">
-              <th class="px-4 py-3 font-medium">Company</th>
-              <th class="px-4 py-3 font-medium">Role</th>
-              <th class="px-4 py-3 font-medium">Status</th>
-              <th class="px-4 py-3 font-medium">Applied</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="job in jobs"
-              :key="job.jobId"
-              class="border-b border-slate-800/60 last:border-0 hover:bg-slate-800/30"
-            >
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-2">
-                  <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-teal-300">
-                    {{ companyInitial(job.company) }}
-                  </span>
-                  <span class="font-medium text-slate-200">{{ job.company || '—' }}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3 text-slate-300">
-                <a
-                  v-if="job.url"
-                  :href="job.url"
-                  target="_blank"
-                  rel="noopener"
-                  class="hover:text-teal-300 hover:underline"
-                >
-                  {{ job.title }}
-                </a>
-                <span v-else>{{ job.title }}</span>
-              </td>
-              <td class="px-4 py-3">
-                <span class="badge text-xs" :class="statusClass(job.status)">{{ statusLabel(job.status) }}</span>
-              </td>
-              <td class="px-4 py-3 text-xs text-slate-500">{{ formatDate(job.submittedAt || job.lastAttempted) }}</td>
-            </tr>
-          </tbody>
-        </table>
+          <table class="w-full min-w-[32rem] text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 bg-slate-900/60 text-xs uppercase tracking-wide text-slate-500">
+                <th class="px-4 py-3 font-medium">Company</th>
+                <th class="px-4 py-3 font-medium">Role</th>
+                <th class="px-4 py-3 font-medium">Status</th>
+                <th class="px-4 py-3 font-medium">Applied</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="job in visibleJobs"
+                :key="job.jobId"
+                class="border-b border-slate-800/60 last:border-0 hover:bg-slate-800/30"
+              >
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-teal-300">
+                      {{ companyInitial(job.company) }}
+                    </span>
+                    <span class="font-medium text-slate-200">{{ job.company || '—' }}</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-slate-300">
+                  <a
+                    v-if="job.url"
+                    :href="job.url"
+                    target="_blank"
+                    rel="noopener"
+                    class="hover:text-teal-300 hover:underline"
+                  >
+                    {{ job.title }}
+                  </a>
+                  <span v-else>{{ job.title }}</span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="badge text-xs" :class="statusClass(job.status)">{{ statusLabel(job.status) }}</span>
+                </td>
+                <td class="px-4 py-3 text-xs text-slate-500">{{ formatDate(job.submittedAt || job.lastAttempted) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+
+        <p v-if="hiddenJobCount > 0" class="mt-3 text-center text-sm text-slate-500">
+          Showing {{ visibleJobs.length }} of {{ total || jobs.length }} —
+          <RouterLink to="/follow-ups" class="text-teal-400 hover:underline">view all in follow-ups →</RouterLink>
+        </p>
       </div>
+
+      <button type="button" class="btn-secondary mt-4 w-full text-sm sm:w-auto" @click="expanded = false">
+        Collapse
+      </button>
     </template>
   </div>
 </template>
