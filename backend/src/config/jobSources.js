@@ -58,36 +58,35 @@ module.exports = {
   indeedSearchLocation: process.env.INDEED_SEARCH_LOCATION || 'remote',
   adzunaAppId: process.env.ADZUNA_APP_ID || '',
   adzunaAppKey: process.env.ADZUNA_APP_KEY || '',
-  adzunaWhat: process.env.ADZUNA_WHAT || 'remote',
-  adzunaWhere: process.env.ADZUNA_WHERE || 'remote',
+  adzunaWhat: process.env.ADZUNA_WHAT || 'remote software engineer',
+  adzunaWhere: process.env.ADZUNA_WHERE || 'United States',
   adzunaMaxDaysOld: process.env.ADZUNA_MAX_DAYS_OLD || '7',
-  // All live fetchers by default — set JOB_SOURCES_ENABLED only to limit (comma-separated)
+  // Actionable sources only — direct company ATS + curated US remote boards
   allSources: [
     'remoteok',
     'remotive',
-    'jobicy',
-    'himalayas',
     'weworkremotely',
     'greenhouse',
     'lever',
     'ashby',
-    'jungle',
+    'adzuna',
+  ],
+  jobMinSalaryUsd: parseNumber(process.env.JOB_MIN_SALARY_USD, 140000),
+  jobMinCallbackScore: parseNumber(process.env.JOB_MIN_CALLBACK_SCORE, 25),
+  // Opt-in lower-trust / international boards (not recommended)
+  optionalSources: [
+    'jobicy',
+    'himalayas',
     'roberthalf',
-    'arbeitnow',
     'workingnomads',
     'jobspresso',
-    'fourdayweek',
-    'landingjobs',
-    'wellfound',
     'dice',
-    'adzuna',
     'indeed',
-    'devitjobs',
-    'aijobs',
     'ycombinator',
     'workatastartup',
     'usajobs',
   ],
+  internationalSources: ['jungle', 'arbeitnow', 'fourdayweek', 'landingjobs', 'devitjobs', 'aijobs'],
   get enabledSources() {
     const explicit = parseList(process.env.JOB_SOURCES_ENABLED, []);
     return explicit.length ? explicit : this.allSources;

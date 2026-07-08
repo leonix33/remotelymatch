@@ -130,16 +130,30 @@ function computeInterviewLikelihood(job, profile, context = {}, companyCounts = 
     factors.push({ key: 'quality', impact: 4, label: 'Rich job listing' });
   }
 
-  const interviewLikelihoodPct = Math.min(95, Math.max(5, Math.round(score)));
+  const salaryMax = job.effectiveSalaryMaxUsd ?? job.salaryMax ?? null;
+  if (salaryMax && salaryMax >= 140000) {
+    score += 8;
+    factors.push({ key: 'comp', impact: 8, label: 'Strong compensation ($140k+)' });
+  } else if (salaryMax && salaryMax >= 100000) {
+    score += 4;
+    factors.push({ key: 'comp', impact: 4, label: 'Solid compensation ($100k+)' });
+  }
+
+  if (['greenhouse', 'lever', 'ashby'].includes(job.atsType)) {
+    score += 6;
+    factors.push({ key: 'direct_apply', impact: 6, label: 'Direct company ATS — recruiters see your app' });
+  }
+
+  const interviewLikelihoodPct = Math.min(95, Math.max(5, Math.round(score));
 
   return {
     interviewLikelihoodPct,
     likelihoodTier: likelihoodTier(interviewLikelihoodPct),
-    likelihoodFactors: factors.slice(0, 6),
+    likelihoodFactors: factors.slice(0, 8),
     recommendAction:
       interviewLikelihoodPct >= 35
         ? 'approve'
-        : interviewLikelihoodPct >= 22
+        : interviewLikelihoodPct >= 25
           ? 'review'
           : 'skip_unless_strategic',
   };

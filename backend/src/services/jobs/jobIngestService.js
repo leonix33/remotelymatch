@@ -5,12 +5,14 @@ const { normalizeJob } = require('./jobNormalizer');
 const { deduplicateJobs } = require('./jobDedupService');
 const { enrichJobs } = require('./jobQualityService');
 const { SOURCE_FETCHERS } = require('./jobSourceFetchers');
+const { filterQualityJobs, annotateJobQuality } = require('./jobQualityGate');
+const env = require('../../config/env');
 
 let lastIngest = {
   startedAt: null,
   finishedAt: null,
   sources: {},
-  totals: { fetched: 0, deduped: 0, saved: 0 },
+  totals: { fetched: 0, filtered: 0, deduped: 0, saved: 0 },
   errors: [],
 };
 
@@ -57,7 +59,7 @@ async function ingestJobs({ sources, persist = true, dryRun = false } = {}) {
     startedAt: new Date().toISOString(),
     finishedAt: null,
     sources: {},
-    totals: { fetched: 0, deduped: 0, saved: 0 },
+    totals: { fetched: 0, filtered: 0, deduped: 0, saved: 0 },
     errors: [],
   };
 
@@ -70,12 +72,19 @@ async function ingestJobs({ sources, persist = true, dryRun = false } = {}) {
     lastIngest.totals.fetched += rows.length;
     for (const row of rows) {
       if (!row?.title) continue;
-      normalized.push(normalizeJob(row));
+      normalized.push(annotateJobQuality(normalizeJob(row)));
     }
   }
 
   const scored = enrichJobs(normalized);
-  const deduped = deduplicateJobs(scored);
+  const beforeQuality = scored.length;
+  const qualityFiltered =
+    env.usRemoteJobsOnly !== false
+      ? filterQualityJobs(scored, { minSalaryUsd: env.jobMinSalaryUsd })
+      : scored;
+  lastIngest.totals.filtered = beforeQuality - qualityFiltered.length;
+
+  const deduped = deduplicateJobs(qualityFiltered);
   lastIngest.totals.deduped = deduped.length;
 
   if (dryRun || !persist) {

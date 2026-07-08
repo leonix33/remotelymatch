@@ -79,7 +79,7 @@ Surfaces: **Dashboard** (`TopMatchJobsPreview.vue`), **Queue** (`ApprovalsView.v
 ## Tier 1 — Core loop proof (Week 2–3)
 
 - [x] **T1-1** "Why this job" on every match card → user understands score
-- [ ] **T1-2** One-tap approve from match list → &lt; 3 taps to queue
+- [x] **T1-2** One-tap approve from match list → &lt; 3 taps to queue *(Dashboard "Add to queue" on each match)*
 - [x] **T1-3** Kit preview before approve → user sees tailored snippet *(bullets in insight panel)*
 - [x] **T1-4** Outcome tracker: Applied → Reply → Interview → Offer *(user-facing `/outcomes`)*
 - [ ] **T1-5** Weekly digest email → "5 matches, 2 to approve, 1 follow-up due"

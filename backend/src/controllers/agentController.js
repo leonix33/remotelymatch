@@ -71,7 +71,27 @@ async function applyApproved(req, res, next) {
     }
 
     const profile = await profileService.getOrCreate(req.user.sub);
-    const scored = scoreJobsForProfile(approved, profile, req.user.sub);
+    let scored = scoreJobsForProfile(approved, profile, req.user.sub);
+
+    const minCallback = profile.minCallbackScore ?? env.jobMinCallbackScore ?? 25;
+    if (env.qualityFirstMode !== false) {
+      const before = scored.length;
+      scored = scored.filter(
+        (job) =>
+          (job.interviewLikelihoodPct ?? 0) >= minCallback &&
+          job.recommendAction !== 'skip_unless_strategic'
+      );
+      if (!scored.length) {
+        return res.status(400).json({
+          message: `No approved jobs meet your ${minCallback}% callback score floor. Queue higher-quality roles first.`,
+          hint: 'Focus on Greenhouse/Lever/Ashby roles with strong match and callback score.',
+        });
+      }
+      if (scored.length < before) {
+        console.info(`applyApproved: filtered ${before - scored.length} low-callback jobs for user ${req.user.sub}`);
+      }
+    }
+
     const useTailoredResume =
       typeof req.body?.useTailoredResume === 'boolean'
         ? req.body.useTailoredResume

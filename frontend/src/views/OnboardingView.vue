@@ -62,7 +62,7 @@ function draftPayload() {
     defaultApplyResumeMode: 'tailored',
     defaultTailorMode: 'high_match',
     autoApplyEnabled: true,
-    defaultQuickApplyCount: 5,
+    defaultQuickApplyCount: 3,
     onboardingComplete: false,
   };
 }

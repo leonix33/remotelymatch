@@ -726,10 +726,8 @@ function parseRssJobs(rssText, source, idPrefix) {
 
 async function fetchDevItJobs() {
   const jobs = [];
-  for (const [feedUrl, source] of [
-    ['https://devitjobs.com/job_feed.xml', 'DevITJobs'],
-    ['https://devitjobs.uk/job_feed.xml', 'DevITJobs UK'],
-  ]) {
+  // US feed only — UK feed (devitjobs.uk) excluded; opt-in via JOB_SOURCES_ENABLED=devitjobs if needed
+  for (const [feedUrl, source] of [['https://devitjobs.com/job_feed.xml', 'DevITJobs']]) {
     try {
       const res = await fetch(feedUrl, {
         headers: { 'User-Agent': USER_AGENT },

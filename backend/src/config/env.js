@@ -76,4 +76,8 @@ module.exports = {
   vapidPrivateKey: trim(process.env.VAPID_PRIVATE_KEY) || '',
   vapidSubject: trim(process.env.VAPID_SUBJECT) || 'mailto:leonix23@gmail.com',
   openJobMarket: process.env.OPEN_JOB_MARKET !== '0',
+  usRemoteJobsOnly: process.env.US_REMOTE_JOBS_ONLY !== '0',
+  jobMinSalaryUsd: Number(process.env.JOB_MIN_SALARY_USD) || 140000,
+  jobMinCallbackScore: Number(process.env.JOB_MIN_CALLBACK_SCORE) || 25,
+  qualityFirstMode: process.env.QUALITY_FIRST_MODE !== '0',
 };

@@ -26,19 +26,22 @@ async function pollTailoredKits(jobIds, onProgress) {
   return best;
 }
 
-async function fetchPendingJobs(count, minMatch) {
+async function fetchPendingJobs(count, minMatch, minCallback = 25) {
   const floor = Math.max(50, Number(minMatch) || 60);
   const { data } = await http.get('/approvals', {
     params: {
       status: 'pending',
       sort: 'match',
-      limit: count,
+      limit: Math.max(count * 3, 15),
       minMatch: floor,
+      minCallback,
       offset: 0,
     },
   });
-  const jobs = data?.items || [];
-  return { jobs, listData: data, minMatchUsed: floor };
+  const jobs = (data?.items || [])
+    .sort((a, b) => (b.interviewLikelihoodPct || 0) - (a.interviewLikelihoodPct || 0))
+    .slice(0, count);
+  return { jobs, listData: data, minMatchUsed: floor, minCallbackUsed: minCallback };
 }
 
 export function useQuickApply() {
@@ -47,7 +50,7 @@ export function useQuickApply() {
   const error = ref('');
   const step = ref('');
 
-  async function quickApply({ count = 15, useTailoredResume = false, autoApply = true, minMatch, runSearch = false } = {}) {
+  async function quickApply({ count = 3, useTailoredResume = false, autoApply = true, minMatch, minCallback = 25, runSearch = false } = {}) {
     applying.value = true;
     message.value = '';
     error.value = '';
@@ -63,14 +66,14 @@ export function useQuickApply() {
         }
       }
 
-      step.value = 'Finding your best matches…';
-      let { jobs, listData, minMatchUsed } = await fetchPendingJobs(count, minMatch);
+      step.value = 'Finding your highest callback matches…';
+      let { jobs, listData, minMatchUsed, minCallbackUsed } = await fetchPendingJobs(count, minMatch, minCallback);
 
       if (!jobs.length && !runSearch) {
         step.value = 'Refreshing job listings…';
         try {
           await http.post('/agent/run', {}, { timeout: 300000 });
-          ({ jobs, listData, minMatchUsed } = await fetchPendingJobs(count, minMatch));
+          ({ jobs, listData, minMatchUsed, minCallbackUsed } = await fetchPendingJobs(count, minMatch, minCallback));
         } catch {
           /* continue */
         }
@@ -80,7 +83,7 @@ export function useQuickApply() {
         const hint = listData?.hint;
         throw new Error(
           hint ||
-            `No jobs at ${minMatchUsed || minMatch || 60}%+ match. Browse Jobs, tighten your target roles in Profile, or lower minimum match score slightly.`
+            `No roles at ${minCallbackUsed}%+ callback score and ${minMatchUsed || minMatch || 60}%+ match. Add higher-quality matches from step 2 — quality beats volume for recruiter replies.`
         );
       }
 

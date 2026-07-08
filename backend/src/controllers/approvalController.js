@@ -60,6 +60,7 @@ async function list(req, res, next) {
       status: req.query.status || 'pending',
       search: req.query.search || '',
       minMatch: req.query.minMatch || '',
+      minCallback: req.query.minCallback || '',
       ats: req.query.ats || '',
       sort: req.query.sort || 'match',
       limit: req.query.limit || 0,

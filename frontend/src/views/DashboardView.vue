@@ -22,8 +22,8 @@ const { saveState, schedule, flush } = useProfileAutosave();
 const resumeText = ref('');
 const digestEmail = ref('');
 const applicantName = ref('');
-const jobCount = ref(5);
-const autoApplyEnabled = ref(true);
+const jobCount = ref(3);
+const autoApplyEnabled = ref(false);
 const savingResume = ref(false);
 const queueCounts = ref({ pending: 0, approved: 0, applied: 0 });
 const recentApplied = ref([]);
@@ -78,8 +78,8 @@ const currentWizardStep = computed(() => {
 
 const applyButtonLabel = computed(() => {
   if (applying.value) return applyStep.value || 'Working…';
-  if (autoApplyEnabled.value) return `Auto apply to ${jobCount.value} best matches`;
-  return `Prepare ${jobCount.value} tailored applications`;
+  if (autoApplyEnabled.value) return `Apply to top ${jobCount.value} callback matches`;
+  return `Prepare ${jobCount.value} high-callback applications`;
 });
 
 function syncFromProfile(p) {
@@ -92,7 +92,7 @@ function syncFromProfile(p) {
   digestEmail.value = p.digestEmail || '';
   applicantName.value = p.applicantName || p.displayName || auth.user?.name || '';
   if (p.defaultQuickApplyCount) jobCount.value = p.defaultQuickApplyCount;
-  autoApplyEnabled.value = p.autoApplyEnabled !== false;
+  autoApplyEnabled.value = p.autoApplyEnabled === true;
   if (!hasResume.value) resumeExpanded.value = true;
 }
 
@@ -124,6 +124,10 @@ async function onResumeParsed() {
   syncFromProfile(profileStore.profile);
   matchRefreshKey.value += 1;
   resumeExpanded.value = false;
+}
+
+async function onMatchApproved() {
+  await loadStatus();
 }
 
 function mergeBatchIntoActivity(result) {
@@ -162,6 +166,7 @@ async function startApplying() {
       useTailoredResume: true,
       autoApply: autoApplyEnabled.value,
       minMatch: profileStore.profile?.minMatchScore || 50,
+      minCallback: profileStore.profile?.minCallbackScore ?? 25,
       runSearch: false,
     });
     if (result?.kits?.length || result?.count) {
@@ -299,8 +304,10 @@ onMounted(async () => {
       <div class="flex items-center gap-3">
         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/20 text-sm font-bold text-teal-300">2</span>
         <div>
-          <h2 class="font-semibold text-slate-100">Best matches for you</h2>
-          <p class="text-sm text-slate-500">Searched across all job boards — tailored to your resume</p>
+          <h2 class="font-semibold text-slate-100">Best matches for recruiter callbacks</h2>
+          <p class="text-sm text-slate-500">
+            Quality over volume — US remote $140k+ from company ATS boards, ranked by callback score
+          </p>
         </div>
       </div>
       <TopMatchJobsPreview
@@ -308,6 +315,7 @@ onMounted(async () => {
         :refresh-key="matchRefreshKey"
         :min-match="profileStore.profile?.minMatchScore || 50"
         :limit="jobCount"
+        @approved="onMatchApproved"
       />
     </section>
 
@@ -317,7 +325,7 @@ onMounted(async () => {
         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/20 text-sm font-bold text-teal-300">3</span>
         <div>
           <h2 class="font-semibold text-slate-100">Apply</h2>
-          <p class="text-sm text-slate-500">We tailor your resume for each job and submit applications</p>
+          <p class="text-sm text-slate-500">Tailor for a few high-callback roles — quality beats spray-and-pray</p>
         </div>
       </div>
 
@@ -337,16 +345,26 @@ onMounted(async () => {
             <input
               v-model.number="jobCount"
               type="number"
-              min="3"
-              max="15"
+              min="1"
+              max="10"
               class="input ml-2 inline-block w-16 text-center"
               @change="saveSettings"
             />
           </label>
           <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
             <input v-model="autoApplyEnabled" type="checkbox" class="accent-teal-500" @change="saveSettings" />
-            Auto apply (submit immediately)
+            Submit immediately (off = review kits first)
           </label>
+        </div>
+
+        <div class="rounded-lg border border-teal-900/40 bg-teal-950/20 p-3 text-sm text-teal-200/90">
+          <p class="font-medium text-teal-300">Quality-first strategy</p>
+          <ul class="mt-2 space-y-1 text-xs text-slate-400">
+            <li>· Only roles with <strong class="text-slate-300">25%+ callback score</strong> are queued</li>
+            <li>· Prefer <strong class="text-slate-300">Greenhouse / Lever / Ashby</strong> — recruiters actually review these</li>
+            <li>· Apply to <strong class="text-slate-300">3–5 strong fits/week</strong>, then follow up within 5 days</li>
+            <li>· Log every reply at <RouterLink to="/outcomes" class="text-teal-400 hover:underline">Outcomes</RouterLink> — scores improve over time</li>
+          </ul>
         </div>
 
         <details class="rounded-lg border border-slate-800 bg-slate-900/40 p-3">

@@ -19,7 +19,12 @@ function inferRemoteType(location = '', description = '') {
 }
 
 function parseSalaryNumbers(text = '') {
-  const matches = String(text).match(/\$?\s?(\d{2,3}(?:,\d{3})+|\d{2,3})(?:k)?/gi) || [];
+  const blob = String(text);
+  const salaryContext =
+    /salary|compensation|pay range|base pay|ote|total comp|annually|per year|\/yr|\/year/i.test(blob);
+  if (!salaryContext) return { salaryMin: null, salaryMax: null };
+
+  const matches = blob.match(/\$?\s?(\d{2,3}(?:,\d{3})+|\d{2,3})(?:k)?/gi) || [];
   const values = matches
     .map((m) => {
       const raw = m.replace(/[$,\s]/g, '').toLowerCase();

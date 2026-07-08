@@ -41,7 +41,9 @@ const updateSchema = z.object({
   contactPhone: z.string().optional(),
   defaultSupplementPages: z.number().min(1).max(6).optional(),
   defaultTailorMode: z.enum(['balanced', 'high_match']).optional(),
-  defaultQuickApplyCount: z.number().min(3).max(50).optional(),
+  defaultQuickApplyCount: z.number().min(1).max(15).optional(),
+  minCallbackScore: z.number().min(0).max(95).optional(),
+  qualityFirstMode: z.boolean().optional(),
   highMatchTarget: z.number().min(95).max(100).optional(),
   savedJobs: z
     .array(
@@ -234,7 +236,7 @@ async function parseResume(req, res, next) {
         patch.defaultApplyResumeMode = 'tailored';
         patch.defaultTailorMode = 'high_match';
         patch.autoApplyEnabled = true;
-        patch.defaultQuickApplyCount = profile.defaultQuickApplyCount || 5;
+        patch.defaultQuickApplyCount = profile.defaultQuickApplyCount || 3;
         if (!profile.minMatchScore) patch.minMatchScore = 50;
       }
 

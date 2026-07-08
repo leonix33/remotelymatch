@@ -12,6 +12,7 @@ const applicationKitStore = require('./applicationKitStore');
 const { profileResumeAlignment } = require('./resumeParseService');
 const { buildKitSummary } = require('./kitReadinessService');
 const activityService = require('./activityService');
+const { applyJobPoolFilters, filterByCallbackScore } = require('./jobPoolFilter');
 
 const JOB_LIST_CACHE_MS = 120_000;
 const jobListCache = new Map();
@@ -52,6 +53,7 @@ async function buildJobList(userId) {
   const openMarket = env.openJobMarket !== false;
   const minMatch = profile.minMatchScore || (openMarket ? 40 : 60);
   let jobs = await loadJobs(0);
+  jobs = applyJobPoolFilters(jobs);
 
   const hasSearchCriteria = Boolean(profile?.targetTitles?.length || profile?.mustHaveSkills?.length);
   const hasResume = Boolean((profile?.resumeText || '').trim().length >= 50);
@@ -77,6 +79,7 @@ async function buildJobList(userId) {
     jobs = scoreJobsForProfile(jobs, profile, userId);
   }
 
+  jobs = filterByCallbackScore(jobs, { minCallbackScore: profile.minCallbackScore });
   jobs = jobs.filter((j) => (j.personalMatchPct ?? j.matchPct ?? 0) >= minMatch);
 
   if (!env.mongoUri) {
@@ -111,6 +114,12 @@ async function buildJobList(userId) {
         atsType: job.atsType,
         source: job.source,
         emailSection: job.emailSection,
+        interviewLikelihoodPct: job.interviewLikelihoodPct,
+        likelihoodTier: job.likelihoodTier,
+        likelihoodFactors: job.likelihoodFactors,
+        recommendAction: job.recommendAction,
+        strengths: job.strengths,
+        gaps: job.gaps,
         status: row?.status || 'pending',
         notes: row?.notes || '',
         reviewedAt: row?.reviewedAt,
@@ -152,6 +161,12 @@ async function buildJobList(userId) {
       atsType: job.atsType,
       source: job.source,
       emailSection: job.emailSection,
+      interviewLikelihoodPct: job.interviewLikelihoodPct,
+      likelihoodTier: job.likelihoodTier,
+      likelihoodFactors: job.likelihoodFactors,
+      recommendAction: job.recommendAction,
+      strengths: job.strengths,
+      gaps: job.gaps,
       status: existing?.status || 'pending',
       notes: existing?.notes || '',
       reviewedAt: existing?.reviewedAt,
@@ -163,7 +178,7 @@ async function buildJobList(userId) {
   return result;
 }
 
-function applyFilters(items, { statusFilter, search, minMatch, ats, sort }) {
+function applyFilters(items, { statusFilter, search, minMatch, minCallback, ats, sort }) {
   let list = items;
   if (statusFilter && statusFilter !== 'all') {
     list = list.filter((j) => j.status === statusFilter);
@@ -180,6 +195,10 @@ function applyFilters(items, { statusFilter, search, minMatch, ats, sort }) {
   if (minMatch) {
     const min = Number(minMatch);
     list = list.filter((j) => (j.personalMatchPct ?? j.matchPct ?? 0) >= min);
+  }
+  if (minCallback) {
+    const min = Number(minCallback);
+    list = list.filter((j) => (j.interviewLikelihoodPct ?? 0) >= min);
   }
   if (ats && ats !== 'all') {
     list = list.filter((j) => (j.atsType || '').toLowerCase() === ats.toLowerCase());
@@ -201,6 +220,7 @@ async function listForUser(userId, options = {}) {
     status: statusFilter = 'pending',
     search = '',
     minMatch = '',
+    minCallback = env.qualityFirstMode !== false ? String(env.jobMinCallbackScore) : '',
     ats = '',
     sort = 'match',
     limit = 0,
@@ -213,7 +233,7 @@ async function listForUser(userId, options = {}) {
     if (job.status in counts) counts[job.status] += 1;
   }
 
-  const all = applyFilters(base, { statusFilter, search, minMatch, ats, sort });
+  const all = applyFilters(base, { statusFilter, search, minMatch, minCallback, ats, sort });
   const total = all.length;
   const slice = limit > 0 ? all.slice(Number(offset), Number(offset) + Number(limit)) : all;
 
