@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { isAdminRole } from '../utils/roles';
 import { useProfileStore } from '../stores/profile';
 import { tryDevAutoLogin } from '../utils/devAuth';
 import LoginView from '../views/LoginView.vue';
@@ -98,7 +99,7 @@ router.beforeEach(async (to) => {
   if (to.meta.guest && auth.accessToken && !['/welcome', '/privacy', '/terms', '/login'].includes(to.path)) return '/';
   if (to.meta.guest && auth.accessToken && to.path === '/login' && !to.query.forgot && !to.query.reset) return '/';
   if (!showAskAi && to.path === '/concierge') return '/';
-  if (to.matched.some((record) => record.meta.adminOnly) && auth.user?.role !== 'admin') return '/';
+  if (to.matched.some((record) => record.meta.adminOnly) && !isAdminRole(auth.user?.role)) return '/';
 
   if (auth.accessToken && to.meta.requiresAuth) {
     const profileStore = useProfileStore();

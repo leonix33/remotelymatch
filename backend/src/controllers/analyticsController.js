@@ -1,8 +1,9 @@
 const analyticsService = require('../services/analyticsService');
+const { isAdminRole } = require('../utils/roles');
 
 async function summary(req, res, next) {
   try {
-    const userId = req.user.role === 'admin' ? null : req.user.sub;
+    const userId = isAdminRole(req.user.role) ? null : req.user.sub;
     const data = await analyticsService.summary(userId);
     res.json(data);
   } catch (err) {

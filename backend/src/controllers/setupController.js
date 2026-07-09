@@ -1,4 +1,5 @@
 const env = require('../config/env');
+const { isAdminRole } = require('../utils/roles');
 const profileService = require('../services/profileService');
 const platformSettingsService = require('../services/platformSettingsService');
 const emailService = require('../services/emailService');
@@ -68,7 +69,7 @@ async function status(req, res, next) {
       adzunaConfigured: adzuna.configured,
       adzunaSource: adzuna.source,
       adzunaAppIdHint: adzuna.appIdHint,
-      isAdmin: req.user?.role === 'admin',
+      isAdmin: isAdminRole(req.user?.role),
     });
   } catch (err) {
     next(err);

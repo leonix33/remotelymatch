@@ -9,7 +9,8 @@ export const useAuthStore = defineStore('auth', {
     accessToken: localStorage.getItem('accessToken'),
   }),
   getters: {
-    isAdmin: (s) => s.user?.role === 'admin',
+    isSuperAdmin: (s) => s.user?.role === 'superadmin',
+    isAdmin: (s) => s.user?.role === 'admin' || s.user?.role === 'superadmin',
   },
   actions: {
     applySession(data) {

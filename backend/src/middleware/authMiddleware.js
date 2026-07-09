@@ -1,12 +1,13 @@
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
+const { isAdminRole, isSuperAdminRole } = require('../utils/roles');
 const User = require('../models/User');
 
 async function resolveLegacyDevAdmin(user) {
   if (user.sub !== 'dev-admin' || !env.mongoUri) return user;
   const admin = await User.findOne({
     email: env.adminEmail?.toLowerCase(),
-    role: 'admin',
+    role: { $in: ['superadmin', 'admin'] },
     active: true,
   });
   if (!admin) {
@@ -32,8 +33,30 @@ async function requireAuth(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (req.user?.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+  if (!isAdminRole(req.user?.role)) return res.status(403).json({ message: 'Admin only' });
   next();
 }
 
-module.exports = { requireAuth, requireAdmin };
+async function requireAdminFresh(req, res, next) {
+  if (!isAdminRole(req.user?.role)) return res.status(403).json({ message: 'Admin only' });
+  if (!env.mongoUri || !req.user?.sub || req.user.sub === 'dev-admin') return next();
+  try {
+    const dbUser = await User.findById(req.user.sub).select('role active email');
+    if (!dbUser?.active) return res.status(403).json({ message: 'Account disabled' });
+    if (!isAdminRole(dbUser.role)) return res.status(403).json({ message: 'Admin access revoked' });
+    req.user.role = dbUser.role;
+    req.user.email = dbUser.email;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+function requireSuperAdmin(req, res, next) {
+  if (!isSuperAdminRole(req.user?.role)) {
+    return res.status(403).json({ message: 'Super admin only' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin, requireAdminFresh, requireSuperAdmin };

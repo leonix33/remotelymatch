@@ -110,7 +110,7 @@ async function adminRemoveUser(userId) {
 }
 
 async function countActiveAdmins(excludeUserId) {
-  const query = { role: 'admin', active: true };
+  const query = { role: { $in: ['superadmin', 'admin'] }, active: true };
   if (excludeUserId) query._id = { $ne: excludeUserId };
   return User.countDocuments(query);
 }

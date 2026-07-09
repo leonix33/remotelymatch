@@ -11,6 +11,7 @@ const jobIngestService = require('../services/jobs/jobIngestService');
 const { purgeStaleJobs } = require('../services/jobs/jobStalePurgeService');
 const scoredJobListCache = require('../services/jobListCache');
 const env = require('../config/env');
+const { isAdminRole } = require('../utils/roles');
 
 async function runAgent(req, res, next) {
   try {
@@ -309,7 +310,7 @@ async function applyApproved(req, res, next) {
 async function listRuns(req, res, next) {
   try {
     if (!env.mongoUri) return res.json([]);
-    const q = req.user.role === 'admin' ? {} : { startedBy: req.user.sub };
+    const q = isAdminRole(req.user.role) ? {} : { startedBy: req.user.sub };
     const runs = await AgentRun.find(q).sort({ createdAt: -1 }).limit(20).lean();
     res.json(runs);
   } catch (err) {

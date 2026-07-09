@@ -9,6 +9,12 @@ const userDataService = require('../services/userDataService');
 const authService = require('../services/authService');
 const profileService = require('../services/profileService');
 const env = require('../config/env');
+const {
+  isAdminRole,
+  isSuperAdminRole,
+  isProtectedAccount,
+  assertCanModifyUser,
+} = require('../utils/roles');
 
 const createUserSchema = z.object({
   name: z.string().min(2),
@@ -126,18 +132,42 @@ async function updateUser(req, res, next) {
     const body = patchUserSchema.parse(req.body);
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const actor = { role: req.user.role, sub: req.user.sub };
+
+    if (user._id.toString() !== req.user.sub) {
+      try {
+        assertCanModifyUser(actor, user, env.adminEmail);
+      } catch (guardErr) {
+        return res.status(guardErr.status || 403).json({ message: guardErr.message });
+      }
+    }
+
     if (user._id.toString() === req.user.sub && body.active === false) {
       return res.status(400).json({ message: 'You cannot disable your own account' });
     }
     if (user._id.toString() === req.user.sub && body.role && body.role !== user.role) {
       return res.status(400).json({ message: 'You cannot change your own role' });
     }
-    if (body.role === 'user' && user.role === 'admin') {
+
+    if (body.role === 'user' && isAdminRole(user.role)) {
+      try {
+        assertCanModifyUser(actor, user, env.adminEmail, 'demote-admin');
+      } catch (guardErr) {
+        return res.status(guardErr.status || 403).json({ message: guardErr.message });
+      }
       const admins = await userDataService.countActiveAdmins(user._id);
       if (admins === 0) {
         return res.status(400).json({ message: 'Cannot demote the last admin' });
       }
     }
+
+    if (typeof body.active === 'boolean' && body.active === false && isProtectedAccount(user, env.adminEmail)) {
+      if (!isSuperAdminRole(actor.role) || user._id.toString() === req.user.sub) {
+        return res.status(403).json({ message: 'Cannot disable super admin' });
+      }
+    }
+
     if (body.name) user.name = body.name;
     if (body.role) user.role = body.role;
     if (typeof body.active === 'boolean') user.active = body.active;
@@ -175,7 +205,14 @@ async function deleteUser(req, res, next) {
     }
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.role === 'admin') {
+
+    try {
+      assertCanModifyUser({ role: req.user.role }, user, env.adminEmail);
+    } catch (guardErr) {
+      return res.status(guardErr.status || 403).json({ message: guardErr.message });
+    }
+
+    if (isAdminRole(user.role)) {
       const admins = await userDataService.countActiveAdmins(user._id);
       if (admins === 0) {
         return res.status(400).json({ message: 'Cannot delete the last admin' });
@@ -199,8 +236,14 @@ async function resetPassword(req, res, next) {
     if (password.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters' });
     }
-    const user = await User.findById(req.params.id).select('name email active');
+    const user = await User.findById(req.params.id).select('name email active role');
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    try {
+      assertCanModifyUser({ role: req.user.role }, user, env.adminEmail);
+    } catch (guardErr) {
+      return res.status(guardErr.status || 403).json({ message: guardErr.message });
+    }
 
     const result = await authService.resetPassword(req.params.id, password);
 

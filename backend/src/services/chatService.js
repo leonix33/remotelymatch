@@ -3,6 +3,7 @@ const Message = require('../models/Message');
 const ChatRequest = require('../models/ChatRequest');
 const User = require('../models/User');
 const env = require('../config/env');
+const { isAdminRole } = require('../utils/roles');
 
 function requireMongo() {
   if (!env.mongoUri) throw new Error('MongoDB is required for team chat');
@@ -321,7 +322,7 @@ async function createApplySquad(creatorId, { jobId, jobTitle, company, memberIds
 async function addMentor(conversationId, mentorId, requesterId) {
   requireMongo();
   const mentor = await User.findById(mentorId);
-  if (!mentor?.isMentor && mentor?.role !== 'admin') throw new Error('User is not a mentor');
+  if (!mentor?.isMentor && !isAdminRole(mentor?.role)) throw new Error('User is not a mentor');
   const conversation = await Conversation.findById(conversationId);
   if (!conversation || !isMember(conversation, requesterId)) throw new Error('Conversation not found');
   if (isMember(conversation, mentorId)) return conversation;

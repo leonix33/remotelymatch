@@ -1,6 +1,7 @@
 const Team = require('../models/Team');
 const User = require('../models/User');
 const env = require('../config/env');
+const { isAdminRole } = require('../utils/roles');
 
 function requireMongo() {
   if (!env.mongoUri) throw new Error('MongoDB is required');
@@ -18,7 +19,7 @@ async function ensureTeamForUser(user) {
     if (team) return team;
   }
 
-  if (user.role === 'admin') {
+  if (isAdminRole(user.role)) {
     let team = await Team.findOne({ ownerId: user._id });
     if (!team) {
       team = await Team.create({ name: `${user.name}'s Team`, ownerId: user._id, plan: 'free' });
@@ -28,7 +29,9 @@ async function ensureTeamForUser(user) {
     return team;
   }
 
-  const admin = await User.findOne({ role: 'admin', active: true });
+  const admin =
+    (await User.findOne({ role: 'superadmin', active: true })) ||
+    (await User.findOne({ role: 'admin', active: true }));
   if (admin?.teamId) {
     user.teamId = admin.teamId;
     await user.save();
@@ -100,7 +103,7 @@ async function getUsageSummary(userId) {
 async function upgradePlan(userId, plan) {
   requireMongo();
   const user = await User.findById(userId);
-  if (!user || user.role !== 'admin') throw new Error('Admin only');
+  if (!user || !isAdminRole(user.role)) throw new Error('Admin only');
   const team = await ensureTeamForUser(user);
   team.plan = plan;
   await team.save();

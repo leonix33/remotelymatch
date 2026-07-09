@@ -11,7 +11,7 @@ async function ensureAdmin({ env, User, teamService }) {
   const forcePasswordSync = process.env.ADMIN_PASSWORD_FORCE_SYNC === '1';
   const existing = await User.findOne({ email });
   if (existing) {
-    existing.role = 'admin';
+    existing.role = 'superadmin';
     existing.active = true;
     if (forcePasswordSync) {
       existing.passwordHash = passwordHash;
@@ -25,7 +25,7 @@ async function ensureAdmin({ env, User, teamService }) {
   const user = await User.create({
     name: 'Admin',
     email,
-    role: 'admin',
+    role: 'superadmin',
     passwordHash,
   });
   await teamService.ensureTeamForUser(user);

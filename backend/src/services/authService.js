@@ -55,12 +55,12 @@ async function loginWithEnvAdmin(email) {
       user = await User.create({
         name: 'Admin',
         email,
-        role: 'admin',
+        role: 'superadmin',
         passwordHash,
       });
     } else {
       user.passwordHash = passwordHash;
-      user.role = 'admin';
+      user.role = 'superadmin';
       user.active = true;
       await user.save();
     }
@@ -70,7 +70,7 @@ async function loginWithEnvAdmin(email) {
     _id: 'dev-admin',
     name: 'Admin',
     email: env.adminEmail,
-    role: 'admin',
+    role: 'superadmin',
   };
   return { user: devUser, accessToken: signAccessToken(devUser) };
 }

@@ -4,6 +4,7 @@ import http from '../api/http';
 import { useAuthStore } from '../stores/auth';
 import PasswordInput from '../components/PasswordInput.vue';
 import { TEAM_MAILBOX } from '../constants/domain';
+import { canChangeRole, canManageUser, isSuperAdminRole, roleLabel } from '../utils/roles';
 
 const auth = useAuthStore();
 const users = ref([]);
@@ -123,7 +124,7 @@ function shareInviteViaWhatsApp(inv) {
 }
 
 async function toggleActive(user) {
-  if (isSelf(user)) return;
+  if (isSelf(user) || !canManageUser(auth.user?.role, user)) return;
   error.value = '';
   success.value = '';
   try {
@@ -137,7 +138,7 @@ async function toggleActive(user) {
 
 async function changeRole(user, role) {
   const id = userId(user);
-  if (isSelf(user) || user.role === role) return;
+  if (isSelf(user) || user.role === role || !canChangeRole(auth.user?.role, user)) return;
   roleSaving.value = id;
   error.value = '';
   success.value = '';
@@ -221,7 +222,20 @@ async function submitNameEdit() {
 }
 
 function roleClass(role) {
-  return role === 'admin' ? 'badge-gold' : 'badge-teal';
+  if (role === 'superadmin') return 'badge-gold';
+  return role === 'admin' ? 'badge-teal' : 'badge-slate';
+}
+
+function roleDisplay(role) {
+  return roleLabel(role);
+}
+
+function userIsProtected(user) {
+  return isSuperAdminRole(user?.role);
+}
+
+function canOpenManage(user) {
+  return !isSelf(user) && canManageUser(auth.user?.role, user);
 }
 
 const filteredUsers = computed(() => {
@@ -298,7 +312,7 @@ function prefillEmailTest(email) {
 
 async function sendLoginEmail(user) {
   const id = userId(user);
-  if (!id || isSelf(user)) return;
+  if (!id || isSelf(user) || !canManageUser(auth.user?.role, user)) return;
   closeMenu();
   loginEmailSending.value = id;
   error.value = '';
@@ -336,6 +350,7 @@ function closeMenu() {
 }
 
 function openReset(user) {
+  if (!canManageUser(auth.user?.role, user)) return;
   closeMenu();
   resetTarget.value = user;
   resetPassword.value = '';
@@ -344,6 +359,11 @@ function openReset(user) {
 }
 
 function handleMenuAction(user, action) {
+  if (action === 'edit-application-name') {
+    if (!isSelf(user) && !canManageUser(auth.user?.role, user)) return;
+  } else if (!canManageUser(auth.user?.role, user)) {
+    return;
+  }
   closeMenu();
   if (action === 'edit-application-name') openNameEdit(user);
   else if (action === 'make-admin') changeRole(user, 'admin');
@@ -546,14 +566,14 @@ onMounted(() => {
                 Applies as <span class="text-slate-400">{{ applicationNameFor(u) }}</span>
               </p>
               <div class="mt-2 flex flex-wrap gap-2">
-                <span class="badge capitalize" :class="roleClass(u.role)">{{ u.role }}</span>
+                <span class="badge" :class="roleClass(u.role)">{{ roleDisplay(u.role) }}</span>
                 <span class="badge" :class="u.active !== false ? 'badge-teal' : 'badge-slate'">
                   {{ u.active !== false ? 'Can log in' : 'Blocked' }}
                 </span>
               </div>
             </div>
           </div>
-          <div v-if="!isSelf(u)" class="mt-4 grid grid-cols-2 gap-2">
+          <div v-if="canOpenManage(u)" class="mt-4 grid grid-cols-2 gap-2">
             <button type="button" class="btn-secondary text-sm" @click="openReset(u)">Reset password</button>
             <button
               type="button"
@@ -596,7 +616,7 @@ onMounted(() => {
               </div>
             </td>
             <td class="px-6 py-4">
-              <span class="badge capitalize" :class="roleClass(u.role)">{{ u.role }}</span>
+              <span class="badge" :class="roleClass(u.role)">{{ roleDisplay(u.role) }}</span>
             </td>
             <td class="px-6 py-4">
               <span class="badge" :class="u.active !== false ? 'badge-teal' : 'badge-slate'">
@@ -604,7 +624,7 @@ onMounted(() => {
               </span>
             </td>
             <td class="px-6 py-4 text-right">
-              <div v-if="!isSelf(u)" class="flex justify-end gap-2">
+              <div v-if="canOpenManage(u)" class="flex justify-end gap-2">
                 <button type="button" class="btn-secondary px-3 py-1.5 text-xs" @click="openReset(u)">
                   Reset password
                 </button>
@@ -617,7 +637,8 @@ onMounted(() => {
                   Manage
                 </button>
               </div>
-              <span v-else class="text-xs text-slate-500">Your account</span>
+              <span v-else-if="isSelf(u)" class="text-xs text-slate-500">Your account</span>
+              <span v-else-if="userIsProtected(u)" class="text-xs text-amber-300/90">Protected</span>
             </td>
           </tr>
         </tbody>
@@ -901,13 +922,17 @@ onMounted(() => {
             <h3 id="team-actions-title" class="font-semibold text-slate-200">{{ menuUser.name }}</h3>
             <p class="text-sm text-slate-500">{{ menuUser.email }}</p>
             <div class="mt-2 flex flex-wrap gap-2">
-              <span class="badge capitalize" :class="roleClass(menuUser.role)">{{ menuUser.role }}</span>
+              <span class="badge" :class="roleClass(menuUser.role)">{{ roleDisplay(menuUser.role) }}</span>
               <span class="badge" :class="menuUser.active !== false ? 'badge-teal' : 'badge-slate'">
                 {{ menuUser.active !== false ? 'Can log in' : 'Blocked' }}
               </span>
             </div>
           </div>
         </div>
+
+        <p v-if="userIsProtected(menuUser) && !auth.isSuperAdmin" class="mt-4 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-100/90">
+          Super admin accounts can only be managed by the platform owner.
+        </p>
 
         <p class="team-manage-section-label mt-6">Profile</p>
         <button
@@ -921,6 +946,7 @@ onMounted(() => {
 
         <p class="team-manage-section-label mt-6">Access</p>
         <button
+          v-if="canManageUser(auth.user?.role, menuUser)"
           type="button"
           class="team-manage-action"
           :disabled="loginEmailSending === userId(menuUser)"
@@ -933,12 +959,17 @@ onMounted(() => {
           <span class="team-manage-action-title">Test delivery to this address</span>
           <span class="team-manage-action-hint">Send a test email to {{ menuUser.email }} and scroll to the test section</span>
         </button>
-        <button type="button" class="team-manage-action" @click="openReset(menuUser)">
+        <button
+          v-if="canManageUser(auth.user?.role, menuUser)"
+          type="button"
+          class="team-manage-action"
+          @click="openReset(menuUser)"
+        >
           <span class="team-manage-action-title">Reset password</span>
           <span class="team-manage-action-hint">Choose the password yourself, then email it to them</span>
         </button>
         <button
-          v-if="menuUser.role !== 'admin'"
+          v-if="canChangeRole(auth.user?.role, menuUser) && menuUser.role !== 'admin' && menuUser.role !== 'superadmin'"
           type="button"
           class="team-manage-action"
           :disabled="roleSaving === userId(menuUser)"
@@ -948,7 +979,7 @@ onMounted(() => {
           <span class="team-manage-action-hint">Can invite users and manage the team</span>
         </button>
         <button
-          v-else
+          v-else-if="canChangeRole(auth.user?.role, menuUser) && menuUser.role === 'admin'"
           type="button"
           class="team-manage-action"
           :disabled="roleSaving === userId(menuUser)"
@@ -958,6 +989,7 @@ onMounted(() => {
           <span class="team-manage-action-hint">Remove team admin permissions</span>
         </button>
         <button
+          v-if="canManageUser(auth.user?.role, menuUser)"
           type="button"
           class="team-manage-action"
           @click="handleMenuAction(menuUser, 'toggle-active')"
@@ -970,6 +1002,7 @@ onMounted(() => {
 
         <p class="team-manage-section-label mt-5 text-red-400/80">Danger zone</p>
         <button
+          v-if="canManageUser(auth.user?.role, menuUser)"
           type="button"
           class="team-manage-action team-manage-action--danger"
           @click="handleMenuAction(menuUser, 'delete')"

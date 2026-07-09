@@ -326,7 +326,9 @@ onUnmounted(() => clearInterval(pollTimer));
                   <p class="text-xs text-slate-500">{{ user.email }}</p>
                 </td>
                 <td class="py-3 pr-4">
-                  <span class="badge" :class="user.role === 'admin' ? 'badge-gold' : 'badge-slate'">{{ user.role }}</span>
+                  <span class="badge" :class="user.role === 'superadmin' ? 'badge-gold' : user.role === 'admin' ? 'badge-teal' : 'badge-slate'">
+                    {{ user.role === 'superadmin' ? 'Super admin' : user.role }}
+                  </span>
                   <span v-if="!user.active" class="ml-1 badge badge-red text-[10px]">disabled</span>
                 </td>
                 <td class="py-3 pr-4 text-xs">
