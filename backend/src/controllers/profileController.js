@@ -231,13 +231,11 @@ async function parseResume(req, res, next) {
 
       const isFirstSetup = !profile.onboardingComplete;
       if (isFirstSetup && parsed.resumeText?.length >= 50) {
-        patch.onboardingComplete = true;
         patch.tailorResumeOnApply = true;
         patch.defaultApplyResumeMode = 'tailored';
         patch.defaultTailorMode = 'high_match';
-        patch.autoApplyEnabled = true;
         patch.defaultQuickApplyCount = profile.defaultQuickApplyCount || 3;
-        if (!profile.minMatchScore) patch.minMatchScore = 50;
+        if (!profile.minMatchScore) patch.minMatchScore = 40;
       }
 
       profile = await profileService.update(req.user.sub, patch);

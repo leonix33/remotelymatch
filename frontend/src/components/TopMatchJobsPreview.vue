@@ -9,6 +9,7 @@ import { useJobApprove } from '../composables/useJobApprove';
 const props = defineProps({
   limit: { type: Number, default: 5 },
   minMatch: { type: Number, default: null },
+  minCallback: { type: Number, default: null },
   refreshKey: { type: Number, default: 0 },
   compact: { type: Boolean, default: false },
   showApprove: { type: Boolean, default: true },
@@ -56,26 +57,29 @@ async function load() {
   actionMessage.value = '';
   actionError.value = '';
   try {
-    const floor = props.minMatch != null ? props.minMatch : 50;
-    const [{ data: approvalData }, statuses] = await Promise.all([
-      http.get('/approvals', {
-        params: {
-          status: 'pending',
-          sort: 'match',
-          limit: props.limit,
-          minMatch: floor,
-          minCallback: 25,
-          offset: 0,
-        },
-      }),
-      loadApprovalStatuses(),
-    ]);
+    const floor = props.minMatch != null ? props.minMatch : 40;
+    const callbackFloor = props.minCallback != null ? props.minCallback : 25;
+    const approvalParams = {
+      status: 'pending',
+      sort: 'match',
+      limit: props.limit,
+      minMatch: floor,
+      offset: 0,
+    };
+    if (callbackFloor > 0) approvalParams.minCallback = callbackFloor;
 
-    let rows = approvalData?.items || [];
+    const statuses = await loadApprovalStatuses();
+    let rows = [];
+    try {
+      const { data: approvalData } = await http.get('/approvals', { params: approvalParams });
+      rows = approvalData?.items || [];
+    } catch (e) {
+      console.warn('approvals load failed, falling back to /jobs', e);
+    }
+
     if (!rows.length) {
-      const { data: jobData } = await http.get('/jobs', {
-        params: { limit: props.limit * 2, offset: 0, minMatch: floor },
-      });
+      const jobParams = { limit: props.limit * 2, offset: 0, minMatch: floor };
+      const { data: jobData } = await http.get('/jobs', { params: jobParams });
       rows = (jobData?.jobs || []).filter(
         (j) => !statuses.approved.has(j.jobId) && !statuses.rejected.has(j.jobId)
       );
@@ -84,8 +88,11 @@ async function load() {
     jobs.value = rows.slice(0, props.limit);
     approvedLocally.value = new Set();
     skippedLocally.value = new Set();
-  } catch {
-    error.value = 'Could not load job matches yet — try again in a moment.';
+    if (!jobs.value.length) {
+      error.value = '';
+    }
+  } catch (e) {
+    error.value = e.response?.data?.message || 'Could not load job matches yet — try again in a moment.';
     jobs.value = [];
   } finally {
     loading.value = false;
@@ -123,7 +130,7 @@ defineExpose({ refresh: load });
     <p v-else-if="error" class="text-sm text-amber-300">{{ error }}</p>
 
     <p v-else-if="!jobs.length && !actionMessage" class="rounded-xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-500">
-      No matches yet — we're refreshing listings. You can still apply and we'll queue the best roles as they arrive.
+      No matches yet for your profile — we're refreshing listings across all fields. You can finish setup and browse jobs from the dashboard.
     </p>
 
     <template v-else>

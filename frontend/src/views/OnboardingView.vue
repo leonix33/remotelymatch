@@ -20,8 +20,8 @@ const auth = useAuthStore();
 const { saveState, schedule, flush } = useProfileAutosave({ delay: 700 });
 
 const steps = [
-  { label: 'Upload resume', hint: 'Any resume — we build your entire profile' },
-  { label: 'Your matches', hint: 'Roles tailored to you' },
+  { label: 'Upload resume', hint: 'Any resume, any field — we build your entire profile' },
+  { label: 'Your matches', hint: 'Remote roles tailored to you' },
 ];
 
 const step = ref(1);
@@ -159,6 +159,10 @@ onMounted(async () => {
   if (!digestEmail.value.trim()) {
     digestEmail.value = auth.user?.email || '';
   }
+  if (profileStore.profile?.onboardingComplete && step.value === 2) {
+    await profileStore.save({ onboardingComplete: false }).catch(() => {});
+    matchRefreshKey.value += 1;
+  }
   autosaveEnabled.value = true;
   if (profileStore.profile?.onboardingComplete) {
     router.replace('/');
@@ -226,7 +230,7 @@ onMounted(async () => {
         <template v-else>
           <h2 class="font-semibold text-slate-200">Your best matches</h2>
           <p class="text-sm text-slate-500">
-            We searched all job boards and found roles that fit your resume. You'll get a tailored resume for each one.
+            Any field, any resume — we search remote roles that fit your experience and tailor applications for you.
           </p>
 
           <div v-if="suggestedTitles.length" class="rounded-xl border border-teal-900/30 bg-teal-950/20 p-4">
@@ -236,7 +240,8 @@ onMounted(async () => {
 
           <TopMatchJobsPreview
             :refresh-key="matchRefreshKey"
-            :min-match="50"
+            :min-match="30"
+            :min-callback="0"
             :limit="5"
             compact
           />

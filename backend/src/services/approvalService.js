@@ -12,7 +12,7 @@ const applicationKitStore = require('./applicationKitStore');
 const { profileResumeAlignment } = require('./resumeParseService');
 const { buildKitSummary } = require('./kitReadinessService');
 const activityService = require('./activityService');
-const { applyJobPoolFilters, filterByCallbackScore } = require('./jobPoolFilter');
+const { applyJobPoolFilters, filterByCallbackScore, poolOptionsForProfile } = require('./jobPoolFilter');
 
 const JOB_LIST_CACHE_MS = 120_000;
 const jobListCache = new Map();
@@ -50,10 +50,11 @@ async function buildJobList(userId) {
   }
 
   const profile = await profileService.getOrCreate(userId);
+  const poolOpts = poolOptionsForProfile(profile);
   const openMarket = env.openJobMarket !== false;
   const minMatch = profile.minMatchScore || (openMarket ? 40 : 60);
   let jobs = await loadJobs(0);
-  jobs = applyJobPoolFilters(jobs);
+  jobs = applyJobPoolFilters(jobs, poolOpts);
 
   const hasSearchCriteria = Boolean(profile?.targetTitles?.length || profile?.mustHaveSkills?.length);
   const hasResume = Boolean((profile?.resumeText || '').trim().length >= 50);
@@ -79,7 +80,7 @@ async function buildJobList(userId) {
     jobs = scoreJobsForProfile(jobs, profile, userId);
   }
 
-  jobs = filterByCallbackScore(jobs, { minCallbackScore: profile.minCallbackScore });
+  jobs = filterByCallbackScore(jobs, poolOpts);
   jobs = jobs.filter((j) => (j.personalMatchPct ?? j.matchPct ?? 0) >= minMatch);
 
   if (!env.mongoUri) {
@@ -216,11 +217,13 @@ function applyFilters(items, { statusFilter, search, minMatch, minCallback, ats,
 }
 
 async function listForUser(userId, options = {}) {
+  const profile = await profileService.getOrCreate(userId);
+  const poolOpts = poolOptionsForProfile(profile);
   const {
     status: statusFilter = 'pending',
     search = '',
     minMatch = '',
-    minCallback = env.qualityFirstMode !== false ? String(env.jobMinCallbackScore) : '',
+    minCallback = poolOpts.relaxed ? '' : String(env.jobMinCallbackScore),
     ats = '',
     sort = 'match',
     limit = 0,

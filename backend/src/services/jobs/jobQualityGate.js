@@ -144,8 +144,15 @@ function meetsSalaryFloor(job, minUsd = 100000) {
 }
 
 function isActionableJob(job, options = {}) {
-  const minSalaryUsd = options.minSalaryUsd ?? 140000;
-  const requireTrustedSource = options.requireTrustedSource !== false;
+  const relaxed = options.relaxed === true;
+  const minSalaryUsd = options.minSalaryUsd ?? (relaxed ? 60000 : 140000);
+  const requireTrustedSource = options.requireTrustedSource !== false && !relaxed;
+
+  if (relaxed) {
+    if (!job?.title?.trim() || !hasDirectApplyUrl(job)) return false;
+    if (!isUsEligibleJob(job)) return false;
+    return true;
+  }
 
   if (!job?.title?.trim() || !job?.company?.trim()) return false;
   if (!hasDirectApplyUrl(job)) return false;

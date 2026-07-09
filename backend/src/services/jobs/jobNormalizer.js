@@ -46,6 +46,7 @@ function extractSkills(text = '') {
     'marketing', 'seo', 'sales', 'crm', 'hubspot', 'salesforce', 'design', 'figma', 'ux', 'ui',
     'product', 'analytics', 'sql', 'excel', 'finance', 'accounting', 'writing', 'content',
     'customer success', 'support', 'project management', 'agile', 'scrum', 'hr', 'recruiting',
+    'operations', 'healthcare', 'teaching', 'legal', 'business analysis', 'supply chain', 'retail',
   ];
   const hay = text.toLowerCase();
   return catalog.filter((skill) => hay.includes(skill));

@@ -3,6 +3,119 @@ const mammoth = require('mammoth');
 const { normalizeResumeLayout, preserveLineBreaksFromExtracted } = require('./resumeLayoutService');
 const { repairResumeText, prepareResumeTextForParsing } = require('./resumeRepairService');
 
+const GENERAL_MUST_CATALOG = [
+  'project management',
+  'project manager',
+  'program management',
+  'agile',
+  'scrum',
+  'kanban',
+  'jira',
+  'confluence',
+  'stakeholder',
+  'stakeholder management',
+  'pmp',
+  'lean',
+  'six sigma',
+  'microsoft office',
+  'excel',
+  'powerpoint',
+  'word',
+  'google sheets',
+  'sales',
+  'marketing',
+  'digital marketing',
+  'content marketing',
+  'seo',
+  'sem',
+  'crm',
+  'hubspot',
+  'salesforce',
+  'customer success',
+  'account management',
+  'business analysis',
+  'business analyst',
+  'data analysis',
+  'financial analysis',
+  'financial modeling',
+  'accounting',
+  'bookkeeping',
+  'quickbooks',
+  'human resources',
+  'recruiting',
+  'talent acquisition',
+  'onboarding',
+  'training',
+  'public speaking',
+  'presentation',
+  'negotiation',
+  'contract management',
+  'vendor management',
+  'cross-functional',
+  'leadership',
+  'team leadership',
+  'operations',
+  'supply chain',
+  'logistics',
+  'healthcare',
+  'patient care',
+  'clinical',
+  'teaching',
+  'curriculum',
+  'instruction',
+  'legal',
+  'paralegal',
+  'compliance',
+  'writing',
+  'editing',
+  'copywriting',
+  'graphic design',
+  'figma',
+  'adobe',
+  'photoshop',
+  'illustrator',
+  'research',
+  'reporting',
+  'budgeting',
+  'forecasting',
+  'risk management',
+  'quality assurance',
+  'process improvement',
+];
+
+const GENERAL_NICE_CATALOG = [
+  'notion',
+  'asana',
+  'trello',
+  'monday.com',
+  'slack',
+  'zoom',
+  'tableau',
+  'power bi',
+  'looker',
+  'sap',
+  'oracle',
+  'workday',
+  'zendesk',
+  'intercom',
+  'shopify',
+  'e-commerce',
+  'social media',
+  'linkedin',
+  'public relations',
+  'event planning',
+  'fundraising',
+  'grant writing',
+  'nonprofit',
+  'real estate',
+  'insurance',
+  'banking',
+  'retail',
+  'hospitality',
+  'construction',
+  'manufacturing',
+];
+
 const MUST_HAVE_CATALOG = [
   'kubernetes',
   'k8s',
@@ -165,10 +278,14 @@ function scanCatalog(text, catalog) {
 }
 
 function extractSkillsFromText(text) {
-  const mustHave = scanCatalog(text, MUST_HAVE_CATALOG);
-  const niceToHave = scanCatalog(text, NICE_TO_HAVE_CATALOG).filter(
-    (skill) => !mustHave.some((m) => normalize(m) === normalize(skill))
-  );
+  const mustHave = uniqueSkills([
+    ...scanCatalog(text, MUST_HAVE_CATALOG),
+    ...scanCatalog(text, GENERAL_MUST_CATALOG),
+  ]);
+  const niceToHave = uniqueSkills([
+    ...scanCatalog(text, NICE_TO_HAVE_CATALOG),
+    ...scanCatalog(text, GENERAL_NICE_CATALOG),
+  ]).filter((skill) => !mustHave.some((m) => normalize(m) === normalize(skill)));
   return {
     mustHave,
     niceToHave,
@@ -183,10 +300,13 @@ function suggestTitles(text) {
 
 function suggestHeadline(text, extractedSkills) {
   const top = (extractedSkills.mustHave.length ? extractedSkills.mustHave : extractedSkills.all).slice(0, 4);
-  if (!top.length) return '';
+  const titles = suggestTitles(text);
   const role =
-    suggestTitles(text).find((t) => /engineer|devops|sre|platform|cloud/i.test(t)) || 'Platform Engineer';
-  return top.map((s) => s.replace(/\b\w/g, (c) => c.toUpperCase())).join(' | ').replace(/^/, `${role} | `).slice(0, 120);
+    titles[0] ||
+    (top.length ? 'Professional' : '');
+  if (!top.length && !role) return '';
+  const skillsLine = top.map((s) => s.replace(/\b\w/g, (c) => c.toUpperCase())).join(' | ');
+  return role ? `${role} | ${skillsLine}`.slice(0, 120) : skillsLine.slice(0, 120);
 }
 
 function computeResumeScore(profile) {

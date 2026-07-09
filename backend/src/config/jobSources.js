@@ -58,7 +58,7 @@ module.exports = {
   indeedSearchLocation: process.env.INDEED_SEARCH_LOCATION || 'remote',
   adzunaAppId: process.env.ADZUNA_APP_ID || '',
   adzunaAppKey: process.env.ADZUNA_APP_KEY || '',
-  adzunaWhat: process.env.ADZUNA_WHAT || 'remote software engineer',
+  adzunaWhat: process.env.ADZUNA_WHAT || 'remote',
   adzunaWhere: process.env.ADZUNA_WHERE || 'United States',
   adzunaMaxDaysOld: process.env.ADZUNA_MAX_DAYS_OLD || '7',
   // Actionable sources only — direct company ATS + curated US remote boards

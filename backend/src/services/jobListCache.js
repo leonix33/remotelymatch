@@ -3,7 +3,7 @@ const profileService = require('./profileService');
 const jobService = require('./jobService');
 const env = require('../config/env');
 const Job = require('../models/Job');
-const { applyJobPoolFilters, filterByCallbackScore } = require('./jobPoolFilter');
+const { applyJobPoolFilters, filterByCallbackScore, poolOptionsForProfile } = require('./jobPoolFilter');
 
 const CACHE_MS = 90_000;
 const cache = new Map();
@@ -28,6 +28,7 @@ async function loadRawJobs() {
 
 async function listScoredForUser(userId) {
   const profile = await profileService.getOrCreate(userId);
+  const poolOpts = poolOptionsForProfile(profile);
   const key = cacheKey(userId, profile);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) {
@@ -35,9 +36,9 @@ async function listScoredForUser(userId) {
   }
 
   let jobs = await loadRawJobs();
-  jobs = applyJobPoolFilters(jobs);
+  jobs = applyJobPoolFilters(jobs, poolOpts);
   jobs = scoreJobsForProfile(jobs, profile, userId);
-  jobs = filterByCallbackScore(jobs, { minCallbackScore: profile.minCallbackScore });
+  jobs = filterByCallbackScore(jobs, poolOpts);
   cache.set(key, { at: Date.now(), jobs });
   return { jobs, profile };
 }

@@ -2,22 +2,28 @@ const env = require('../config/env');
 const { enrichJobScores } = require('./jobs/jobQualityService');
 const { filterQualityJobs } = require('./jobs/jobQualityGate');
 
+function isRelaxed(options = {}) {
+  return options.relaxed === true || env.qualityFirstMode === false;
+}
+
 /**
  * Source, salary, and geography gate — run before scoring.
  */
-function applyJobPoolFilters(jobs = []) {
+function applyJobPoolFilters(jobs = [], options = {}) {
   if (!jobs.length) return [];
   const enriched = jobs.map((j) => enrichJobScores(j));
   if (env.usRemoteJobsOnly === false) return enriched;
-  return filterQualityJobs(enriched, { minSalaryUsd: env.jobMinSalaryUsd });
+  const minSalaryUsd = isRelaxed(options) ? 60000 : env.jobMinSalaryUsd;
+  return filterQualityJobs(enriched, { minSalaryUsd, relaxed: isRelaxed(options) });
 }
 
 /**
  * Callback-score gate — run after scoreJobsForProfile adds interviewLikelihoodPct.
  */
 function filterByCallbackScore(jobs = [], options = {}) {
+  if (isRelaxed(options)) return jobs;
+
   const minCallback = options.minCallbackScore ?? env.jobMinCallbackScore ?? 25;
-  if (env.qualityFirstMode === false) return jobs;
 
   return jobs
     .filter((job) => {
@@ -34,8 +40,16 @@ function filterByCallbackScore(jobs = [], options = {}) {
 }
 
 function filterRecruiterQualityJobs(jobs = [], options = {}) {
-  const pool = applyJobPoolFilters(jobs);
+  const pool = applyJobPoolFilters(jobs, options);
   return filterByCallbackScore(pool, options);
+}
+
+function poolOptionsForProfile(profile = {}) {
+  const relaxed = !profile.onboardingComplete;
+  return {
+    relaxed,
+    minCallbackScore: relaxed ? 0 : profile.minCallbackScore,
+  };
 }
 
 function callbackTierLabel(pct = 0) {
@@ -49,5 +63,6 @@ module.exports = {
   applyJobPoolFilters,
   filterByCallbackScore,
   filterRecruiterQualityJobs,
+  poolOptionsForProfile,
   callbackTierLabel,
 };

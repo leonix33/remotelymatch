@@ -49,7 +49,7 @@ services:
       - key: ADZUNA_APP_KEY
         sync: false
       - key: ADZUNA_WHAT
-        value: devops engineer remote
+        value: remote
       - key: ADZUNA_WHERE
         value: United States
       - key: ADZUNA_MAX_DAYS_OLD
