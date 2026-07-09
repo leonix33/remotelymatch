@@ -158,7 +158,7 @@ onMounted(async () => {
       <div>
         <h2 class="text-2xl font-bold text-slate-100">Community resumes</h2>
         <p class="mt-1 max-w-xl text-slate-400">
-          Share your resume as a sample. Browse teammates' formats for DevOps, SRE, cloud, and platform roles.
+          Share your resume as a sample. Browse teammates' formats across different roles and industries.
         </p>
       </div>
       <div class="card px-4 py-3 text-center">
@@ -226,9 +226,9 @@ onMounted(async () => {
           <input type="file" accept=".pdf" class="hidden" @change="uploadPdf" />
         </label>
       </div>
-      <input v-model="form.title" required class="input" placeholder="Resume title e.g. Senior DevOps Resume 2026" />
+      <input v-model="form.title" required class="input" placeholder="Resume title e.g. Project Manager Resume 2026" />
       <input v-model="form.headline" class="input" placeholder="Headline" />
-      <input v-model="form.targetRole" class="input" placeholder="Target role e.g. Staff SRE" />
+      <input v-model="form.targetRole" class="input" placeholder="Target role e.g. Senior Project Manager" />
       <textarea v-model="form.content" required rows="12" class="input font-mono text-sm" placeholder="Paste full resume text…" />
       <input v-model="form.skills" class="input" placeholder="Skills (comma-separated)" />
       <input v-model="form.tags" class="input" placeholder="Tags e.g. devops, kubernetes, aws" />

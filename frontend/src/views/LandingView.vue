@@ -71,7 +71,7 @@ const stats = [
         <div class="card p-6">
           <p class="text-2xl">🤝</p>
           <h3 class="mt-3 font-semibold text-teal-200">Apply squads</h3>
-          <p class="mt-2 text-sm text-slate-400">Coordinate with teammates, share resumes, prep interviews together.</p>
+          <p class="mt-2 text-sm text-slate-400">Optional team mode — coordinate with others, share resumes, and prep interviews together.</p>
         </div>
         <div class="card p-6">
           <p class="text-2xl">📈</p>
@@ -83,7 +83,7 @@ const stats = [
       <section class="mt-24 card p-8 text-center md:p-12">
         <h2 class="text-2xl font-bold text-slate-100">Built for serious remote job seekers</h2>
         <p class="mx-auto mt-3 max-w-xl text-slate-400">
-          Invite-only teams. Admin controls access. No public signup noise — built for DevOps, SRE, cloud, and platform engineers who want control before auto-apply.
+          Invite-only teams. Admin controls access. No public signup noise — built for remote job seekers in any field who want control before auto-apply.
         </p>
         <RouterLink to="/login" class="btn-primary mt-8 inline-block">Sign in to {{ brand.name }}</RouterLink>
         <p class="mt-4 text-xs text-slate-600">Need access? Contact {{ brand.supportEmail }}</p>

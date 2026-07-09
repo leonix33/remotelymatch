@@ -469,7 +469,7 @@ async function removeApolloKey() {
         </div>
         <div class="md:col-span-2">
           <label class="mb-1 block text-sm text-slate-400">Headline</label>
-          <input v-model="form.headline" class="input" placeholder="Platform Engineer | Azure | Databricks | Terraform" />
+          <input v-model="form.headline" class="input" placeholder="Project Manager | Agile | Stakeholder management" />
         </div>
       </div>
 

@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
           id: appUrl,
           name: appName,
           short_name: 'remotelymatch',
-          description: 'Find, match, and apply to remote DevOps & SRE jobs — mobile-ready dashboard',
+          description: 'Find, match, and apply to remote jobs in any field — mobile-ready dashboard',
           theme_color: '#0f172a',
           background_color: '#0f172a',
           display: 'standalone',
