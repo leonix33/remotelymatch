@@ -2,6 +2,7 @@ const vm = require('node:vm');
 const { USER_AGENT } = require('../../constants/brand');
 const jobSourcesConfig = require('../../config/jobSources');
 const { stripHtml } = require('./jobNormalizer');
+const { titleCaseSlug } = require('./companyTrustService');
 
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
@@ -107,17 +108,18 @@ async function fetchGreenhouseBoards(boards = jobSourcesConfig.greenhouseBoards)
       const data = await fetchJson(
         `https://boards-api.greenhouse.io/v1/boards/${board}/jobs?content=true`
       );
+      const companyName = (data.name || '').trim() || titleCaseSlug(board);
       for (const item of data.jobs || []) {
         jobs.push(
           rawJob({
             id: `greenhouse-${board}-${item.id}`,
             title: item.title,
-            company: board.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+            company: companyName,
             location: item.location?.name || 'Remote',
             applyUrl: item.absolute_url,
             source: `Greenhouse:${board}`,
             description: stripHtml(item.content || ''),
-            postedAt: item.updated_at || item.created_at || null,
+            postedAt: item.created_at || item.updated_at || null,
             atsType: 'greenhouse',
           })
         );
@@ -139,7 +141,7 @@ async function fetchLeverCompanies(companies = jobSourcesConfig.leverCompanies) 
           rawJob({
             id: `lever-${company}-${item.id}`,
             title: item.text,
-            company: item.categories?.team || company,
+            company: item.categories?.team || titleCaseSlug(company),
             location: item.categories?.location || 'Remote',
             applyUrl: item.hostedUrl || item.applyUrl,
             source: `Lever:${company}`,
@@ -168,7 +170,7 @@ async function fetchAshbyOrgs(orgs = jobSourcesConfig.ashbyOrgs) {
           rawJob({
             id: `ashby-${org}-${item.id}`,
             title: item.title,
-            company: item.companyName || org,
+            company: item.companyName || titleCaseSlug(org),
             location: item.location || 'Remote',
             applyUrl: item.jobUrl,
             source: `Ashby:${org}`,

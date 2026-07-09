@@ -84,6 +84,7 @@ async function ingestJobs({ sources, persist = true, dryRun = false } = {}) {
           minSalaryUsd: env.jobMinSalaryUsd,
           maxAgeDays: env.jobMaxAgeDays,
           aggregatorRequiresAts: env.jobAggregatorRequiresAts,
+          requireDomainMatch: env.jobRequireDomainMatch,
         })
       : scored;
   lastIngest.totals.filtered = beforeQuality - qualityFiltered.length;

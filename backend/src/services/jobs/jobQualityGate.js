@@ -9,6 +9,12 @@ const {
   inferSalaryCurrency,
   annotateJobLocation,
 } = require('./jobLocationFilter');
+const {
+  hasEmployerAtsUrl,
+  isVerifiedCompany,
+  passesCompanyTrustGate,
+  annotateEmployerTrust,
+} = require('./companyTrustService');
 
 /** Boards where postings link to real company apply pages (highest hire rate). */
 const TIER1_ATS_SOURCES = ['greenhouse', 'lever', 'ashby'];
@@ -43,43 +49,6 @@ const BLOCKED_LOW_QUALITY_SOURCES = [
   'hacker news',
 ];
 
-const PLACEHOLDER_COMPANY_RE =
-  /^(unknown|see posting|see post|n\/a|na|confidential|company name|tbd|various|not specified|undisclosed|your company)$/i;
-
-const STAFFING_AGENCY_HINTS = [
-  'robert half',
-  'randstad',
-  'adecco',
-  'manpower',
-  'kelly services',
-  'teksystems',
-  'aerotek',
-  'insight global',
-  'apex systems',
-  'motion recruitment',
-  'cybercoders',
-  'talent solutions',
-  'staffing agency',
-  'recruitment agency',
-];
-
-const EMPLOYER_ATS_HOSTS = [
-  'greenhouse.io',
-  'lever.co',
-  'jobs.lever.co',
-  'ashbyhq.com',
-  'myworkdayjobs.com',
-  'workday.com',
-  'icims.com',
-  'jobvite.com',
-  'smartrecruiters.com',
-  'bamboohr.com',
-  'taleo.net',
-  'ultipro.com',
-  'paylocity.com',
-  'recruiting.adp.com',
-];
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const SALARY_CONTEXT_RE =
@@ -111,23 +80,6 @@ function hasDirectApplyUrl(job) {
   // Reject search/listing pages that aren't a specific posting
   if (/[?&]q=|[?&]search=|\/search\?|\/jobs\?|\/job-search/i.test(lower)) return false;
   return true;
-}
-
-function isVerifiedCompany(job) {
-  const company = normalize(job?.company || '').trim();
-  if (!company || company.length < 2) return false;
-  if (PLACEHOLDER_COMPANY_RE.test(company)) return false;
-  if (STAFFING_AGENCY_HINTS.some((hint) => company.includes(hint))) return false;
-  return true;
-}
-
-function hasEmployerAtsUrl(job) {
-  const ats = normalize(job?.atsType || '');
-  if (['greenhouse', 'lever', 'ashby', 'workday', 'icims', 'jobvite', 'smartrecruiters', 'bamboohr'].includes(ats)) {
-    return true;
-  }
-  const url = (job.applyUrl || job.url || '').toLowerCase();
-  return EMPLOYER_ATS_HOSTS.some((host) => url.includes(host));
 }
 
 function effectivePostedAt(job) {
@@ -226,18 +178,19 @@ function isActionableJob(job, options = {}) {
   const requireTrustedSource = options.requireTrustedSource !== false && !relaxed;
   const maxAgeDays = options.maxAgeDays ?? 30;
   const aggregatorRequiresAts = options.aggregatorRequiresAts !== false;
+  const requireDomainMatch = options.requireDomainMatch !== false && !relaxed;
 
   if (relaxed) {
     if (!job?.title?.trim() || !hasDirectApplyUrl(job)) return false;
     if (!isUsEligibleJob(job)) return false;
-    if (!isVerifiedCompany(job)) return false;
+    if (!passesCompanyTrustGate(job, { requireDomainMatch: false })) return false;
     if (!isFreshEnough(job, maxAgeDays)) return false;
     return true;
   }
 
   if (!job?.title?.trim() || !job?.company?.trim()) return false;
   if (!hasDirectApplyUrl(job)) return false;
-  if (!isVerifiedCompany(job)) return false;
+  if (!passesCompanyTrustGate(job, { requireDomainMatch })) return false;
   if (!isFreshEnough(job, maxAgeDays)) return false;
   if (requireTrustedSource && !isTrustedSource(job.source)) return false;
   if (!isUsEligibleJob(job)) return false;
@@ -268,13 +221,15 @@ function filterQualityJobs(jobs = [], options = {}) {
 
 function annotateJobQuality(job) {
   const salary = effectiveSalaryUsd(job);
-  return annotateJobLocation({
-    ...job,
-    salaryCurrency: salary.currency || job.salaryCurrency || inferSalaryCurrency(job),
-    salaryKnown: salary.known,
-    effectiveSalaryMaxUsd: salary.maxUsd,
-    sourceTier: sourceTier(job.source),
-  });
+  return annotateEmployerTrust(
+    annotateJobLocation({
+      ...job,
+      salaryCurrency: salary.currency || job.salaryCurrency || inferSalaryCurrency(job),
+      salaryKnown: salary.known,
+      effectiveSalaryMaxUsd: salary.maxUsd,
+      sourceTier: sourceTier(job.source),
+    })
+  );
 }
 
 module.exports = {

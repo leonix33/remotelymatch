@@ -151,10 +151,25 @@ describe('jobQualityGate', () => {
 
     const adzunaAts = enrichJobScores({
       ...adzunaBoard,
-      applyUrl: 'https://boards.greenhouse.io/acme/jobs/456',
+      company: 'Datadog',
+      applyUrl: 'https://boards.greenhouse.io/datadog/jobs/456',
       atsType: 'greenhouse',
     });
     assert.equal(hasEmployerAtsUrl(adzunaAts), true);
     assert.equal(isActionableJob(adzunaAts, { minSalaryUsd: 100000, maxAgeDays: 30 }), true);
+  });
+
+  it('rejects ATS jobs with company/domain mismatch', () => {
+    const mismatch = enrichJobScores({
+      ...baseJob,
+      company: 'Wrong Company Name',
+      applyUrl: 'https://boards.greenhouse.io/datadog/jobs/999',
+    });
+    assert.equal(isActionableJob(mismatch, { minSalaryUsd: 100000, maxAgeDays: 30 }), false);
+  });
+
+  it('rejects expanded staffing agencies', () => {
+    const kforce = enrichJobScores({ ...baseJob, company: 'Kforce Professional Staffing' });
+    assert.equal(isActionableJob(kforce, { minSalaryUsd: 100000 }), false);
   });
 });

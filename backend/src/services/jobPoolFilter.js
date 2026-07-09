@@ -12,6 +12,8 @@ function qualityFilterOptions(options = {}) {
     relaxed: isRelaxed(options),
     maxAgeDays: options.maxAgeDays ?? env.jobMaxAgeDays ?? 30,
     aggregatorRequiresAts: options.aggregatorRequiresAts ?? env.jobAggregatorRequiresAts !== false,
+    requireDomainMatch:
+      options.requireDomainMatch ?? (env.jobRequireDomainMatch !== false && !isRelaxed(options)),
   };
 }
 

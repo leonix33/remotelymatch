@@ -1,3 +1,5 @@
+const { annotateEmployerTrust } = require('./companyTrustService');
+
 function freshnessScore(postedAt) {
   if (!postedAt) return 40;
   const posted = new Date(postedAt);
@@ -47,7 +49,7 @@ function enrichJobScores(job) {
   const freshness = freshnessScore(job.postedAt);
   const quality = qualityScore(job);
   const baselineMatch = job.matchPct || Math.max(45, Math.min(80, quality + 12));
-  return {
+  return annotateEmployerTrust({
     ...job,
     freshnessScore: freshness,
     freshnessLabel: freshnessLabel(job.postedAt),
@@ -60,7 +62,7 @@ function enrichJobScores(job) {
         : quality >= 50
           ? 'strong_review'
           : 'manual_browse'),
-  };
+  });
 }
 
 function enrichJobs(jobs) {

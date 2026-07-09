@@ -82,4 +82,5 @@ module.exports = {
   qualityFirstMode: process.env.QUALITY_FIRST_MODE !== '0',
   jobMaxAgeDays: Number(process.env.JOB_MAX_AGE_DAYS) || 30,
   jobAggregatorRequiresAts: process.env.JOB_AGGREGATOR_REQUIRES_ATS !== '0',
+  jobRequireDomainMatch: process.env.JOB_REQUIRE_DOMAIN_MATCH !== '0',
 };

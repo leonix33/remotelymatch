@@ -23,10 +23,24 @@ function likelihoodLabel(tier) {
   if (tier === 'moderate') return 'Moderate callback';
   return 'Low callback';
 }
+
+function postedLabel(job) {
+  return job.postedAgeLabel || null;
+}
+
+function trustLabel(job) {
+  return job.employerTrustLabel || (job.isDirectEmployer ? 'Direct employer' : null);
+}
 </script>
 
 <template>
   <div class="flex flex-wrap items-center gap-2">
+    <span v-if="trustLabel(job)" class="badge badge-teal" :title="trustLabel(job)">
+      {{ trustLabel(job) }}
+    </span>
+    <span v-if="postedLabel(job)" class="badge badge-slate">
+      {{ postedLabel(job) }}
+    </span>
     <span class="badge badge-teal" v-if="matchPct(job) != null">{{ matchPct(job) }}% match</span>
     <span
       v-if="job.interviewLikelihoodPct != null"

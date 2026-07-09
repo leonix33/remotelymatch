@@ -139,7 +139,7 @@ function computeInterviewLikelihood(job, profile, context = {}, companyCounts = 
     factors.push({ key: 'comp', impact: 4, label: 'Solid compensation ($100k+)' });
   }
 
-  if (['greenhouse', 'lever', 'ashby'].includes(job.atsType)) {
+  if (['greenhouse', 'lever', 'ashby'].includes(job.atsType) || job.isDirectEmployer) {
     score += 6;
     factors.push({ key: 'direct_apply', impact: 6, label: 'Direct company ATS — recruiters see your app' });
   }

@@ -24,6 +24,10 @@ const jobSchema = new mongoose.Schema(
     freshnessScore: { type: Number, default: 0, index: true },
     freshnessLabel: String,
     qualityScore: { type: Number, default: 0, index: true },
+    isDirectEmployer: { type: Boolean, default: false },
+    employerTrustLabel: String,
+    postedAgeLabel: String,
+    companyDomainVerified: { type: Boolean, default: null },
   },
   { timestamps: true }
 );
