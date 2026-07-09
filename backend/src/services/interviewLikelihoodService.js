@@ -144,7 +144,7 @@ function computeInterviewLikelihood(job, profile, context = {}, companyCounts = 
     factors.push({ key: 'direct_apply', impact: 6, label: 'Direct company ATS — recruiters see your app' });
   }
 
-  const interviewLikelihoodPct = Math.min(95, Math.max(5, Math.round(score));
+  const interviewLikelihoodPct = Math.min(95, Math.max(5, Math.round(score)));
 
   return {
     interviewLikelihoodPct,
