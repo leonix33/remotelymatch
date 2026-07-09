@@ -26,22 +26,39 @@ async function pollTailoredKits(jobIds, onProgress) {
   return best;
 }
 
-async function fetchPendingJobs(count, minMatch, minCallback = 25) {
-  const floor = Math.max(50, Number(minMatch) || 60);
+async function fetchPendingJobsOnce(count, minMatch, minCallback = 25) {
+  const floor = Math.max(0, Number(minMatch) || 50);
+  const callbackFloor = Math.max(0, Number(minCallback) || 0);
   const { data } = await http.get('/approvals', {
     params: {
       status: 'pending',
       sort: 'match',
       limit: Math.max(count * 3, 15),
       minMatch: floor,
-      minCallback,
+      minCallback: callbackFloor,
       offset: 0,
     },
   });
   const jobs = (data?.items || [])
     .sort((a, b) => (b.interviewLikelihoodPct || 0) - (a.interviewLikelihoodPct || 0))
     .slice(0, count);
-  return { jobs, listData: data, minMatchUsed: floor, minCallbackUsed: minCallback };
+  return { jobs, listData: data, minMatchUsed: floor, minCallbackUsed: callbackFloor };
+}
+
+async function fetchPendingJobs(count, minMatch, minCallback = 25) {
+  const attempts = [
+    { minMatch, minCallback },
+    { minMatch: Math.min(50, Number(minMatch) || 50), minCallback: Math.min(15, Number(minCallback) || 25) },
+    { minMatch: 40, minCallback: 0 },
+  ];
+
+  let last = null;
+  for (const attempt of attempts) {
+    const result = await fetchPendingJobsOnce(count, attempt.minMatch, attempt.minCallback);
+    last = result;
+    if (result.jobs.length) return result;
+  }
+  return last || { jobs: [], listData: {}, minMatchUsed: minMatch, minCallbackUsed: minCallback };
 }
 
 export function useQuickApply() {
@@ -69,7 +86,7 @@ export function useQuickApply() {
       step.value = 'Finding your highest callback matches…';
       let { jobs, listData, minMatchUsed, minCallbackUsed } = await fetchPendingJobs(count, minMatch, minCallback);
 
-      if (!jobs.length && !runSearch) {
+      if (!jobs.length) {
         step.value = 'Refreshing job listings…';
         try {
           await http.post('/agent/run', {}, { timeout: 300000 });
@@ -81,9 +98,14 @@ export function useQuickApply() {
 
       if (!jobs.length) {
         const hint = listData?.hint;
+        const stats = listData?.poolStats;
+        const statsNote = stats
+          ? ` (${stats.raw} total → ${stats.afterQuality} quality → ${stats.afterMatch} match your profile)`
+          : '';
         throw new Error(
-          hint ||
-            `No roles at ${minCallbackUsed}%+ callback score and ${minMatchUsed || minMatch || 60}%+ match. Add higher-quality matches from step 2 — quality beats volume for recruiter replies.`
+          hint
+            ? `${hint}${statsNote}`
+            : `No roles at ${minCallbackUsed}%+ callback score and ${minMatchUsed || minMatch || 50}%+ match. Add matches from step 2 or lower thresholds in Profile.${statsNote}`
         );
       }
 

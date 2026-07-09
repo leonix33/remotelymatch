@@ -13,17 +13,20 @@ const applicationKitStore = require('./applicationKitStore');
 const { profileResumeAlignment } = require('./resumeParseService');
 const { buildKitSummary } = require('./kitReadinessService');
 const activityService = require('./activityService');
-const { applyJobPoolFilters, filterByCallbackScore, poolOptionsForProfile } = require('./jobPoolFilter');
+const { applyJobPoolFilters, poolOptionsForProfile } = require('./jobPoolFilter');
+const scoredJobListCache = require('./jobListCache');
+const { warmConversionContext } = require('./conversionStatsService');
 
 const JOB_LIST_CACHE_MS = 120_000;
-const jobListCache = new Map();
+const approvalFeedCache = new Map();
 
 function kitSummaryFromKit(kit, jobStatus) {
   return buildKitSummary(kit, jobStatus);
 }
 
 function invalidateJobListCache(userId) {
-  jobListCache.delete(String(userId));
+  scoredJobListCache.invalidate(userId);
+  approvalFeedCache.delete(String(userId));
 }
 
 function requireMongo() {
@@ -43,46 +46,41 @@ async function loadJobs(minMatch = 60) {
   );
 }
 
+async function poolDiagnostics(userId, profile) {
+  const poolOpts = poolOptionsForProfile(profile);
+  const limit = env.openJobMarket !== false ? 2000 : 500;
+  let raw = [];
+  if (env.mongoUri) {
+    raw = await Job.find({}).sort({ qualityScore: -1, freshnessScore: -1 }).limit(limit).lean();
+  } else {
+    raw = jobService.readJobsFromSqlite(limit);
+  }
+  const afterPool = applyJobPoolFilters(raw, poolOpts);
+  const conversionContext = await warmConversionContext(userId);
+  const scored = scoreJobsForProfile(afterPool, profile, userId, conversionContext);
+  const minMatch = profile.minMatchScore || (env.openJobMarket !== false ? 40 : 60);
+  const afterMatch = scored.filter((j) => (j.personalMatchPct ?? j.matchPct ?? 0) >= minMatch);
+  return {
+    raw: raw.length,
+    afterQuality: afterPool.length,
+    afterScoring: scored.length,
+    afterMatch: afterMatch.length,
+  };
+}
+
 async function buildJobList(userId) {
   const cacheKey = String(userId);
-  const cached = jobListCache.get(cacheKey);
+  const cached = approvalFeedCache.get(cacheKey);
   if (cached && Date.now() - cached.at < JOB_LIST_CACHE_MS) {
     return cached.data;
   }
 
-  const profile = await profileService.getOrCreate(userId);
-  const poolOpts = poolOptionsForProfile(profile);
+  const { jobs: scoredJobs, profile } = await scoredJobListCache.listScoredForUser(userId, {
+    skipCallbackFilter: true,
+  });
   const openMarket = env.openJobMarket !== false;
   const minMatch = profile.minMatchScore || (openMarket ? 40 : 60);
-  let jobs = await loadJobs(0);
-  jobs = applyJobPoolFilters(jobs, poolOpts);
-
-  const hasSearchCriteria = Boolean(profile?.targetTitles?.length || profile?.mustHaveSkills?.length);
-  const hasResume = Boolean((profile?.resumeText || '').trim().length >= 50);
-
-  if (!hasSearchCriteria) {
-    jobs = jobs.map((j) => {
-      const agentMatch = j.matchPct || 0;
-      const qualityBoost = j.qualityScore || j.score || 0;
-      const baseline = openMarket
-        ? Math.max(agentMatch, Math.min(80, 42 + Math.floor(qualityBoost / 4)))
-        : agentMatch;
-      return {
-        ...j,
-        personalMatchPct: baseline,
-        matchPct: baseline,
-        agentMatchPct: agentMatch,
-      };
-    });
-    if (hasResume) {
-      jobs = scoreJobsForProfile(jobs, profile, userId);
-    }
-  } else {
-    jobs = scoreJobsForProfile(jobs, profile, userId);
-  }
-
-  jobs = filterByCallbackScore(jobs, poolOpts);
-  jobs = jobs.filter((j) => (j.personalMatchPct ?? j.matchPct ?? 0) >= minMatch);
+  let jobs = scoredJobs.filter((j) => (j.personalMatchPct ?? j.matchPct ?? 0) >= minMatch);
 
   if (!env.mongoUri) {
     const local = localApprovalService.listForUser(userId);
@@ -127,7 +125,7 @@ async function buildJobList(userId) {
         reviewedAt: row?.reviewedAt,
       };
     });
-    jobListCache.set(cacheKey, { at: Date.now(), data: result });
+    approvalFeedCache.set(cacheKey, { at: Date.now(), data: result });
     return result;
   }
 
@@ -176,7 +174,7 @@ async function buildJobList(userId) {
     };
   });
 
-  jobListCache.set(cacheKey, { at: Date.now(), data: result });
+  approvalFeedCache.set(cacheKey, { at: Date.now(), data: result });
   return result;
 }
 
@@ -219,12 +217,11 @@ function applyFilters(items, { statusFilter, search, minMatch, minCallback, ats,
 
 async function listForUser(userId, options = {}) {
   const profile = await profileService.getOrCreate(userId);
-  const poolOpts = poolOptionsForProfile(profile);
   const {
     status: statusFilter = 'pending',
     search = '',
     minMatch = '',
-    minCallback = poolOpts.relaxed ? '' : String(env.jobMinCallbackScore),
+    minCallback = '',
     ats = '',
     sort = 'match',
     limit = 0,
@@ -250,27 +247,29 @@ async function listForUser(userId, options = {}) {
   }));
 
   let hint = null;
+  let poolStats = null;
   if (total === 0 && statusFilter === 'pending') {
-    const profile = await profileService.getOrCreate(userId);
     const alignment = profileResumeAlignment(profile);
-    let rawJobCount = 0;
-    if (env.mongoUri) {
-      rawJobCount = await Job.countDocuments({});
-    } else {
-      rawJobCount = jobService.readJobsFromSqlite(500).length;
-    }
-    if (!rawJobCount) {
-      hint = 'No jobs in the system yet. Run a job search from the Apply tab or ask an admin to refresh listings.';
+    poolStats = await poolDiagnostics(userId, profile);
+    if (!poolStats.raw) {
+      hint = 'No jobs in the database yet. Tap Apply again to refresh listings, or ask an admin to run job ingest.';
+    } else if (!poolStats.afterQuality) {
+      hint =
+        'Jobs were found but none passed quality filters (freshness, company trust, salary). Refresh listings from Apply or widen your target roles.';
+    } else if (!poolStats.afterMatch) {
+      hint = `No jobs meet your ${profile.minMatchScore || 60}% match threshold. Lower it in Profile or update target roles and skills.`;
+    } else if (Number(minCallback) >= (env.jobMinCallbackScore || 25)) {
+      hint = `Jobs match your profile but none reach ${minCallback || env.jobMinCallbackScore}% callback score. Approve matches in step 2 or lower callback threshold in Profile.`;
     } else if (!alignment.aligned && alignment.reason) {
       hint = alignment.reason;
     } else if (Number(minMatch) > (profile.minMatchScore || 60)) {
       hint = `No jobs meet ${minMatch}% match. Try lowering your match threshold in Profile.`;
     } else {
-      hint = 'No jobs meet your match threshold. Lower it in Profile or update your target roles and skills.';
+      hint = 'No pending matches right now. Refresh listings or approve roles from step 2.';
     }
   }
 
-  return { items, total, hint, counts };
+  return { items, total, hint, counts, poolStats };
 }
 
 async function loadJobSnapshots(jobIds) {

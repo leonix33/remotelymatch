@@ -167,7 +167,7 @@ async function startApplying() {
       autoApply: autoApplyEnabled.value,
       minMatch: profileStore.profile?.minMatchScore || 50,
       minCallback: profileStore.profile?.minCallbackScore ?? 25,
-      runSearch: false,
+      runSearch: true,
     });
     if (result?.kits?.length || result?.count) {
       tailoredSeedKits.value = result.kits || [];
@@ -313,7 +313,8 @@ onMounted(async () => {
       <TopMatchJobsPreview
         class="mt-5"
         :refresh-key="matchRefreshKey"
-        :min-match="profileStore.profile?.minMatchScore || 50"
+        :min-match="Math.min(profileStore.profile?.minMatchScore || 50, 50)"
+        :min-callback="15"
         :limit="jobCount"
         @approved="onMatchApproved"
       />

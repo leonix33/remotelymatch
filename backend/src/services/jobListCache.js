@@ -27,10 +27,10 @@ async function loadRawJobs() {
   return jobService.readJobsFromSqlite(limit);
 }
 
-async function listScoredForUser(userId) {
+async function listScoredForUser(userId, { skipCallbackFilter = false } = {}) {
   const profile = await profileService.getOrCreate(userId);
   const poolOpts = poolOptionsForProfile(profile);
-  const key = cacheKey(userId, profile);
+  const key = `${cacheKey(userId, profile)}:${skipCallbackFilter ? 'all' : 'cb'}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) {
     return { jobs: hit.jobs, profile };
@@ -40,7 +40,9 @@ async function listScoredForUser(userId) {
   jobs = applyJobPoolFilters(jobs, poolOpts);
   const conversionContext = await warmConversionContext(userId);
   jobs = scoreJobsForProfile(jobs, profile, userId, conversionContext);
-  jobs = filterByCallbackScore(jobs, { ...poolOpts, conversionContext });
+  if (!skipCallbackFilter) {
+    jobs = filterByCallbackScore(jobs, { ...poolOpts, conversionContext });
+  }
   cache.set(key, { at: Date.now(), jobs });
   return { jobs, profile };
 }
