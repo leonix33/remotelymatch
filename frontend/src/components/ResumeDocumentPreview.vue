@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { parseResumeForDisplay, parseResumeHeader, splitContactParts, isSkillsTagline } from '../utils/resumeDocument';
+import { isDateOnlyLine, isLikelyJobTitleLine } from '../utils/resumeExperienceParser';
 import ResumeDocumentRow from './ResumeDocumentRow.vue';
 
 const props = defineProps({
@@ -25,12 +26,32 @@ const contactParts = computed(() => {
   return parts;
 });
 
+function isNewJobBoundary(row, jobEntry) {
+  if (row.type === 'job-block' || row.type === 'job-header') return true;
+  if (!jobEntry) return false;
+
+  const prior = jobEntry.rows;
+  const hasJobHeader = prior.some((r) => r.type === 'job-block' && (r.dates || r.company));
+
+  if (row.type === 'date' && hasJobHeader) return true;
+
+  if (row.type === 'text' && isLikelyJobTitleLine(row.text) && hasJobHeader) {
+    return true;
+  }
+
+  if (row.type === 'text' && isDateOnlyLine(row.text) && hasJobHeader) {
+    return true;
+  }
+
+  return false;
+}
+
 function groupExperienceRows(lines) {
   const groups = [];
   let jobEntry = null;
 
   for (const row of lines) {
-    if (row.type === 'job-block' || row.type === 'job-header') {
+    if (isNewJobBoundary(row, jobEntry)) {
       if (jobEntry) groups.push(jobEntry);
       jobEntry = { kind: 'job-entry', rows: [row] };
     } else if (jobEntry) {

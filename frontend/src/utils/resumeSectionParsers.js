@@ -1,4 +1,8 @@
-import { mergeOrphanPrefixLines, tryParseJobBlock, splitParagraphToBullets, condenseCarBullet } from './resumeExperienceParser';
+import {
+  groupExperienceLinesIntoChunks,
+  parseExperienceChunkLines,
+  splitExperienceBlob,
+} from './resumeExperienceParser';
 
 /**
  * Split comma-separated skill/tool lists while respecting parentheses.
@@ -200,9 +204,53 @@ export function parseEducationSectionLines(contentLines) {
   const merged = contentLines.map((l) => String(l).trim()).filter(Boolean);
   const rows = [];
 
+  const DEGREE_LINE_RE =
+    /^(Master|Bachelor|Associate|Doctor|Doctorate|B\.?S\.?|M\.?S\.?|B\.?A\.?|M\.?A\.?|Ph\.?D\.?|Diploma|Certificate)\b/i;
+  const MISPLACED_SUMMARY_RE =
+    /\b(certification portfolio|enterprise cloud platforms|Databricks SME|Azure \(\d+ certs\)|AWS \(\d+ certs\)|extensive certification)\b/i;
+
   for (let i = 0; i < merged.length; i += 1) {
     const t = merged[i];
     const next = merged[i + 1];
+
+    if (MISPLACED_SUMMARY_RE.test(t) && t.length > 180) {
+      continue;
+    }
+
+    if (t.includes('|') && DEGREE_LINE_RE.test(t)) {
+      const bachelorSplit = t.search(/\bBachelor\b/i);
+      if (bachelorSplit > 24 && /\bMaster\b/i.test(t.slice(0, bachelorSplit))) {
+        const firstDegree = t.slice(0, bachelorSplit).trim();
+        const secondDegree = t.slice(bachelorSplit).trim();
+        for (const degreeLine of [firstDegree, secondDegree]) {
+          const parts = degreeLine.split(/\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
+          if (parts.length >= 2) {
+            rows.push({ type: 'education-block', degree: parts[0], school: parts.slice(1).join(' | ') });
+          }
+        }
+        continue;
+      }
+
+      const parts = t.split(/\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        rows.push({ type: 'education-block', degree: parts[0], school: parts.slice(1).join(' | ') });
+        continue;
+      }
+    }
+
+    const inlineDegrees = t.match(
+      /((?:Master|Bachelor|Associate|Doctor(?:ate)?|B\.?S\.?|M\.?S\.?|B\.?A\.?|M\.?A\.?|Ph\.?D\.?)[^|]+(?:\|[^|]+)+)/gi
+    );
+    if (inlineDegrees?.length >= 2) {
+      for (const degreeChunk of inlineDegrees) {
+        const parts = degreeChunk.split(/\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+          rows.push({ type: 'education-block', degree: parts[0], school: parts.slice(1).join(' | ') });
+        }
+      }
+      continue;
+    }
+
     if (
       next &&
       /University|College|Institute|School|Academy|WGU|Yaounde|Governors/i.test(next) &&
@@ -210,8 +258,21 @@ export function parseEducationSectionLines(contentLines) {
     ) {
       rows.push({ type: 'education-block', degree: t, school: next });
       i += 1;
-    } else if (/University|College|Institute|School|WGU|Yaounde/i.test(t) && rows.length && rows[rows.length - 1].type === 'education-block' && !rows[rows.length - 1].school) {
+    } else if (
+      /University|College|Institute|School|WGU|Yaounde/i.test(t) &&
+      rows.length &&
+      rows[rows.length - 1].type === 'education-block' &&
+      !rows[rows.length - 1].school
+    ) {
       rows[rows.length - 1].school = t;
+    } else if (DEGREE_LINE_RE.test(t) && next && /University|College|Institute|School|WGU|Yaounde|Governors/i.test(next)) {
+      rows.push({ type: 'education-block', degree: t, school: next });
+      i += 1;
+    } else if (t.includes('|') && /University|College|Institute|School|WGU|Yaounde|Governors/i.test(t)) {
+      const parts = t.split(/\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        rows.push({ type: 'education-block', degree: parts[0], school: parts.slice(1).join(' | ') });
+      }
     } else if (t) {
       rows.push({ type: 'text', text: t });
     }
@@ -266,16 +327,23 @@ export function parseCertificationsSectionLines(contentLines) {
       if (currentGroup) rows.push(currentGroup);
       const label = line.split(':')[0].trim();
       const firstItem = groupMatch[2]?.trim();
+      const firstItems = firstItem
+        ? firstItem.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean)
+        : [];
       currentGroup = {
         type: 'cert-group',
         label,
-        items: firstItem ? [firstItem] : [],
+        items: firstItems,
       };
       continue;
     }
 
-    if (currentGroup && line.length < 100 && !line.includes(':')) {
-      currentGroup.items.push(line);
+    if (currentGroup && line.length < 120) {
+      if (line.includes('|')) {
+        currentGroup.items.push(...line.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean));
+      } else if (!line.includes(':')) {
+        currentGroup.items.push(line);
+      }
       continue;
     }
 
@@ -293,6 +361,20 @@ export function parseCertificationsSectionLines(contentLines) {
 
   if (currentGroup) rows.push(currentGroup);
 
+  for (const row of rows) {
+    if (row.type === 'cert-group' && Array.isArray(row.items)) {
+      const seen = new Set();
+      row.items = row.items
+        .flatMap((item) => String(item).split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean))
+        .filter((item) => {
+          const key = item.toLowerCase();
+          if (!item || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    }
+  }
+
   if (!rows.length && lines.length) {
     return lines.map((t) => ({ type: 'cert-item', text: t }));
   }
@@ -300,65 +382,18 @@ export function parseCertificationsSectionLines(contentLines) {
   return rows;
 }
 
-const JOB_TITLE_DATE =
-  /((?:Senior\s+|Lead\s+)?(?:Cloud\s+(?:Platform\s+)?|Platform\s+|DevOps\s+)?Engineer(?:\s*\/\s*DevOps)?|DevOps\s+Engineer|Cloud\s+Engineer(?:\s*\/\s*DevOps)?)\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4})\s+(?:[–\-—]\s*|\s+)(Present|Current|Now|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}|\d{4})/gi;
-
-export function splitExperienceBlob(text) {
-  const t = String(text || '').trim().replace(/\s+/g, ' ');
-  if (!t || t.length < 80) return null;
-
-  const matches = [...t.matchAll(JOB_TITLE_DATE)];
-  if (matches.length < 2) return null;
-
-  const chunks = [];
-  for (let i = 0; i < matches.length; i += 1) {
-    const start = matches[i].index;
-    const end = i + 1 < matches.length ? matches[i + 1].index : t.length;
-    chunks.push(t.slice(start, end).trim());
-  }
-  return chunks.filter(Boolean);
-}
-
-function isValidBulletRow(row) {
-  if (row.type !== 'bullet') return true;
-  const t = String(row.text || '').trim();
-  return t.length >= 15 && !/^[-–—|.\s]+$/.test(t);
-}
 
 export function parseExperienceSectionLines(contentLines) {
-  const flat = contentLines.map((l) => String(l).trim()).filter(Boolean).join(' ');
-  const multi = splitExperienceBlob(flat);
-  const chunks = multi || mergeOrphanPrefixLines(contentLines.map((l) => String(l).trim()).filter(Boolean));
+  const lines = contentLines.map((l) => String(l).trim()).filter(Boolean);
+  const flat = lines.join(' ');
+  const blobChunks = splitExperienceBlob(flat);
+  const lineChunks = groupExperienceLinesIntoChunks(lines);
+  const chunks = blobChunks || lineChunks;
 
   const rows = [];
   for (const chunk of chunks) {
-    const t = String(chunk || '').trim();
-    if (!t) continue;
-
-    const jobBlock = tryParseJobBlock(t);
-    if (jobBlock) {
-      rows.push({
-        ...jobBlock,
-        tags: (jobBlock.tags || []).slice(0, 4),
-      });
-      if (jobBlock.bodyText) {
-        const bullets = splitParagraphToBullets(jobBlock.bodyText);
-        if (bullets) rows.push(...bullets.slice(0, 8).filter(isValidBulletRow));
-        else rows.push({ type: 'text', text: condenseCarBullet(jobBlock.bodyText) });
-      }
-      continue;
-    }
-
-    if (t.length > 100) {
-      const bullets = splitParagraphToBullets(t);
-      if (bullets) {
-        rows.push(...bullets.slice(0, 8).filter(isValidBulletRow));
-        continue;
-      }
-    }
-
-    rows.push({ type: 'text', text: t });
+    const chunkLines = Array.isArray(chunk) ? chunk : [String(chunk)];
+    rows.push(...parseExperienceChunkLines(chunkLines));
   }
-
   return rows;
 }
