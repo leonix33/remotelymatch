@@ -61,6 +61,7 @@ async function start() {
   const conferenceService = require('./services/conferenceService');
   const { startReminderCron } = require('./services/reminderService');
   const { startWeeklyPulseCron } = require('./services/weeklyPulseService');
+  const { startStaleJobPurgeCron } = require('./services/jobs/jobStalePurgeService');
   const teamService = require('./services/teamService');
 
   if (env.mongoUri) {
@@ -84,6 +85,7 @@ async function start() {
     console.log(`${env.appName} running on port ${env.port} (HTTP + WebSocket)`);
     startReminderCron();
     startWeeklyPulseCron();
+    startStaleJobPurgeCron();
     bootstrapData({ env, conferenceService, jobService, User, teamService }).catch((err) => {
       console.warn('Background bootstrap failed:', err.message);
     });

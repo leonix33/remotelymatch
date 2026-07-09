@@ -703,6 +703,14 @@ function parseRssJobs(rssText, source, idPrefix) {
     const block = match[1];
     const title = (block.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || block.match(/<title>(.*?)<\/title>/))?.[1] || '';
     const link = (block.match(/<link>(.*?)<\/link>/) || [])[1] || '';
+    const pubDateRaw =
+      (block.match(/<pubDate>(.*?)<\/pubDate>/) ||
+        block.match(/<dc:date>(.*?)<\/dc:date>/) ||
+        block.match(/<updated>(.*?)<\/updated>/))?.[1] || '';
+    const postedAt =
+      pubDateRaw && !Number.isNaN(new Date(pubDateRaw).getTime())
+        ? new Date(pubDateRaw).toISOString()
+        : null;
     const description = stripHtml(
       (block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/) ||
         block.match(/<description>([\s\S]*?)<\/description>/))?.[1] || ''
@@ -717,6 +725,7 @@ function parseRssJobs(rssText, source, idPrefix) {
         applyUrl: link,
         source,
         description,
+        postedAt,
         atsType: 'job-board',
       })
     );

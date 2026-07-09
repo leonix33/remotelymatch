@@ -43,6 +43,45 @@ const BLOCKED_LOW_QUALITY_SOURCES = [
   'hacker news',
 ];
 
+const PLACEHOLDER_COMPANY_RE =
+  /^(unknown|see posting|see post|n\/a|na|confidential|company name|tbd|various|not specified|undisclosed|your company)$/i;
+
+const STAFFING_AGENCY_HINTS = [
+  'robert half',
+  'randstad',
+  'adecco',
+  'manpower',
+  'kelly services',
+  'teksystems',
+  'aerotek',
+  'insight global',
+  'apex systems',
+  'motion recruitment',
+  'cybercoders',
+  'talent solutions',
+  'staffing agency',
+  'recruitment agency',
+];
+
+const EMPLOYER_ATS_HOSTS = [
+  'greenhouse.io',
+  'lever.co',
+  'jobs.lever.co',
+  'ashbyhq.com',
+  'myworkdayjobs.com',
+  'workday.com',
+  'icims.com',
+  'jobvite.com',
+  'smartrecruiters.com',
+  'bamboohr.com',
+  'taleo.net',
+  'ultipro.com',
+  'paylocity.com',
+  'recruiting.adp.com',
+];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const SALARY_CONTEXT_RE =
   /salary|compensation|pay range|base pay|ote|total comp|annually|per year|\/yr|\/year|\$[\d,]+k?|\£[\d,]+|\€[\d,]+/i;
 
@@ -72,6 +111,44 @@ function hasDirectApplyUrl(job) {
   // Reject search/listing pages that aren't a specific posting
   if (/[?&]q=|[?&]search=|\/search\?|\/jobs\?|\/job-search/i.test(lower)) return false;
   return true;
+}
+
+function isVerifiedCompany(job) {
+  const company = normalize(job?.company || '').trim();
+  if (!company || company.length < 2) return false;
+  if (PLACEHOLDER_COMPANY_RE.test(company)) return false;
+  if (STAFFING_AGENCY_HINTS.some((hint) => company.includes(hint))) return false;
+  return true;
+}
+
+function hasEmployerAtsUrl(job) {
+  const ats = normalize(job?.atsType || '');
+  if (['greenhouse', 'lever', 'ashby', 'workday', 'icims', 'jobvite', 'smartrecruiters', 'bamboohr'].includes(ats)) {
+    return true;
+  }
+  const url = (job.applyUrl || job.url || '').toLowerCase();
+  return EMPLOYER_ATS_HOSTS.some((host) => url.includes(host));
+}
+
+function effectivePostedAt(job) {
+  const posted = job?.postedAt ? new Date(job.postedAt) : null;
+  if (posted && !Number.isNaN(posted.getTime())) return posted;
+  const seen = job?.firstSeen ? new Date(job.firstSeen) : null;
+  if (seen && !Number.isNaN(seen.getTime())) return seen;
+  return null;
+}
+
+function jobAgeDays(job) {
+  const posted = effectivePostedAt(job);
+  if (!posted) return null;
+  return (Date.now() - posted.getTime()) / DAY_MS;
+}
+
+function isFreshEnough(job, maxAgeDays = 30) {
+  if (!maxAgeDays || maxAgeDays <= 0) return true;
+  const age = jobAgeDays(job);
+  if (age == null) return false;
+  return age <= maxAgeDays;
 }
 
 function parseSalaryFromText(text = '') {
@@ -147,20 +224,29 @@ function isActionableJob(job, options = {}) {
   const relaxed = options.relaxed === true;
   const minSalaryUsd = options.minSalaryUsd ?? (relaxed ? 60000 : 140000);
   const requireTrustedSource = options.requireTrustedSource !== false && !relaxed;
+  const maxAgeDays = options.maxAgeDays ?? 30;
+  const aggregatorRequiresAts = options.aggregatorRequiresAts !== false;
 
   if (relaxed) {
     if (!job?.title?.trim() || !hasDirectApplyUrl(job)) return false;
     if (!isUsEligibleJob(job)) return false;
+    if (!isVerifiedCompany(job)) return false;
+    if (!isFreshEnough(job, maxAgeDays)) return false;
     return true;
   }
 
   if (!job?.title?.trim() || !job?.company?.trim()) return false;
   if (!hasDirectApplyUrl(job)) return false;
+  if (!isVerifiedCompany(job)) return false;
+  if (!isFreshEnough(job, maxAgeDays)) return false;
   if (requireTrustedSource && !isTrustedSource(job.source)) return false;
   if (!isUsEligibleJob(job)) return false;
 
   const tier = sourceTier(job.source);
   const descLen = (job.description || '').length;
+
+  if (tier === 3 && aggregatorRequiresAts && !hasEmployerAtsUrl(job)) return false;
+  if (tier >= 2 && jobAgeDays(job) == null) return false;
 
   const salaryOk = meetsSalaryFloor(job, minSalaryUsd);
   if (salaryOk === false) return false;
@@ -196,6 +282,10 @@ module.exports = {
   TIER1_ATS_SOURCES,
   TIER2_REMOTE_BOARDS,
   isTrustedSource,
+  isVerifiedCompany,
+  isFreshEnough,
+  jobAgeDays,
+  hasEmployerAtsUrl,
   isActionableJob,
   meetsSalaryFloor,
   effectiveSalaryUsd,

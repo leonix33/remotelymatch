@@ -3,6 +3,9 @@ const assert = require('node:assert/strict');
 const { enrichJobScores } = require('../services/jobs/jobQualityService');
 const {
   isTrustedSource,
+  isVerifiedCompany,
+  isFreshEnough,
+  hasEmployerAtsUrl,
   isActionableJob,
   meetsSalaryFloor,
   filterQualityJobs,
@@ -17,6 +20,7 @@ const baseJob = {
   source: 'Greenhouse',
   description: 'Remote US role. '.repeat(40),
   remoteType: 'remote',
+  postedAt: new Date().toISOString(),
 };
 
 describe('jobQualityGate', () => {
@@ -97,5 +101,60 @@ describe('jobQualityGate', () => {
     });
     assert.equal(salary.known, true);
     assert.equal(salary.maxUsd, 160000);
+  });
+
+  it('rejects placeholder company names', () => {
+    assert.equal(isVerifiedCompany({ company: 'See posting' }), false);
+    assert.equal(isVerifiedCompany({ company: 'Unknown' }), false);
+    assert.equal(isVerifiedCompany({ company: 'Datadog' }), true);
+    const bad = enrichJobScores({ ...baseJob, company: 'See posting' });
+    assert.equal(isActionableJob(bad, { minSalaryUsd: 100000 }), false);
+  });
+
+  it('rejects staffing agencies', () => {
+    const staffing = enrichJobScores({ ...baseJob, company: 'Robert Half Technology' });
+    assert.equal(isVerifiedCompany(staffing), false);
+    assert.equal(isActionableJob(staffing, { minSalaryUsd: 100000 }), false);
+  });
+
+  it('rejects jobs older than max age', () => {
+    const stale = enrichJobScores({
+      ...baseJob,
+      postedAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    assert.equal(isFreshEnough(stale, 30), false);
+    assert.equal(isActionableJob(stale, { minSalaryUsd: 100000, maxAgeDays: 30 }), false);
+  });
+
+  it('allows fresh jobs within max age', () => {
+    const fresh = enrichJobScores({
+      ...baseJob,
+      postedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    assert.equal(isFreshEnough(fresh, 30), true);
+    assert.equal(isActionableJob(fresh, { minSalaryUsd: 100000, maxAgeDays: 30 }), true);
+  });
+
+  it('requires employer ATS for aggregator listings', () => {
+    const adzunaBoard = enrichJobScores({
+      ...baseJob,
+      source: 'Adzuna',
+      applyUrl: 'https://www.adzuna.com/details/123',
+      atsType: 'adzuna',
+      description: `${baseJob.description} Salary $150,000 - $180,000.`,
+      salaryMin: 150000,
+      salaryMax: 180000,
+      qualityScore: 60,
+    });
+    assert.equal(hasEmployerAtsUrl(adzunaBoard), false);
+    assert.equal(isActionableJob(adzunaBoard, { minSalaryUsd: 100000, maxAgeDays: 30 }), false);
+
+    const adzunaAts = enrichJobScores({
+      ...adzunaBoard,
+      applyUrl: 'https://boards.greenhouse.io/acme/jobs/456',
+      atsType: 'greenhouse',
+    });
+    assert.equal(hasEmployerAtsUrl(adzunaAts), true);
+    assert.equal(isActionableJob(adzunaAts, { minSalaryUsd: 100000, maxAgeDays: 30 }), true);
   });
 });

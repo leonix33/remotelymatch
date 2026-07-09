@@ -6,6 +6,7 @@ const { deduplicateJobs } = require('./jobDedupService');
 const { enrichJobs } = require('./jobQualityService');
 const { SOURCE_FETCHERS } = require('./jobSourceFetchers');
 const { filterQualityJobs, annotateJobQuality } = require('./jobQualityGate');
+const { purgeStaleJobs } = require('./jobStalePurgeService');
 
 let lastIngest = {
   startedAt: null,
@@ -79,7 +80,11 @@ async function ingestJobs({ sources, persist = true, dryRun = false } = {}) {
   const beforeQuality = scored.length;
   const qualityFiltered =
     env.usRemoteJobsOnly !== false
-      ? filterQualityJobs(scored, { minSalaryUsd: env.jobMinSalaryUsd })
+      ? filterQualityJobs(scored, {
+          minSalaryUsd: env.jobMinSalaryUsd,
+          maxAgeDays: env.jobMaxAgeDays,
+          aggregatorRequiresAts: env.jobAggregatorRequiresAts,
+        })
       : scored;
   lastIngest.totals.filtered = beforeQuality - qualityFiltered.length;
 
@@ -108,6 +113,13 @@ async function ingestJobs({ sources, persist = true, dryRun = false } = {}) {
   }
   lastIngest.totals.saved = saved;
   lastIngest.finishedAt = new Date().toISOString();
+
+  try {
+    const purged = await purgeStaleJobs(env.jobMaxAgeDays);
+    lastIngest.totals.purged = purged.deleted || 0;
+  } catch (err) {
+    lastIngest.errors.push({ source: 'purge', message: err.message });
+  }
 
   return { jobs: deduped, saved, ...lastIngest };
 }

@@ -55,8 +55,13 @@ function extractSkills(text = '') {
 function detectAtsFromUrl(url = '') {
   const lower = url.toLowerCase();
   if (lower.includes('greenhouse.io')) return 'greenhouse';
-  if (lower.includes('lever.co')) return 'lever';
+  if (lower.includes('lever.co') || lower.includes('jobs.lever.co')) return 'lever';
   if (lower.includes('ashbyhq.com')) return 'ashby';
+  if (lower.includes('myworkdayjobs.com') || lower.includes('workday.com')) return 'workday';
+  if (lower.includes('icims.com')) return 'icims';
+  if (lower.includes('jobvite.com')) return 'jobvite';
+  if (lower.includes('smartrecruiters.com')) return 'smartrecruiters';
+  if (lower.includes('bamboohr.com')) return 'bamboohr';
   if (lower.includes('usajobs.gov')) return 'usajobs';
   if (lower.includes('wellfound.com') || lower.includes('angel.co')) return 'wellfound';
   if (lower.includes('workatastartup.com')) return 'workatastartup';
@@ -72,11 +77,12 @@ function normalizeJob(raw) {
   const applyUrl = raw.applyUrl || raw.url || '';
   const salary = parseSalaryNumbers(`${raw.salaryText || ''} ${description}`);
   const skills = raw.skills?.length ? raw.skills : extractSkills(`${raw.title} ${description}`);
-  const postedAt = raw.postedAt ? new Date(raw.postedAt) : raw.firstSeen ? new Date(raw.firstSeen) : null;
+  const postedAt = raw.postedAt ? new Date(raw.postedAt) : null;
   const remoteType = raw.remoteType || inferRemoteType(location, description);
 
   const id = raw.id || raw.jobId;
   const source = raw.source || 'unknown';
+  const validPostedAt = postedAt && !Number.isNaN(postedAt.getTime()) ? postedAt : null;
 
   return {
     id,
@@ -92,12 +98,12 @@ function normalizeJob(raw) {
     applyUrl,
     url: applyUrl,
     source,
-    postedAt: postedAt && !Number.isNaN(postedAt.getTime()) ? postedAt.toISOString() : null,
+    postedAt: validPostedAt ? validPostedAt.toISOString() : null,
     atsType: raw.atsType || detectAtsFromUrl(applyUrl),
     tier: raw.tier || 'SECONDARY',
     score: raw.score || 0,
     matchPct: raw.matchPct || 0,
-    firstSeen: postedAt || new Date(),
+    firstSeen: validPostedAt || null,
   };
 }
 

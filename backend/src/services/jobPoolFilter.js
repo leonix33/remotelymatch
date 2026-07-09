@@ -6,6 +6,15 @@ function isRelaxed(options = {}) {
   return options.relaxed === true || env.qualityFirstMode === false;
 }
 
+function qualityFilterOptions(options = {}) {
+  return {
+    minSalaryUsd: isRelaxed(options) ? 60000 : env.jobMinSalaryUsd,
+    relaxed: isRelaxed(options),
+    maxAgeDays: options.maxAgeDays ?? env.jobMaxAgeDays ?? 30,
+    aggregatorRequiresAts: options.aggregatorRequiresAts ?? env.jobAggregatorRequiresAts !== false,
+  };
+}
+
 /**
  * Source, salary, and geography gate — run before scoring.
  */
@@ -13,8 +22,7 @@ function applyJobPoolFilters(jobs = [], options = {}) {
   if (!jobs.length) return [];
   const enriched = jobs.map((j) => enrichJobScores(j));
   if (env.usRemoteJobsOnly === false) return enriched;
-  const minSalaryUsd = isRelaxed(options) ? 60000 : env.jobMinSalaryUsd;
-  return filterQualityJobs(enriched, { minSalaryUsd, relaxed: isRelaxed(options) });
+  return filterQualityJobs(enriched, qualityFilterOptions(options));
 }
 
 /**
@@ -34,6 +42,7 @@ function filterByCallbackScore(jobs = [], options = {}) {
     })
     .sort(
       (a, b) =>
+        (b.freshnessScore || 0) - (a.freshnessScore || 0) ||
         (b.interviewLikelihoodPct || 0) - (a.interviewLikelihoodPct || 0) ||
         (b.personalMatchPct ?? b.matchPct ?? 0) - (a.personalMatchPct ?? a.matchPct ?? 0)
     );

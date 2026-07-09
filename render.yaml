@@ -62,6 +62,10 @@ services:
         value: "25"
       - key: QUALITY_FIRST_MODE
         value: "1"
+      - key: JOB_MAX_AGE_DAYS
+        value: "30"
+      - key: JOB_AGGREGATOR_REQUIRES_ATS
+        value: "1"
       - key: JOB_SOURCES_ENABLED
         value: remoteok,remotive,weworkremotely,greenhouse,lever,ashby,adzuna
       - key: RESEND_API_KEY

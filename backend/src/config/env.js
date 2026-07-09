@@ -80,4 +80,6 @@ module.exports = {
   jobMinSalaryUsd: Number(process.env.JOB_MIN_SALARY_USD) || 140000,
   jobMinCallbackScore: Number(process.env.JOB_MIN_CALLBACK_SCORE) || 25,
   qualityFirstMode: process.env.QUALITY_FIRST_MODE !== '0',
+  jobMaxAgeDays: Number(process.env.JOB_MAX_AGE_DAYS) || 30,
+  jobAggregatorRequiresAts: process.env.JOB_AGGREGATOR_REQUIRES_ATS !== '0',
 };
