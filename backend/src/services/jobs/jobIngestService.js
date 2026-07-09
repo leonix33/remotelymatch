@@ -6,7 +6,6 @@ const { deduplicateJobs } = require('./jobDedupService');
 const { enrichJobs } = require('./jobQualityService');
 const { SOURCE_FETCHERS } = require('./jobSourceFetchers');
 const { filterQualityJobs, annotateJobQuality } = require('./jobQualityGate');
-const env = require('../../config/env');
 
 let lastIngest = {
   startedAt: null,
