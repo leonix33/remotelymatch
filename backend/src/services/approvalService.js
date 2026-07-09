@@ -49,9 +49,19 @@ async function loadJobs(minMatch = 60) {
 async function poolDiagnostics(userId, profile) {
   const poolOpts = poolOptionsForProfile(profile);
   const limit = env.openJobMarket !== false ? 2000 : 500;
+  const cutoff = new Date(Date.now() - Math.max(env.jobMaxAgeDays || 30, 60) * 24 * 60 * 60 * 1000);
   let raw = [];
   if (env.mongoUri) {
-    raw = await Job.find({}).sort({ qualityScore: -1, freshnessScore: -1 }).limit(limit).lean();
+    raw = await Job.find({
+      $or: [
+        { postedAt: { $gte: cutoff } },
+        { postedAt: { $in: [null, undefined] }, updatedAt: { $gte: cutoff } },
+        { postedAt: { $exists: false }, updatedAt: { $gte: cutoff } },
+      ],
+    })
+      .sort({ postedAt: -1, updatedAt: -1 })
+      .limit(limit)
+      .lean();
   } else {
     raw = jobService.readJobsFromSqlite(limit);
   }
@@ -62,6 +72,7 @@ async function poolDiagnostics(userId, profile) {
   const afterMatch = scored.filter((j) => (j.personalMatchPct ?? j.matchPct ?? 0) >= minMatch);
   return {
     raw: raw.length,
+    totalInDb: env.mongoUri ? await Job.countDocuments({}) : raw.length,
     afterQuality: afterPool.length,
     afterScoring: scored.length,
     afterMatch: afterMatch.length,
@@ -255,7 +266,7 @@ async function listForUser(userId, options = {}) {
       hint = 'No jobs in the database yet. Tap Apply again to refresh listings, or ask an admin to run job ingest.';
     } else if (!poolStats.afterQuality) {
       hint =
-        'Jobs were found but none passed quality filters (freshness, company trust, salary). Refresh listings from Apply or widen your target roles.';
+        'No recent quality jobs in the pool. Tap Apply again to refresh listings — stale jobs are purged and fresh ATS roles are ingested automatically.';
     } else if (!poolStats.afterMatch) {
       hint = `No jobs meet your ${profile.minMatchScore || 60}% match threshold. Lower it in Profile or update target roles and skills.`;
     } else if (Number(minCallback) >= (env.jobMinCallbackScore || 25)) {

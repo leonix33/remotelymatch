@@ -16,17 +16,37 @@ function qualityFilterOptions(options = {}) {
     requireDomainMatch:
       options.requireDomainMatch ?? (env.jobRequireDomainMatch !== false && !isRelaxed(options)),
     maxApplicants: options.maxApplicants ?? env.jobMaxApplicants ?? 75,
+    requireTrustedSource: options.requireTrustedSource,
   };
 }
 
-/**
- * Source, salary, and geography gate — run before scoring.
- */
 function applyJobPoolFilters(jobs = [], options = {}) {
   if (!jobs.length) return [];
   const enriched = jobs.map((j) => enrichJobScores(j));
   if (env.usRemoteJobsOnly === false) return enriched;
-  return filterQualityJobs(enriched, qualityFilterOptions(options));
+
+  const strict = filterQualityJobs(enriched, qualityFilterOptions(options));
+  if (strict.length) return strict;
+
+  // Rescue tier — legacy DB rows may lack dates/trust metadata; keep real employers without emptying the pool.
+  const rescue = filterQualityJobs(enriched, {
+    ...qualityFilterOptions({ ...options, relaxed: true }),
+    maxAgeDays: Math.max(env.jobMaxAgeDays || 30, 45),
+    requireDomainMatch: false,
+    aggregatorRequiresAts: false,
+    maxApplicants: Math.max(env.jobMaxApplicants || 75, 150),
+    minSalaryUsd: 80000,
+  });
+  if (rescue.length) return rescue;
+
+  return filterQualityJobs(enriched, {
+    relaxed: true,
+    maxAgeDays: 60,
+    requireDomainMatch: false,
+    aggregatorRequiresAts: false,
+    maxApplicants: 200,
+    minSalaryUsd: 60000,
+  });
 }
 
 /**

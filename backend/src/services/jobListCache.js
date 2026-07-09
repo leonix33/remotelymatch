@@ -16,11 +16,25 @@ function cacheKey(userId, profile) {
   return `${userId}:${profile?.minMatchScore || 0}:${resumeLen}:${titles}:${skills}`;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function recentJobCutoff(days = 60) {
+  const d = Number(days) || 60;
+  return new Date(Date.now() - d * DAY_MS);
+}
+
 async function loadRawJobs() {
   const limit = env.openJobMarket !== false ? 2000 : 500;
+  const cutoff = recentJobCutoff(Math.max(env.jobMaxAgeDays || 30, 60));
   if (env.mongoUri) {
-    return Job.find({})
-      .sort({ qualityScore: -1, freshnessScore: -1, matchPct: -1 })
+    return Job.find({
+      $or: [
+        { postedAt: { $gte: cutoff } },
+        { postedAt: { $in: [null, undefined] }, updatedAt: { $gte: cutoff } },
+        { postedAt: { $exists: false }, updatedAt: { $gte: cutoff } },
+      ],
+    })
+      .sort({ postedAt: -1, updatedAt: -1, qualityScore: -1, freshnessScore: -1 })
       .limit(limit)
       .lean();
   }

@@ -89,6 +89,10 @@ function effectivePostedAt(job) {
   if (posted && !Number.isNaN(posted.getTime())) return posted;
   const seen = job?.firstSeen ? new Date(job.firstSeen) : null;
   if (seen && !Number.isNaN(seen.getTime())) return seen;
+  const updated = job?.updatedAt ? new Date(job.updatedAt) : null;
+  if (updated && !Number.isNaN(updated.getTime())) return updated;
+  const created = job?.createdAt ? new Date(job.createdAt) : null;
+  if (created && !Number.isNaN(created.getTime())) return created;
   return null;
 }
 
@@ -204,7 +208,7 @@ function isActionableJob(job, options = {}) {
   const descLen = (job.description || '').length;
 
   if (tier === 3 && aggregatorRequiresAts && !hasEmployerAtsUrl(job)) return false;
-  if (tier >= 2 && jobAgeDays(job) == null) return false;
+  if (tier >= 2 && jobAgeDays(job) == null && !relaxed) return false;
 
   const salaryOk = meetsSalaryFloor(job, minSalaryUsd);
   if (salaryOk === false) return false;

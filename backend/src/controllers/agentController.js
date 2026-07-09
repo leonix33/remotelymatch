@@ -8,6 +8,8 @@ const profileService = require('../services/profileService');
 const teamService = require('../services/teamService');
 const { scoreJobsForProfile } = require('../services/jobScoringService');
 const jobIngestService = require('../services/jobs/jobIngestService');
+const { purgeStaleJobs } = require('../services/jobs/jobStalePurgeService');
+const scoredJobListCache = require('../services/jobListCache');
 const env = require('../config/env');
 
 async function runAgent(req, res, next) {
@@ -22,8 +24,10 @@ async function runAgent(req, res, next) {
     let ingestNote = '';
     if (env.mongoUri && env.openJobMarket !== false) {
       try {
+        const purged = await purgeStaleJobs();
         const ingest = await jobIngestService.ingestJobs({ persist: true });
-        ingestNote = ` Broad ingest saved ${ingest.totals?.saved || 0} jobs.`;
+        ingestNote = ` Purged ${purged.deleted || 0} stale jobs. Broad ingest saved ${ingest.totals?.saved || 0} jobs.`;
+        scoredJobListCache.invalidate(req.user.sub);
       } catch (ingestErr) {
         ingestNote = ` Broad ingest skipped: ${ingestErr.message}`;
       }

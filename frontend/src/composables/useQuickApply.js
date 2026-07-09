@@ -100,7 +100,7 @@ export function useQuickApply() {
         const hint = listData?.hint;
         const stats = listData?.poolStats;
         const statsNote = stats
-          ? ` (${stats.raw} total → ${stats.afterQuality} quality → ${stats.afterMatch} match your profile)`
+          ? ` (${stats.totalInDb ?? stats.raw} in database → ${stats.raw} recent → ${stats.afterQuality} quality → ${stats.afterMatch} match your profile)`
           : '';
         throw new Error(
           hint
