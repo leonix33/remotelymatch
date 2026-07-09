@@ -1,7 +1,6 @@
 const Profile = require('../models/Profile');
 const env = require('../config/env');
 const profileFileService = require('./profileFileService');
-const jobListCache = require('./jobListCache');
 const { enrichProfileResponse } = require('./resumeParseService');
 const { encryptApiKey, maskApiKey } = require('./openaiKeyCrypto');
 
@@ -88,8 +87,14 @@ async function update(userId, data) {
       { new: true, upsert: true }
     ).select('+openaiApiKeyEncrypted +hunterApiKeyEncrypted +apolloApiKeyEncrypted');
   }
-  jobListCache.invalidate(userId);
+  invalidateJobCaches(userId);
   return toResponse(profile);
+}
+
+function invalidateJobCaches(userId) {
+  // Lazy require avoids circular dependency: jobListCache -> profileService -> jobListCache
+  const jobListCache = require('./jobListCache');
+  jobListCache.invalidate(userId);
 }
 
 async function setOpenAiKey(userId, apiKey) {
