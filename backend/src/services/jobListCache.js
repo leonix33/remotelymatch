@@ -4,6 +4,7 @@ const jobService = require('./jobService');
 const env = require('../config/env');
 const Job = require('../models/Job');
 const { applyJobPoolFilters, filterByCallbackScore, poolOptionsForProfile } = require('./jobPoolFilter');
+const { warmConversionContext } = require('./conversionStatsService');
 
 const CACHE_MS = 90_000;
 const cache = new Map();
@@ -37,8 +38,9 @@ async function listScoredForUser(userId) {
 
   let jobs = await loadRawJobs();
   jobs = applyJobPoolFilters(jobs, poolOpts);
-  jobs = scoreJobsForProfile(jobs, profile, userId);
-  jobs = filterByCallbackScore(jobs, poolOpts);
+  const conversionContext = await warmConversionContext(userId);
+  jobs = scoreJobsForProfile(jobs, profile, userId, conversionContext);
+  jobs = filterByCallbackScore(jobs, { ...poolOpts, conversionContext });
   cache.set(key, { at: Date.now(), jobs });
   return { jobs, profile };
 }

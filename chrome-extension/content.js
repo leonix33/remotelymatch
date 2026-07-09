@@ -5,6 +5,36 @@ function guessCompany() {
   return host;
 }
 
+function scrapeApplicantCount(root = document) {
+  const scope = root?.querySelector ? root : document;
+  const text = scope.innerText || scope.textContent || '';
+
+  const over = text.match(/over\s+(\d[\d,]*)\s+applicants?/i);
+  if (over) {
+    const count = Number(over[1].replace(/,/g, ''));
+    return { applicantCount: count, applicantCountLabel: `Over ${count} applicants`, applicantCountCapped: true };
+  }
+
+  const among = text.match(/among the first\s+(\d[\d,]*)\s+applicants?/i);
+  if (among) {
+    const count = Number(among[1].replace(/,/g, ''));
+    return { applicantCount: count, applicantCountLabel: `First ${count} applicants`, applicantCountCapped: false };
+  }
+
+  const plain = text.match(/(\d[\d,]*)\s+applicants?/i);
+  if (plain) {
+    const count = Number(plain[1].replace(/,/g, ''));
+    return { applicantCount: count, applicantCountLabel: `${count} applicants`, applicantCountCapped: false };
+  }
+
+  return null;
+}
+
+function attachApplicantFields(job, root) {
+  const parsed = scrapeApplicantCount(root);
+  return parsed ? { ...job, ...parsed } : job;
+}
+
 function scrapeLinkedIn() {
   const title =
     document.querySelector('.job-details-jobs-unified-top-card__job-title h1')?.innerText?.trim() ||
@@ -16,7 +46,10 @@ function scrapeLinkedIn() {
     document.querySelector('.jobs-unified-top-card__company-name a')?.innerText?.trim() ||
     document.querySelector('.topcard__org-name-link')?.innerText?.trim() ||
     document.querySelector('[data-test-company-name]')?.innerText?.trim();
-  return { url: location.href, title: title || document.title, company: company || guessCompany(), source: 'linkedin' };
+  return attachApplicantFields(
+    { url: location.href, title: title || document.title, company: company || guessCompany(), source: 'linkedin' },
+    document
+  );
 }
 
 function scrapeIndeed() {
@@ -31,7 +64,7 @@ function scrapeIndeed() {
     document.querySelector('.jobsearch-InlineCompanyRating a')?.innerText?.trim() ||
     document.querySelector('.jobsearch-CompanyInfoWithoutHeaderImage a')?.innerText?.trim() ||
     guessCompany();
-  return { url: location.href, title, company, source: 'indeed' };
+  return attachApplicantFields({ url: location.href, title, company, source: 'indeed' }, document);
 }
 
 function scrapeWellfound() {
@@ -106,12 +139,17 @@ function scrapeLinkedInSearchJobs() {
     const company =
       card.querySelector('.job-card-container__primary-description, .artdeco-entity-lockup__subtitle, .base-search-card__subtitle')?.innerText?.trim();
     if (!url && !jobKey) continue;
-    jobs.push({
-      jobKey: jobKey || url,
-      url: url || (jobKey ? `https://www.linkedin.com/jobs/view/${jobKey}` : ''),
-      title: title || 'LinkedIn role',
-      company: company || 'Unknown',
-    });
+    jobs.push(
+      attachApplicantFields(
+        {
+          jobKey: jobKey || url,
+          url: url || (jobKey ? `https://www.linkedin.com/jobs/view/${jobKey}` : ''),
+          title: title || 'LinkedIn role',
+          company: company || 'Unknown',
+        },
+        card
+      )
+    );
   }
   return jobs;
 }

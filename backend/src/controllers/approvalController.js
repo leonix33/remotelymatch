@@ -2,9 +2,24 @@ const approvalService = require('../services/approvalService');
 
 async function queueExternal(req, res, next) {
   try {
-    const { url, title, company, source } = req.body;
+    const { url, title, company, source, applicantCount, applicantCountLabel } = req.body;
     const notify = req.body.notify !== false;
-    const item = await approvalService.addExternal(req.user.sub, { url, title, company, source, notify });
+    const item = await approvalService.addExternal(req.user.sub, {
+      url,
+      title,
+      company,
+      source,
+      applicantCount,
+      applicantCountLabel,
+      notify,
+    });
+    if (item.skipped) {
+      return res.status(200).json({
+        message: item.message || 'Skipped — too many applicants',
+        skipped: true,
+        reason: item.reason,
+      });
+    }
     res.status(item.isNew ? 201 : 200).json({
       message: item.isNew ? 'Added to Apply Queue' : 'Already in your queue',
       item,

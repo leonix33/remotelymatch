@@ -193,10 +193,11 @@ function scoreJobForProfile(job, profile, scoringContext = {}) {
   );
 }
 
-function scoreJobsForProfile(jobs, profile, userId = null) {
-  const conversionContext = userId ? getConversionContext(userId) : { sourceReplyRates: {}, sampleSize: 0 };
+function scoreJobsForProfile(jobs, profile, userId = null, conversionContext = null) {
+  const context =
+    conversionContext || (userId ? getConversionContext(userId) : { sourceReplyRates: {}, sourceStats: {}, sampleSize: 0 });
   const counts = companyJobCounts(jobs);
-  const scoringContext = { conversionContext, companyCounts: counts };
+  const scoringContext = { conversionContext: context, companyCounts: counts };
   return jobs
     .map((j) => scoreJobForProfile(j, profile, scoringContext))
     .sort(

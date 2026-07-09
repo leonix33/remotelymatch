@@ -83,4 +83,7 @@ module.exports = {
   jobMaxAgeDays: Number(process.env.JOB_MAX_AGE_DAYS) || 30,
   jobAggregatorRequiresAts: process.env.JOB_AGGREGATOR_REQUIRES_ATS !== '0',
   jobRequireDomainMatch: process.env.JOB_REQUIRE_DOMAIN_MATCH !== '0',
+  jobMaxApplicants: Number(process.env.JOB_MAX_APPLICANTS) || 75,
+  jobMaxSameCompanyRoles: Number(process.env.JOB_MAX_SAME_COMPANY_ROLES) || 5,
+  jobDropLowYieldSources: process.env.JOB_DROP_LOW_YIELD_SOURCES === '1',
 };

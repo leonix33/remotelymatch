@@ -2,17 +2,21 @@ const Outcome = require('../models/Outcome');
 const env = require('../config/env');
 const openaiService = require('./openaiService');
 const localOutcomeStore = require('./localOutcomeStore');
-const { getConversionContext } = require('./conversionStatsService');
+const { getConversionContext, invalidateConversionContext } = require('./conversionStatsService');
 
 async function upsert(userId, data) {
+  let saved;
   if (!env.mongoUri) {
-    return localOutcomeStore.upsert(userId, data);
+    saved = localOutcomeStore.upsert(userId, data);
+  } else {
+    saved = await Outcome.findOneAndUpdate(
+      { userId, jobId: data.jobId },
+      { userId, ...data },
+      { upsert: true, new: true }
+    );
   }
-  return Outcome.findOneAndUpdate(
-    { userId, jobId: data.jobId },
-    { userId, ...data },
-    { upsert: true, new: true }
-  );
+  invalidateConversionContext(userId);
+  return saved;
 }
 
 async function list(userId) {

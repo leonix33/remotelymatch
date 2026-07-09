@@ -31,6 +31,16 @@ function postedLabel(job) {
 function trustLabel(job) {
   return job.employerTrustLabel || (job.isDirectEmployer ? 'Direct employer' : null);
 }
+
+function applicantLabel(job) {
+  if (job.applicantCountLabel) return job.applicantCountLabel;
+  if (job.applicantCount != null) return `${job.applicantCount} applicants`;
+  return null;
+}
+
+function saturationLabel(job) {
+  return job.saturationLabel || (job.isRepost ? 'Reposted role' : null);
+}
 </script>
 
 <template>
@@ -40,6 +50,16 @@ function trustLabel(job) {
     </span>
     <span v-if="postedLabel(job)" class="badge badge-slate">
       {{ postedLabel(job) }}
+    </span>
+    <span
+      v-if="applicantLabel(job)"
+      class="badge"
+      :class="job.applicantCount > 75 || job.applicantCountCapped ? 'badge-slate' : 'badge-teal'"
+    >
+      {{ applicantLabel(job) }}
+    </span>
+    <span v-if="saturationLabel(job)" class="badge badge-slate">
+      {{ saturationLabel(job) }}
     </span>
     <span class="badge badge-teal" v-if="matchPct(job) != null">{{ matchPct(job) }}% match</span>
     <span

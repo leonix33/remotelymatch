@@ -1,5 +1,13 @@
 const { freshnessScore } = require('./jobs/jobQualityService');
-const { getConversionContext, companyJobCounts, DEFAULT_REPLY_RATE } = require('./conversionStatsService');
+const {
+  getConversionContext,
+  companyJobCounts,
+  DEFAULT_REPLY_RATE,
+} = require('./conversionStatsService');
+const { applicantCountPoints } = require('./jobs/jobApplicantService');
+const { repostPenaltyPoints } = require('./jobs/jobRepostService');
+const { sourceLearningPoints, isLowYieldSource } = require('./jobs/sourceLearningService');
+const env = require('../config/env');
 
 const US_REMOTE_HINTS = [
   'united states',
@@ -67,24 +75,26 @@ function freshnessPoints(job) {
   return { points: 3, label: 'Older posting' };
 }
 
-function companyVelocityPoints(company, companyCounts) {
+function companySaturationPoints(company, companyCounts, maxRoles = 5) {
   const key = normalize(company);
   const count = companyCounts[key] || 0;
-  if (count >= 5) return { points: 10, label: 'High hiring velocity at company' };
-  if (count >= 2) return { points: 6, label: 'Multiple open roles' };
-  return { points: 2, label: 'Single listing' };
+  if (count > maxRoles) return { points: -10, label: `${count} similar roles — likely saturated` };
+  if (count === maxRoles) return { points: -4, label: 'Many open roles at company' };
+  if (count >= 3) return { points: 2, label: 'Active hiring at company' };
+  return { points: 4, label: 'Focused opening' };
 }
 
 function sourceConversionPoints(job, context) {
   const key = normalize(job.source);
   const rate = context.sourceReplyRates[key] ?? context.userReplyRate ?? DEFAULT_REPLY_RATE;
-  const points = Math.round(rate * 100);
+  const learning = sourceLearningPoints(job, context);
+  const points = Math.round(rate * 100) + learning.points;
   const pct = Math.round(rate * 100);
   const label =
     context.sampleSize >= 5
-      ? `Your ${pct}% reply rate on ${job.source || 'this source'}`
+      ? learning.label || `Your ${pct}% reply rate on ${job.source || 'this source'}`
       : `Typical ${Math.round(DEFAULT_REPLY_RATE * 100)}% baseline for this source`;
-  return { points: Math.min(22, Math.max(4, points)), rate, label };
+  return { points: Math.min(22, Math.max(0, points)), rate, label, lowYield: learning.lowYield };
 }
 
 function likelihoodTier(pct) {
@@ -117,9 +127,21 @@ function computeInterviewLikelihood(job, profile, context = {}, companyCounts = 
     factors.push({ key: 'remote', impact: remote.score, label: f });
   }
 
-  const velocity = companyVelocityPoints(job.company, companyCounts);
-  score += velocity.points;
-  factors.push({ key: 'velocity', impact: velocity.points, label: velocity.label });
+  const saturation = companySaturationPoints(job.company, companyCounts, env.jobMaxSameCompanyRoles);
+  score += saturation.points;
+  factors.push({ key: 'saturation', impact: saturation.points, label: saturation.label });
+
+  const applicants = applicantCountPoints(job, env.jobMaxApplicants);
+  score += applicants.points;
+  if (applicants.label) {
+    factors.push({ key: 'applicants', impact: applicants.points, label: applicants.label });
+  }
+
+  const repost = repostPenaltyPoints(job);
+  score += repost.points;
+  if (repost.label) {
+    factors.push({ key: 'repost', impact: repost.points, label: repost.label });
+  }
 
   const source = sourceConversionPoints(job, context);
   score += source.points;
@@ -145,17 +167,22 @@ function computeInterviewLikelihood(job, profile, context = {}, companyCounts = 
   }
 
   const interviewLikelihoodPct = Math.min(95, Math.max(5, Math.round(score)));
+  const lowYield = source.lowYield || isLowYieldSource(job.source, context);
 
   return {
     interviewLikelihoodPct,
     likelihoodTier: likelihoodTier(interviewLikelihoodPct),
-    likelihoodFactors: factors.slice(0, 8),
+    likelihoodFactors: factors.slice(0, 10),
     recommendAction:
-      interviewLikelihoodPct >= 35
-        ? 'approve'
-        : interviewLikelihoodPct >= 25
-          ? 'review'
-          : 'skip_unless_strategic',
+      applicants.oversaturated || lowYield
+        ? 'skip_unless_strategic'
+        : interviewLikelihoodPct >= 35
+          ? 'approve'
+          : interviewLikelihoodPct >= 25
+            ? 'review'
+            : 'skip_unless_strategic',
+    saturationLabel: job.saturationLabel || saturation.label,
+    lowYieldSource: lowYield,
   };
 }
 
@@ -165,12 +192,15 @@ function enrichJobWithLikelihood(job, profile, context, companyCounts) {
 }
 
 function enrichJobsWithLikelihood(jobs, profile, userId) {
-  const context = userId ? getConversionContext(userId) : { sourceReplyRates: {}, userReplyRate: DEFAULT_REPLY_RATE, sampleSize: 0 };
+  const context = userId
+    ? getConversionContext(userId)
+    : { sourceReplyRates: {}, sourceStats: {}, userReplyRate: DEFAULT_REPLY_RATE, sampleSize: 0 };
   const companyCounts = companyJobCounts(jobs);
   return jobs
     .map((j) => enrichJobWithLikelihood(j, profile, context, companyCounts))
     .sort(
       (a, b) =>
+        (b.freshnessScore || 0) - (a.freshnessScore || 0) ||
         (b.interviewLikelihoodPct || 0) - (a.interviewLikelihoodPct || 0) ||
         (b.personalMatchPct ?? b.matchPct ?? 0) - (a.personalMatchPct ?? a.matchPct ?? 0)
     );
@@ -180,4 +210,5 @@ module.exports = {
   computeInterviewLikelihood,
   enrichJobWithLikelihood,
   enrichJobsWithLikelihood,
+  companySaturationPoints,
 };

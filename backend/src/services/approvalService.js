@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const JobApproval = require('../models/JobApproval');
 const Job = require('../models/Job');
 const env = require('../config/env');
+const { attachApplicantFields, isOversaturated } = require('./jobs/jobApplicantService');
 const jobService = require('./jobService');
 const profileService = require('./profileService');
 const { scoreJobsForProfile } = require('./jobScoringService');
@@ -509,8 +510,22 @@ async function markApplied(userId, jobIds) {
   invalidateJobListCache(userId);
 }
 
-async function addExternal(userId, { url, title, company, source, notify = true }) {
+async function addExternal(userId, { url, title, company, source, applicantCount, applicantCountLabel, notify = true }) {
   if (!url) throw new Error('URL is required');
+
+  const enriched = attachApplicantFields(
+    { applicantCount, applicantCountLabel },
+    applicantCount ?? applicantCountLabel
+  );
+  if (isOversaturated(enriched, env.jobMaxApplicants)) {
+    return {
+      jobId: null,
+      skipped: true,
+      reason: 'oversaturated',
+      message: enriched.applicantCountLabel || 'Too many applicants',
+    };
+  }
+
   const jobId = `ext-${crypto.createHash('sha256').update(url).digest('hex').slice(0, 16)}`;
   const row = {
     jobId,
@@ -521,6 +536,9 @@ async function addExternal(userId, { url, title, company, source, notify = true 
     source: source || 'chrome-extension',
     status: 'pending',
     notes: 'Queued from browser extension',
+    applicantCount: enriched.applicantCount ?? null,
+    applicantCountLabel: enriched.applicantCountLabel ?? null,
+    applicantCountCapped: enriched.applicantCountCapped ?? false,
   };
 
   let existing;
@@ -582,8 +600,14 @@ async function ingestLinkedInJobs(userId, { jobs = [], notify = true }) {
         title: job.title,
         company: job.company,
         source: 'linkedin',
+        applicantCount: job.applicantCount,
+        applicantCountLabel: job.applicantCountLabel,
         notify,
       });
+      if (item.skipped) {
+        skipped += 1;
+        continue;
+      }
       items.push(item);
       if (item.isNew) ingested += 1;
       else skipped += 1;

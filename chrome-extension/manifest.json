@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "remotelymatch Queue",
-  "version": "1.3.0",
-  "description": "Queue LinkedIn jobs to remotelymatch — auto-detect new listings and notify your phone",
+  "version": "1.4.0",
+  "description": "Queue jobs to remotelymatch — captures applicant counts and skips oversaturated listings",
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://remotematch.onrender.com/*",

@@ -15,6 +15,8 @@ const {
   passesCompanyTrustGate,
   annotateEmployerTrust,
 } = require('./companyTrustService');
+const { isOversaturated } = require('./jobApplicantService');
+const env = require('../../config/env');
 
 /** Boards where postings link to real company apply pages (highest hire rate). */
 const TIER1_ATS_SOURCES = ['greenhouse', 'lever', 'ashby'];
@@ -179,6 +181,9 @@ function isActionableJob(job, options = {}) {
   const maxAgeDays = options.maxAgeDays ?? 30;
   const aggregatorRequiresAts = options.aggregatorRequiresAts !== false;
   const requireDomainMatch = options.requireDomainMatch !== false && !relaxed;
+  const maxApplicants = options.maxApplicants ?? env.jobMaxApplicants ?? 75;
+
+  if (isOversaturated(job, maxApplicants)) return false;
 
   if (relaxed) {
     if (!job?.title?.trim() || !hasDirectApplyUrl(job)) return false;

@@ -68,6 +68,8 @@ function detectAtsFromUrl(url = '') {
   return 'unknown';
 }
 
+const { attachApplicantFields } = require('./jobApplicantService');
+
 /**
  * Normalize a raw job record into the canonical ingestion schema.
  */
@@ -84,7 +86,7 @@ function normalizeJob(raw) {
   const source = raw.source || 'unknown';
   const validPostedAt = postedAt && !Number.isNaN(postedAt.getTime()) ? postedAt : null;
 
-  return {
+  return attachApplicantFields({
     id,
     jobId: id,
     title: (raw.title || '').trim(),
@@ -104,7 +106,10 @@ function normalizeJob(raw) {
     score: raw.score || 0,
     matchPct: raw.matchPct || 0,
     firstSeen: validPostedAt || null,
-  };
+    isRepost: Boolean(raw.isRepost),
+    repostCount: raw.repostCount || 0,
+    saturationLabel: raw.saturationLabel || null,
+  }, raw.applicantCount ?? raw.applicantCountLabel);
 }
 
 module.exports = {

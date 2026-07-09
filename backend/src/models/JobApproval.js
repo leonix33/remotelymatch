@@ -18,6 +18,9 @@ const jobApprovalSchema = new mongoose.Schema(
     },
     notes: { type: String, default: '' },
     reviewedAt: Date,
+    applicantCount: Number,
+    applicantCountLabel: String,
+    applicantCountCapped: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

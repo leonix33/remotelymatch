@@ -28,6 +28,12 @@ const jobSchema = new mongoose.Schema(
     employerTrustLabel: String,
     postedAgeLabel: String,
     companyDomainVerified: { type: Boolean, default: null },
+    applicantCount: Number,
+    applicantCountLabel: String,
+    applicantCountCapped: { type: Boolean, default: false },
+    isRepost: { type: Boolean, default: false },
+    repostCount: { type: Number, default: 0 },
+    saturationLabel: String,
   },
   { timestamps: true }
 );

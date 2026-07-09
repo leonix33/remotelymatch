@@ -68,6 +68,10 @@ services:
         value: "1"
       - key: JOB_REQUIRE_DOMAIN_MATCH
         value: "1"
+      - key: JOB_MAX_APPLICANTS
+        value: "75"
+      - key: JOB_MAX_SAME_COMPANY_ROLES
+        value: "5"
       - key: JOB_SOURCES_ENABLED
         value: remoteok,remotive,weworkremotely,greenhouse,lever,ashby,adzuna
       - key: RESEND_API_KEY

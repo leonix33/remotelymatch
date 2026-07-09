@@ -14,6 +14,7 @@ const outcomeSchema = new mongoose.Schema(
     matchPct: Number,
     notes: String,
     lessonsLearned: String,
+    source: String,
   },
   { timestamps: true }
 );

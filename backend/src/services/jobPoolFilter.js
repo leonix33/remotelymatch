@@ -1,6 +1,7 @@
 const env = require('../config/env');
 const { enrichJobScores } = require('./jobs/jobQualityService');
 const { filterQualityJobs } = require('./jobs/jobQualityGate');
+const { isLowYieldSource } = require('./jobs/sourceLearningService');
 
 function isRelaxed(options = {}) {
   return options.relaxed === true || env.qualityFirstMode === false;
@@ -14,6 +15,7 @@ function qualityFilterOptions(options = {}) {
     aggregatorRequiresAts: options.aggregatorRequiresAts ?? env.jobAggregatorRequiresAts !== false,
     requireDomainMatch:
       options.requireDomainMatch ?? (env.jobRequireDomainMatch !== false && !isRelaxed(options)),
+    maxApplicants: options.maxApplicants ?? env.jobMaxApplicants ?? 75,
   };
 }
 
@@ -34,12 +36,14 @@ function filterByCallbackScore(jobs = [], options = {}) {
   if (isRelaxed(options)) return jobs;
 
   const minCallback = options.minCallbackScore ?? env.jobMinCallbackScore ?? 25;
+  const context = options.conversionContext || null;
 
   return jobs
     .filter((job) => {
       const callback = job.interviewLikelihoodPct ?? 0;
       if (callback < minCallback) return false;
       if (job.recommendAction === 'skip_unless_strategic') return false;
+      if (env.jobDropLowYieldSources && context && isLowYieldSource(job.source, context)) return false;
       return true;
     })
     .sort(
