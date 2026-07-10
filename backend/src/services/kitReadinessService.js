@@ -35,7 +35,7 @@ function buildKitSummary(kit, jobStatus) {
     useForApply: kit.useForApply !== false,
     pageCount: kit.pageCount || 0,
     supplementPagesTarget: kit.supplementPagesTarget || kit.pageCount,
-    tailorMode: kit.tailorMode || 'balanced',
+    tailorMode: kit.tailorMode || 'high_match',
     estimatedMatchPct: kit.estimatedMatchPct || null,
     generatedAt: kit.generatedAt,
     applied: jobStatus === 'applied' || jobStatus === 'submitted',

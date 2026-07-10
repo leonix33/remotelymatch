@@ -7,7 +7,7 @@ import { useAuthStore } from '../stores/auth';
 
 const resumeMode = defineModel('resumeMode', { type: String, default: 'tailored' });
 const supplementPages = defineModel('supplementPages', { type: Number, default: 3 });
-const tailorMode = defineModel('tailorMode', { type: String, default: 'balanced' });
+const tailorMode = defineModel('tailorMode', { type: String, default: 'high_match' });
 const digestEmail = defineModel('digestEmail', { type: String, default: '' });
 const contactPhone = defineModel('contactPhone', { type: String, default: '' });
 const applicantName = defineModel('applicantName', { type: String, default: '' });
@@ -33,12 +33,10 @@ const loadingPreview = ref(false);
 
 const isTailored = computed(() => resumeMode.value === 'tailored');
 
-const tailorModeLabel = computed(() => {
-  if (tailorMode.value === 'high_match') {
-    return 'ATS mode — targets ~95% keyword overlap with the job posting (truthful experience only)';
-  }
-  return 'Balanced — strong match without copying every phrase from the posting';
-});
+const tailorModeLabel = computed(
+  () =>
+    'Standard high-match tailoring — same ATS-optimized pipeline for every user and every job (all employers preserved, credentials intact).'
+);
 
 const applySummary = computed(() => {
   const contact = applyPreview.value?.contact;
@@ -211,43 +209,15 @@ onMounted(loadApplyPreview);
         Your resume is reformatted for each job — same sections and credentials, wording matched to the posting.
       </p>
 
-      <div class="mt-4">
-        <label class="mb-1 flex items-center justify-between text-sm text-slate-400">
-          <span>Target length (pages)</span>
-          <span class="font-semibold text-teal-300">{{ supplementPages }} page{{ supplementPages === 1 ? '' : 's' }}</span>
-        </label>
-        <input v-model.number="supplementPages" type="range" min="1" max="6" step="1" class="w-full accent-teal-500" />
-        <p class="mt-1 text-xs text-slate-600">Matches your original resume length when longer — never drops certifications or credentials.</p>
+      <div class="mt-4 rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-3 text-xs text-slate-400">
+        <p class="text-sm font-medium text-teal-200">Standard tailoring for everyone</p>
+        <p class="mt-1">
+          Every tailored resume uses the same high-match pipeline — job-aligned wording, all employers kept, certifications preserved.
+        </p>
+        <p class="mt-2">
+          <strong class="text-slate-300">Output:</strong> {{ supplementPages }} page{{ supplementPages === 1 ? '' : 's' }} · ATS high match · 100% quality target
+        </p>
       </div>
-
-      <div class="mt-5 space-y-2">
-        <p class="text-sm text-slate-400">How closely to match the job description</p>
-        <label
-          class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition"
-          :class="tailorMode === 'balanced' ? 'border-teal-600/50 bg-teal-950/20' : 'border-slate-800'"
-        >
-          <input v-model="tailorMode" type="radio" value="balanced" class="mt-1 accent-teal-500" />
-          <span>
-            <strong class="text-slate-200">Balanced</strong>
-            <span class="mt-0.5 block text-xs text-slate-500">Natural wording with strong skill alignment.</span>
-          </span>
-        </label>
-        <label
-          class="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition"
-          :class="tailorMode === 'high_match' ? 'border-teal-600/50 bg-teal-950/20' : 'border-slate-800'"
-        >
-          <input v-model="tailorMode" type="radio" value="high_match" class="mt-1 accent-teal-500" />
-          <span>
-            <strong class="text-slate-200">ATS high match (recommended)</strong>
-            <span class="mt-0.5 block text-xs text-slate-500">~95% keyword alignment with the JD — passes filters and reaches recruiters when your experience supports it.</span>
-          </span>
-        </label>
-      </div>
-
-      <p class="mt-4 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-400">
-        <strong class="text-slate-300">Active mode:</strong> {{ tailorModeLabel }}
-        <span v-if="supplementPages"> · {{ supplementPages }} page{{ supplementPages === 1 ? '' : 's' }}</span>
-      </p>
 
       <ResumePreview
         v-if="hasResumePreview"

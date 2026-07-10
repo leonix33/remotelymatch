@@ -360,7 +360,7 @@ async function getApplyPreview(req, res, next) {
       tailoring: {
         defaultApplyResumeMode: profile.defaultApplyResumeMode || 'base',
         defaultSupplementPages: profile.defaultSupplementPages || 3,
-        defaultTailorMode: profile.defaultTailorMode || 'balanced',
+        defaultTailorMode: profile.defaultTailorMode || 'high_match',
         highMatchTarget: profile.highMatchTarget || 100,
         autoApplyEnabled: profile.autoApplyEnabled === true,
       },

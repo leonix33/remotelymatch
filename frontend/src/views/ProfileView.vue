@@ -83,7 +83,7 @@ const form = ref({
   followUpRemindersEnabled: true,
   contactPhone: '',
   defaultSupplementPages: 3,
-  defaultTailorMode: 'balanced',
+  defaultTailorMode: 'high_match',
 });
 
 function loadForm(p) {
@@ -110,7 +110,7 @@ function loadForm(p) {
     followUpRemindersEnabled: p.followUpRemindersEnabled !== false,
     contactPhone: p.contactPhone || '',
     defaultSupplementPages: p.defaultSupplementPages || 3,
-    defaultTailorMode: p.defaultTailorMode === 'high_match' ? 'high_match' : 'balanced',
+    defaultTailorMode: 'high_match',
   };
 }
 

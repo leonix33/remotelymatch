@@ -1,5 +1,6 @@
 const openaiService = require('./openaiService');
 const env = require('../config/env');
+const { resolveTailorOptions, TAILOR_MODE } = require('../config/tailorDefaults');
 const { contactHeader, contactSignature } = require('./applicantContactService');
 const { HUMAN_WRITING_PROMPT, humanizeKit } = require('./humanizeWritingService');
 const { prepareResumeTextForParsing } = require('./resumeRepairService');
@@ -12,6 +13,7 @@ const {
   injectMissingIntoSection,
   structureToSectionPayload,
 } = require('./resumeStructureService');
+const { splitExperienceContentIntoJobs } = require('./resumeExperiencePreserveService');
 
 const TECH_KEYWORDS = [
   'kubernetes', 'k8s', 'terraform', 'ansible', 'aws', 'azure', 'gcp', 'docker',
@@ -183,6 +185,9 @@ function finalizeTailoredResume(originalResume, structure, kit) {
   if (stillMissing.length) {
     text = injectMissingIntoSection(text, structure, stillMissing);
   }
+
+  const { preserveExperienceFromOriginal } = require('./resumeExperiencePreserveService');
+  text = preserveExperienceFromOriginal(originalResume, text);
 
   return text.trim();
 }
@@ -511,12 +516,12 @@ function normalizeKit(kit, profile, job, jobDescription, missingKeywords, contac
     supplementPages = splitResumeIntoPages(tailoredResumeText, pageTarget);
   }
 
-  const tailorMode = options.tailorMode === 'high_match' ? 'high_match' : kit.tailorMode || 'balanced';
+  const tailorMode = TAILOR_MODE;
   const baseMatch = job?.personalMatchPct ?? job?.matchPct ?? 70;
   const estimatedMatchPct = Math.min(
     98,
     kit.estimatedMatchPct ??
-      baseMatch + (tailorMode === 'high_match' ? Math.max(8, (options.highMatchTarget || 100) - baseMatch) : 4)
+      baseMatch + Math.max(8, (resolveTailorOptions().highMatchTarget || 100) - baseMatch)
   );
 
   return finalizeNormalizedKit(
@@ -596,8 +601,14 @@ async function polishExistingKit({
   const client = userId ? await getClient(userId) : null;
   if (!client) return kit;
 
+  const canonical = resolveTailorOptions();
   const pageTarget = inferResumePageTarget(profile?.resumeText, kit.supplementPagesTarget || kit.pageCount);
-  const options = { supplementPages: pageTarget, tailorMode, highMatchTarget, maxPasses: maxPasses || env.tailorPolishMaxPasses };
+  const options = {
+    supplementPages: pageTarget,
+    tailorMode: canonical.tailorMode,
+    highMatchTarget: canonical.highMatchTarget,
+    maxPasses: maxPasses || canonical.polishMaxPasses,
+  };
   const missingKeywords = kit.missingKeywords || inferMissingKeywords(profile, jobDescription);
   const fullJd = String(jobDescription || '').slice(0, 14000);
   const working = applyAtsMetadata(enrichKitForDisplay(kit), fullJd, job);
@@ -623,12 +634,18 @@ async function generateAdditiveKit({
   contact = {},
   tailorFocus = '',
   supplementPages = DEFAULT_SUPPLEMENT_PAGES,
-  tailorMode = 'high_match',
+  tailorMode = TAILOR_MODE,
   highMatchTarget = 100,
 }) {
-  const pageTarget = inferResumePageTarget(profile?.resumeText, supplementPages);
-  const effectiveMode = tailorMode === 'balanced' ? 'balanced' : 'high_match';
-  const options = { supplementPages: pageTarget, tailorMode: effectiveMode, highMatchTarget };
+  const canonical = resolveTailorOptions();
+  const pageTarget = inferResumePageTarget(profile?.resumeText, canonical.supplementPages);
+  const effectiveMode = canonical.tailorMode;
+  const options = {
+    supplementPages: pageTarget,
+    tailorMode: effectiveMode,
+    highMatchTarget: canonical.highMatchTarget,
+    maxRefinePasses: canonical.generateMaxPasses,
+  };
   const missingKeywords = inferMissingKeywords(profile, jobDescription);
   const preservedCredentials = extractMustPreserveFromResume(profile?.resumeText);
   const structure = parseResumeStructure(profile?.resumeText || '');
@@ -644,10 +661,13 @@ async function generateAdditiveKit({
   }
 
   const contactBlock = contactHeader(contact);
+  const expSection = structure.sections.find((s) => s.key === 'experience');
   const jdAlignmentNote =
-    effectiveMode === 'high_match'
-      ? `Target this exact role: mirror posting requirements and critical keywords truthfully — each term once, scannable bullets, recruiter-first readability.`
-      : 'Align experience to the role with crisp wording — readable for humans and ATS.';
+    'Target this exact role: mirror posting requirements and critical keywords truthfully — each term once, scannable bullets, recruiter-first readability.';
+
+  const originalJobs = splitExperienceContentIntoJobs(expSection?.content || '');
+  const jobCount = originalJobs.length;
+  const jobEmployers = originalJobs.map((j) => j.company || j.title).filter(Boolean).join('; ');
 
   const system = `You are an expert resume writer tailoring a resume for ONE job application. Goal: pass ATS, match the posting, get recruiter callbacks.
 
@@ -657,13 +677,15 @@ JOB-TARGET RULES:
 1. Summary must name "${job?.title || 'this role'}" fit and reflect top posting requirements.
 2. Experience bullets must prove qualifications from the posting using the candidate's real work only.
 3. Each critical keyword/requirement appears at most once — varied wording, no stuffing.
-4. Experience: 4-5 substantive bullets for the most recent role, 3-4 for prior roles (~220-360 chars each). Complete sentences — never truncate or use ellipsis.
-5. If a role has fewer bullets in the original, expand by splitting combined lines into separate JD-aligned accomplishments from the candidate's real work.
+4. Experience: keep ALL ${jobCount || 'original'} employer role(s) with titles, dates, and accomplishments (${jobEmployers || 'every employer from original'}); rewrite bullet wording for the target job — never delete roles or drop key points.
+5. Every accomplishment from the original resume must appear in the tailored output (rewritten for the job if needed). Do not summarize away prior roles.
+6. If a role has fewer bullets in the original, expand by splitting combined lines into separate JD-aligned accomplishments from the candidate's real work.
+7. Experience bullets: 4-5 substantive bullets for the most recent role, 3-4 for prior roles (~220-360 chars each). Complete sentences — never truncate or use ellipsis.
 
 STRUCTURE RULES:
 1. EXACT section headings from original, same order.
-2. Header block unchanged — name, taglines, contact on separate lines.
-3. Education, certifications, credentials: COPY VERBATIM.
+2. Header block unchanged — name, taglines, contact on separate lines (no stray pipe characters).
+3. Education, certifications, credentials: COPY VERBATIM — degree lines only under EDUCATION; never paste summary or certification paragraphs into EDUCATION.
 4. Experience: keep employer names, titles, dates exactly; rewrite bullets only.
 5. Bullet style (${structure.headingStyle}) and ~${pageTarget} pages.
 6. ${jdAlignmentNote}
@@ -696,6 +718,9 @@ ${(profile?.resumeText || profile?.bio || 'No resume').slice(0, 8000)}
 MUST PRESERVE VERBATIM (never drop these lines):
 ${preservedCredentials.length ? preservedCredentials.join('\n') : 'All certification, education, and credential lines from the resume above'}
 
+ORIGINAL EMPLOYERS (${jobCount} role(s) — include every one in EXPERIENCE output):
+${jobCount ? originalJobs.map((j, i) => `${i + 1}. ${j.title || 'Role'} — ${j.company || 'employer from original'}`).join('\n') : 'All roles from FULL ORIGINAL RESUME'}
+
 TARGET ROLE: ${job?.title} at ${job?.company}
 TAILOR MODE: ${effectiveMode} (ATS + job-requirement alignment)
 TARGET LENGTH: ~${pageTarget} printed pages
@@ -716,7 +741,7 @@ ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    temperature: effectiveMode === 'high_match' ? 0.42 : 0.5,
+    temperature: 0.42,
     max_tokens: maxTokens,
     response_format: { type: 'json_object' },
   });
@@ -739,7 +764,7 @@ ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice
     const maxRefinePasses =
       options.maxRefinePasses != null
         ? Math.max(0, Number(options.maxRefinePasses) || 0)
-        : env.tailorGenerateMaxPasses;
+        : canonical.generateMaxPasses;
     if (maxRefinePasses <= 0) return scored;
     return perfectKitForJob({
       client,

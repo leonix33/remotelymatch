@@ -23,7 +23,7 @@ function kitListItem(kit) {
     jobTitle: kit.jobTitle || kit.title || 'Job',
     company: kit.company || 'Unknown',
     pageCount: kit.pageCount || kit.supplementPages?.length || 0,
-    tailorMode: kit.tailorMode || 'balanced',
+    tailorMode: kit.tailorMode || 'high_match',
     estimatedMatchPct: kit.estimatedMatchPct,
     useForApply: kit.useForApply,
     generatedAt: kit.generatedAt,

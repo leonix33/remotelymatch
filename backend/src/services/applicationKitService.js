@@ -8,7 +8,9 @@ const activityService = require('./activityService');
 const jobDescriptionService = require('./jobDescriptionService');
 const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
+const openaiService = require('./openaiService');
 const env = require('../config/env');
+const { resolveTailorOptions } = require('../config/tailorDefaults');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
@@ -92,14 +94,8 @@ async function generateForJob(userId, jobId, options = {}) {
   }
 
   const profile = await profileService.getOrCreate(userId);
-  const supplementPages = resumeTailorService.clampPageCount(
-    options.supplementPages ?? existing?.supplementPagesTarget ?? profile.defaultSupplementPages ?? 3
-  );
-  const tailorMode =
-    options.tailorMode === 'high_match' || options.tailorMode === 'balanced'
-      ? options.tailorMode
-      : existing?.tailorMode || profile.defaultTailorMode || 'high_match';
-  const highMatchTarget = options.highMatchTarget ?? existing?.highMatchTarget ?? profile.highMatchTarget ?? 100;
+  const canonical = resolveTailorOptions();
+  const { supplementPages, tailorMode, highMatchTarget } = canonical;
 
   if (!(profile?.resumeText || '').trim() || profile.resumeText.trim().length < 50) {
     const err = new Error('Add your resume in Profile before generating a tailored application kit.');
@@ -121,6 +117,18 @@ async function generateForJob(userId, jobId, options = {}) {
     err.status = 400;
     throw err;
   }
+
+  const aiLive = await openaiService.isLive(userId);
+  if (!aiLive) {
+    const err = new Error(
+      env.nodeEnv === 'production'
+        ? 'Resume tailoring is temporarily unavailable. Please try again shortly.'
+        : 'Add OPENAI_API_KEY on the server or your personal key in Profile → AI Integration before generating a tailored kit.'
+    );
+    err.status = env.nodeEnv === 'production' ? 503 : 400;
+    throw err;
+  }
+
   const kit = await resumeTailorService.generateAdditiveKit({
     userId,
     profile,
@@ -171,10 +179,8 @@ async function generateForJob(userId, jobId, options = {}) {
 async function polishUntilReady(userId, jobId, options = {}) {
   const { authEmail, tailorFocus: initialFocus } = options;
   const profile = await profileService.getOrCreate(userId);
-  const highMatchTarget = options.highMatchTarget ?? profile.highMatchTarget ?? 100;
-  const supplementPages = resumeTailorService.clampPageCount(
-    options.supplementPages ?? profile.defaultSupplementPages ?? 3
-  );
+  const canonical = resolveTailorOptions();
+  const { highMatchTarget, supplementPages, tailorMode } = canonical;
   const maxRounds = Math.min(5, Math.max(1, Number(options.maxRounds) || 3));
 
   const job = options.job || (await findJob(userId, jobId));
@@ -404,9 +410,6 @@ async function prepareApplyItems(userId, jobs, options = {}) {
           tailorResume: true,
           authEmail,
           job,
-          supplementPages: profile?.defaultSupplementPages,
-          tailorMode: profile?.defaultTailorMode,
-          highMatchTarget: profile?.highMatchTarget,
         });
       } catch (err) {
         console.warn(`Kit generation failed for ${jobId}:`, err.message);
@@ -512,7 +515,7 @@ function kitListItem(kit) {
     jobUrl: display.jobUrl,
     pageCount: display.pageCount || display.supplementPages?.length || 0,
     supplementPagesTarget: display.supplementPagesTarget || display.pageCount || 3,
-    tailorMode: display.tailorMode || 'balanced',
+    tailorMode: display.tailorMode || 'high_match',
     highMatchTarget: display.highMatchTarget || 100,
     estimatedMatchPct: display.estimatedMatchPct || null,
     generatedAt: display.generatedAt,
@@ -539,21 +542,21 @@ async function listKits(userId) {
   return kits.map((kit) => kitListItem(kit));
 }
 
-async function setKitPreference(userId, jobId, { useForApply, tailorFocus, supplementPages, tailorMode, highMatchTarget }) {
+async function setKitPreference(userId, jobId, { useForApply, tailorFocus }) {
+  const canonical = resolveTailorOptions();
   const existing = await applicationKitStore.get(userId, jobId);
   if (!existing?.tailored) {
     const err = new Error('No tailored kit for this job yet. Generate one first.');
     err.status = 404;
     throw err;
   }
-  const patch = {};
+  const patch = {
+    tailorMode: canonical.tailorMode,
+    highMatchTarget: canonical.highMatchTarget,
+    supplementPagesTarget: canonical.supplementPages,
+  };
   if (useForApply !== undefined) patch.useForApply = Boolean(useForApply);
   if (tailorFocus !== undefined) patch.tailorFocus = String(tailorFocus).slice(0, 2000);
-  if (supplementPages !== undefined) {
-    patch.supplementPagesTarget = resumeTailorService.clampPageCount(supplementPages);
-  }
-  if (tailorMode === 'high_match' || tailorMode === 'balanced') patch.tailorMode = tailorMode;
-  if (highMatchTarget !== undefined) patch.highMatchTarget = Math.min(100, Math.max(95, Number(highMatchTarget) || 100));
   return applicationKitStore.patchMeta(userId, jobId, patch);
 }
 

@@ -21,6 +21,7 @@ const useForApply = ref(true);
 const tailorFocus = ref('');
 const supplementPages = ref(3);
 const tailorMode = ref('high_match');
+const supplementPages = ref(3);
 const viewTab = ref('preview');
 
 async function loadKit() {
@@ -53,9 +54,6 @@ async function generate() {
       tailorResume: tailor.value,
       force: true,
       tailorFocus: tailorFocus.value.trim(),
-      supplementPages: supplementPages.value,
-      tailorMode: tailorMode.value,
-      highMatchTarget: 95,
     });
     kit.value = data;
     useForApply.value = data.useForApply !== false;
@@ -78,8 +76,6 @@ async function savePreference() {
     const { data } = await http.patch(`/applications/kit/${encodeURIComponent(props.job.jobId)}/preference`, {
       useForApply: useForApply.value,
       tailorFocus: tailorFocus.value.trim(),
-      supplementPages: supplementPages.value,
-      tailorMode: tailorMode.value,
     });
     kit.value = { ...kit.value, ...data };
     prefMsg.value = useForApply.value
@@ -246,30 +242,9 @@ watch(
           <p v-if="prefMsg" class="text-xs text-teal-300">{{ prefMsg }}</p>
         </div>
 
-        <div>
-          <label class="mb-1 block text-sm text-slate-400">Target length (pages)</label>
-          <div class="flex items-center gap-3">
-            <input v-model.number="supplementPages" type="range" min="1" max="6" class="flex-1 accent-teal-500" />
-            <span class="w-16 text-sm text-slate-300">{{ supplementPages }} page{{ supplementPages > 1 ? 's' : '' }}</span>
-          </div>
-        </div>
-
-        <div>
-          <p class="mb-2 text-sm text-slate-400">How closely to match the job description</p>
-          <label class="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
-            <input v-model="tailorMode" type="radio" value="balanced" class="mt-0.5 accent-teal-500" name="tailor-mode" />
-            <span>
-              <strong class="text-slate-100">Balanced</strong>
-              <span class="mt-0.5 block text-xs text-slate-500">Natural wording — readable for humans, still aligned to the role.</span>
-            </span>
-          </label>
-          <label class="mt-2 flex cursor-pointer items-start gap-2 text-sm text-slate-300">
-            <input v-model="tailorMode" type="radio" value="high_match" class="mt-0.5 accent-teal-500" name="tailor-mode" />
-            <span>
-              <strong class="text-slate-100">ATS high match</strong>
-              <span class="mt-0.5 block text-xs text-slate-500">Strong keyword fit without repetition — best for callbacks.</span>
-            </span>
-          </label>
+        <div class="rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-slate-400">
+          <strong class="text-teal-200">Standard tailoring for every user.</strong>
+          Each job gets the same high-match pipeline: all employers preserved, credentials intact, ATS-aligned bullets (~3 pages).
         </div>
 
         <div>

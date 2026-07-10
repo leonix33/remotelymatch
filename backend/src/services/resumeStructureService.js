@@ -192,7 +192,7 @@ function describeStructureForPrompt(structure) {
       lines.push(`- [${section.key.toUpperCase()}] "${label}" — COPY VERBATIM, no edits`);
     } else if (section.key === 'experience') {
       lines.push(
-        `- [EXPERIENCE] "${label}" — keep every employer, job title, and date line exactly; only rewrite bullet/description text`
+        `- [EXPERIENCE] "${label}" — keep EVERY employer, job title, date line, and accomplishment from the original; rewrite bullet wording for the target job but never delete roles or drop key points`
       );
     } else if (section.key === 'summary') {
       lines.push(`- [SUMMARY] "${label}" — tailor sentences to the job; keep length similar`);
@@ -286,5 +286,6 @@ module.exports = {
   findMissingPreservedLines,
   injectMissingIntoSection,
   structureToSectionPayload,
+  lineAppearsInResume,
   isLikelySectionHeader,
 };
