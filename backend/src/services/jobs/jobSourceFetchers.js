@@ -320,15 +320,27 @@ async function fetchHimalayas() {
 }
 
 async function fetchWeWorkRemotely() {
-  try {
-    const res = await fetch('https://weworkremotely.com/remote-jobs.rss', {
-      headers: { 'User-Agent': USER_AGENT },
-    });
-    const rss = await res.text();
-    return parseRssJobs(rss, 'We Work Remotely', 'weworkremotely');
-  } catch {
-    return [];
+  const feeds = jobSourcesConfig.weworkRemotelyFeeds?.length
+    ? jobSourcesConfig.weworkRemotelyFeeds
+    : ['https://weworkremotely.com/remote-jobs.rss'];
+  const seen = new Set();
+  const jobs = [];
+
+  for (const feedUrl of feeds) {
+    try {
+      const rss = await fetchText(feedUrl);
+      for (const job of parseRssJobs(rss, 'We Work Remotely', 'weworkremotely')) {
+        const key = job.applyUrl || job.id;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        jobs.push(job);
+      }
+    } catch {
+      /* skip feed */
+    }
   }
+
+  return jobs;
 }
 
 async function fetchJobicy() {
@@ -662,39 +674,52 @@ async function fetchIndeed() {
 
 async function fetchAdzuna() {
   const platformSettingsService = require('../platformSettingsService');
-  const { adzunaAppId, adzunaAppKey, adzunaWhat, adzunaWhere, adzunaMaxDaysOld } =
+  const { adzunaAppId, adzunaAppKey, adzunaWhat, adzunaQueries, adzunaWhere, adzunaMaxDaysOld } =
     await platformSettingsService.getAdzunaCredentials();
   if (!adzunaAppId || !adzunaAppKey) return [];
 
-  const params = new URLSearchParams({
-    app_id: adzunaAppId,
-    app_key: adzunaAppKey,
-    what: adzunaWhat,
-    where: adzunaWhere,
-    results_per_page: '50',
-    sort_by: 'date',
-    max_days_old: adzunaMaxDaysOld,
-    'content-type': 'application/json',
-  });
+  const queries = (adzunaQueries?.length ? adzunaQueries : [adzunaWhat]).filter(Boolean);
+  const seen = new Set();
+  const jobs = [];
 
-  try {
-    const data = await fetchJson(`https://api.adzuna.com/v1/api/jobs/us/search/1?${params}`);
-    return (data.results || []).map((item) =>
-      rawJob({
-        id: `adzuna-${item.id}`,
-        title: item.title,
-        company: item.company?.display_name || 'Unknown',
-        location: item.location?.display_name || 'United States',
-        applyUrl: item.redirect_url,
-        source: 'Adzuna',
-        description: stripHtml(item.description || ''),
-        postedAt: item.created || null,
-        atsType: 'adzuna',
-      })
-    );
-  } catch {
-    return [];
+  for (const what of queries) {
+    const params = new URLSearchParams({
+      app_id: adzunaAppId,
+      app_key: adzunaAppKey,
+      what,
+      where: adzunaWhere,
+      results_per_page: '50',
+      sort_by: 'date',
+      max_days_old: adzunaMaxDaysOld,
+      'content-type': 'application/json',
+    });
+
+    try {
+      const data = await fetchJson(`https://api.adzuna.com/v1/api/jobs/us/search/1?${params}`);
+      for (const item of data.results || []) {
+        const id = `adzuna-${item.id}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        jobs.push(
+          rawJob({
+            id,
+            title: item.title,
+            company: item.company?.display_name || 'Unknown',
+            location: item.location?.display_name || 'United States',
+            applyUrl: item.redirect_url,
+            source: 'Adzuna',
+            description: stripHtml(item.description || ''),
+            postedAt: item.created || null,
+            atsType: 'adzuna',
+          })
+        );
+      }
+    } catch {
+      /* skip query */
+    }
   }
+
+  return jobs;
 }
 
 function parseRssJobs(rssText, source, idPrefix) {

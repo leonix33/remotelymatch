@@ -22,7 +22,13 @@ const env = require('../../config/env');
 const TIER1_ATS_SOURCES = ['greenhouse', 'lever', 'ashby'];
 
 /** Curated remote boards with verified listings and direct apply links. */
-const TIER2_REMOTE_BOARDS = ['remoteok', 'remotive', 'we work remotely', 'weworkremotely'];
+const TIER2_REMOTE_BOARDS = [
+  'remoteok',
+  'remotive',
+  'we work remotely',
+  'weworkremotely',
+  'jobspresso',
+];
 
 /** API aggregators — kept only when geo + salary filters pass. */
 const TIER3_AGGREGATORS = ['adzuna'];
@@ -38,7 +44,6 @@ const BLOCKED_LOW_QUALITY_SOURCES = [
   'aijobs',
   'wellfound',
   'working nomads',
-  'jobspresso',
   'jobicy',
   'himalayas',
   'robert half',

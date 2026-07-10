@@ -27,6 +27,7 @@ describe('jobQualityGate', () => {
   it('trusts only actionable sources', () => {
     assert.equal(isTrustedSource('Greenhouse'), true);
     assert.equal(isTrustedSource('RemoteOK'), true);
+    assert.equal(isTrustedSource('Jobspresso'), true);
     assert.equal(isTrustedSource('DevITJobs UK'), false);
     assert.equal(isTrustedSource('Working Nomads'), false);
     assert.equal(isTrustedSource('Dice'), false);

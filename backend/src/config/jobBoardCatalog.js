@@ -41,7 +41,7 @@ const BOARD_OVERRIDES = {
   remote_ok: { status: 'live', ingestType: 'api', fetcherKey: 'remoteok', url: 'https://remoteok.com' },
   remotive: { status: 'live', ingestType: 'api', fetcherKey: 'remotive', url: 'https://remotive.com' },
   we_work_remotely: { status: 'live', ingestType: 'rss', fetcherKey: 'weworkremotely', url: 'https://weworkremotely.com' },
-  remote_co: { status: 'live', ingestType: 'rss', fetcherKey: 'remote_co', url: 'https://remote.co' },
+  remote_co: { status: 'planned', ingestType: 'rss', fetcherKey: 'remote_co', url: 'https://remote.co', notes: 'Feed unavailable — roadmap' },
   jobspresso: { status: 'live', ingestType: 'rss', fetcherKey: 'jobspresso', url: 'https://jobspresso.co' },
   working_nomads: { status: 'live', ingestType: 'api', fetcherKey: 'workingnomads', url: 'https://workingnomads.com' },
   jobicy: { status: 'live', ingestType: 'api', fetcherKey: 'jobicy', url: 'https://jobicy.com' },

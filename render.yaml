@@ -49,7 +49,9 @@ services:
       - key: ADZUNA_APP_KEY
         sync: false
       - key: ADZUNA_WHAT
-        value: remote
+        value: remote software engineer
+      - key: ADZUNA_QUERIES
+        value: remote software engineer,remote devops engineer,remote project manager,remote product manager,remote data engineer
       - key: ADZUNA_WHERE
         value: United States
       - key: ADZUNA_MAX_DAYS_OLD
@@ -73,7 +75,13 @@ services:
       - key: JOB_MAX_SAME_COMPANY_ROLES
         value: "5"
       - key: JOB_SOURCES_ENABLED
-        value: remoteok,remotive,weworkremotely,greenhouse,lever,ashby,adzuna
+        value: remoteok,remotive,weworkremotely,jobspresso,greenhouse,lever,ashby,adzuna
+      - key: JOB_GREENHOUSE_BOARDS
+        value: anthropic,stripe,figma,datadog,cloudflare,gitlab,mongodb,elastic,databricks,coinbase,robinhood,block,dropbox,asana,lyft,instacart,scaleai,vercel,roblox,affirm,purestorage,fastly,reddit,grafanalabs,pinterest,okta,pagerduty,newrelic,twilio
+      - key: JOB_ASHBY_BOARDS
+        value: snowflake,openai,notion,ramp,linear,deel,supabase,cognition,vanta,plaid,harvey,cursor,perplexity,cerebras
+      - key: JOB_LEVER_BOARDS
+        value: palantir,spotify,binance
       - key: RESEND_API_KEY
         sync: false
       # Reliable delivery: Gmail App Password (recommended primary — works for Yahoo/iCloud/Gmail)

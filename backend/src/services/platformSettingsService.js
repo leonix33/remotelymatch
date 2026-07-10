@@ -26,7 +26,14 @@ async function getAdzunaCredentials() {
   const what = (row?.adzunaWhat || jobSources.adzunaWhat || 'remote').trim();
   const where = (row?.adzunaWhere || jobSources.adzunaWhere || 'remote').trim();
   const maxDaysOld = jobSources.adzunaMaxDaysOld || '7';
-  return { adzunaAppId: appId, adzunaAppKey: appKey, adzunaWhat: what, adzunaWhere: where, adzunaMaxDaysOld: maxDaysOld };
+  return {
+    adzunaAppId: appId,
+    adzunaAppKey: appKey,
+    adzunaWhat: what,
+    adzunaQueries: jobSources.adzunaQueries || [],
+    adzunaWhere: where,
+    adzunaMaxDaysOld: maxDaysOld,
+  };
 }
 
 async function isAdzunaConfigured() {
