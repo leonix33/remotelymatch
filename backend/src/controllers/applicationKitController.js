@@ -91,6 +91,7 @@ async function atsScore(req, res, next) {
       resumeText: profile.resumeText,
       tailoredText: kit?.tailoredResumeText,
       jobDescription: jd,
+      job,
     });
     res.json({ jobId, ...ats });
   } catch (err) {
@@ -112,6 +113,7 @@ async function kitCompare(req, res, next) {
     const ats = atsKeywordService.scoreAtsKeywords({
       tailoredText: tailoredResumeText,
       jobDescription,
+      job,
     });
     res.json({
       jobId,

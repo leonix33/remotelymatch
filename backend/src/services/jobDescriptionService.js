@@ -142,13 +142,7 @@ async function resolveJobDescription(job) {
     return text;
   }
 
-  const fallback = [
-    job?.title,
-    job?.company,
-    job?.source,
-    job?.location,
-    `URL: ${url}`,
-  ]
+  const fallback = [job?.title, job?.company, job?.location]
     .filter(Boolean)
     .join('\n');
   const text = fallback.slice(0, 4000);

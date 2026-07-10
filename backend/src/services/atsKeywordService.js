@@ -12,9 +12,59 @@ function normalize(text = '') {
   return String(text).toLowerCase();
 }
 
+function sanitizeJobDescriptionForAts(text = '') {
+  return String(text || '')
+    .replace(/https?:\/\/[^\s]+/gi, ' ')
+    .replace(/www\.[^\s]+/gi, ' ')
+    .replace(/\bURL:\s*[^\n]+/gi, ' ')
+    .replace(/\b[a-f0-9]{8,}\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isValidAtsTerm(term) {
+  const t = String(term || '').trim().toLowerCase();
+  if (!t || t.length < 3 || t.length > 36) return false;
+  if (STOP_WORDS.has(t)) return false;
+  if (/^https?/.test(t) || /^\/\//.test(t)) return false;
+  if (/\.(com|io|org|net|co)\b/.test(t)) return false;
+  if (/^[a-f0-9]{6,}$/.test(t)) return false;
+  if (/^\d+$/.test(t)) return false;
+  if (/[/#?=&]/.test(t)) return false;
+  if (/^(detail|job|remote|apply|posted|source|location|url|viva|usa|inc|llc|corp)$/.test(t)) return false;
+  if (!/[a-z]/.test(t)) return false;
+  return true;
+}
+
+function inferTermsFromJob(job = {}) {
+  const blob = normalize(`${job?.title || ''} ${job?.company || ''}`);
+  const inferred = new Set(TECH_KEYWORDS.filter((keyword) => blob.includes(keyword)));
+
+  if (/\b(devops|devsecops|sre|site reliability|platform engineer|cloud engineer|infrastructure)\b/i.test(blob)) {
+    for (const keyword of [
+      'devops',
+      'ci/cd',
+      'kubernetes',
+      'terraform',
+      'docker',
+      'aws',
+      'azure',
+      'linux',
+      'jenkins',
+      'ansible',
+      'security',
+      'observability',
+    ]) {
+      inferred.add(keyword);
+    }
+  }
+
+  return [...inferred];
+}
+
 function tokenize(text = '') {
-  return normalize(text)
-    .replace(/[^a-z0-9+#./\s-]/g, ' ')
+  return normalize(sanitizeJobDescriptionForAts(text))
+    .replace(/[^a-z0-9+#\s-]/g, ' ')
     .split(/\s+/)
     .filter((t) => t.length > 2);
 }
@@ -44,19 +94,20 @@ function extractPrioritySectionLines(jobDescription = '') {
   return lines.slice(0, 20);
 }
 
-function extractJdTerms(jobDescription = '') {
-  const blob = normalize(jobDescription);
+function extractJdTerms(jobDescription = '', job = {}) {
+  const cleaned = sanitizeJobDescriptionForAts(jobDescription);
+  const blob = normalize(cleaned);
   const terms = new Set();
 
   for (const keyword of TECH_KEYWORDS) {
     if (blob.includes(keyword)) terms.add(keyword);
   }
 
-  for (const line of extractPrioritySectionLines(jobDescription)) {
+  for (const line of extractPrioritySectionLines(cleaned)) {
     addLineTerms(terms, line, 2);
   }
 
-  const lines = String(jobDescription || '')
+  const lines = cleaned
     .split(/[\n•·\-;]+/)
     .map((l) => l.trim())
     .filter((l) => l.length > 8 && l.length < 120);
@@ -65,19 +116,35 @@ function extractJdTerms(jobDescription = '') {
     addLineTerms(terms, line);
   }
 
-  return [...terms].slice(0, 45);
+  for (const inferred of inferTermsFromJob(job)) {
+    terms.add(inferred);
+  }
+
+  const filtered = [...terms].filter(isValidAtsTerm);
+  if (filtered.length < 6) {
+    for (const inferred of inferTermsFromJob(job)) {
+      if (isValidAtsTerm(inferred)) filtered.push(inferred);
+    }
+  }
+
+  return [...new Set(filtered)].slice(0, 45);
 }
 
 function getRedTerms(atsOrBreakdown, limit = 12) {
   const breakdown = Array.isArray(atsOrBreakdown)
     ? atsOrBreakdown
     : atsOrBreakdown?.breakdown || atsOrBreakdown?.atsBreakdown || [];
-  return breakdown.filter((b) => b.status === 'red').map((b) => b.term).slice(0, limit);
+  return breakdown
+    .filter((b) => b.status === 'red')
+    .map((b) => b.term)
+    .filter(isValidAtsTerm)
+    .slice(0, limit);
 }
 
 function buildJdMatchBrief(jobDescription = '', job = {}) {
-  const requirements = extractPrioritySectionLines(jobDescription);
-  const extra = String(jobDescription || '')
+  const cleaned = sanitizeJobDescriptionForAts(jobDescription);
+  const requirements = extractPrioritySectionLines(cleaned);
+  const extra = cleaned
     .split(/[\n•·]+/)
     .map((l) => l.trim())
     .filter((l) => l.length > 15 && l.length < 140 && /\b(experience|required|must|years|proficient|knowledge|ability)\b/i.test(l))
@@ -88,7 +155,7 @@ function buildJdMatchBrief(jobDescription = '', job = {}) {
     roleTitle: job?.title || '',
     company: job?.company || '',
     requirements: merged,
-    criticalTerms: extractJdTerms(jobDescription).slice(0, 28),
+    criticalTerms: extractJdTerms(cleaned, job).slice(0, 28),
   };
 }
 
@@ -186,11 +253,12 @@ function termInResume(term, resumeBlob, resumeTokens) {
   return 'red';
 }
 
-function scoreAtsKeywords({ resumeText = '', tailoredText = '', jobDescription = '' } = {}) {
+function scoreAtsKeywords({ resumeText = '', tailoredText = '', jobDescription = '', job = {} } = {}) {
   const resume = String(tailoredText || resumeText || '').trim();
   const resumeBlob = normalize(resume);
   const resumeTokens = tokenize(resume);
-  const terms = extractJdTerms(jobDescription);
+  const cleanedJd = sanitizeJobDescriptionForAts(jobDescription);
+  const terms = extractJdTerms(cleanedJd, job);
 
   const breakdown = terms.map((term) => ({
     term,

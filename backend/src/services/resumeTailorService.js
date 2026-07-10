@@ -312,6 +312,7 @@ function applyAtsMetadata(kit, jobDescription, job = {}) {
   const ats = scoreAtsKeywords({
     tailoredText: kit.tailoredResumeText,
     jobDescription,
+    job,
   });
   const jdCoverage = scoreJdRequirementCoverage(kit.tailoredResumeText, jobDescription, job);
   const recruiterReady = isRecruiterReady(ats, jdCoverage);

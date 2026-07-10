@@ -48,6 +48,23 @@ Requirements:
     assert.ok(red.length > 0);
     assert.ok(red.every((t) => typeof t === 'string'));
   });
+
+  it('ignores dice URL junk and scores real DevOps keywords', () => {
+    const diceJd = `DevOps Engineer - Remote
+VIVA USA INC
+Remote
+URL: https://www.dice.com/job/detail/5599f0e0-e99c62f041e7`;
+    const job = { title: 'DevOps Engineer - Remote', company: 'VIVA USA INC' };
+    const tailored =
+      'DevOps engineer with Kubernetes, Terraform, Docker, AWS, Azure, Jenkins, Ansible, CI/CD, Linux, security, and observability in production.';
+    const ats = scoreAtsKeywords({ tailoredText: tailored, jobDescription: diceJd, job });
+    const terms = ats.breakdown.map((b) => b.term);
+    assert.ok(!terms.some((t) => /https|dice\.com|detail\//i.test(t)));
+    assert.ok(terms.includes('kubernetes'));
+    assert.ok(ats.score >= 70, `expected strong score, got ${ats.score}`);
+    const red = getRedTerms(ats, 8);
+    assert.ok(!red.some((t) => /https|dice|detail/i.test(t)));
+  });
 });
 
 describe('jd requirement coverage', () => {
