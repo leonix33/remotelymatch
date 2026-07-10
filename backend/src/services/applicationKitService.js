@@ -174,6 +174,14 @@ async function generateForJob(userId, jobId, options = {}) {
     highMatchTarget,
   });
 
+  kit = await resumeTailorService.perfectExperienceForKit({
+    userId,
+    profile,
+    job,
+    jobDescription,
+    kit,
+  });
+
   kit = await ensureMinimumAtsScore(
     userId,
     kit,

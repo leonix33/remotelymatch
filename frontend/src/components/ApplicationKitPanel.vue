@@ -242,8 +242,8 @@ watch(
         </div>
 
         <div class="rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-slate-400">
-          <strong class="text-teal-200">Standard tailoring for every user.</strong>
-          Each job gets the same high-match pipeline: all employers preserved, credentials intact, ATS-aligned bullets (4 pages).
+          <strong class="text-teal-200">Resume perfection for every user.</strong>
+          All jobs stay (5 jobs in → 5 jobs out). Same bullet count per role — only wording changes to match the posting. Credentials and structure intact. 4 pages · 90%+ ATS.
         </div>
 
         <div>

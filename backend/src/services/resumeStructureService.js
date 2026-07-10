@@ -192,7 +192,7 @@ function describeStructureForPrompt(structure) {
       lines.push(`- [${section.key.toUpperCase()}] "${label}" — COPY VERBATIM, no edits`);
     } else if (section.key === 'experience') {
       lines.push(
-        `- [EXPERIENCE] "${label}" — keep EVERY employer, job title, date line, and accomplishment from the original; rewrite bullet wording for the target job but never delete roles or drop key points`
+        `- [EXPERIENCE] "${label}" — keep EVERY employer and the EXACT bullet count per job from the original; copy titles, dates, and companies verbatim; rewrite bullet wording only to match the target job`
       );
     } else if (section.key === 'summary') {
       lines.push(`- [SUMMARY] "${label}" — tailor sentences to the job; keep length similar`);

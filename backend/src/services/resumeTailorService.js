@@ -188,6 +188,9 @@ function finalizeTailoredResume(originalResume, structure, kit) {
   const { preserveExperienceFromOriginal } = require('./resumeExperiencePreserveService');
   text = preserveExperienceFromOriginal(originalResume, text);
 
+  const { enforceExperienceIntegrity } = require('./resumeExperiencePerfectionService');
+  text = enforceExperienceIntegrity(originalResume, text);
+
   return text.trim();
 }
 
@@ -368,10 +371,10 @@ async function refineKitForInterview({
 
 RULES:
 1. ONLY edit summary/profile and experience bullets — never change employers, titles, dates, education, or certifications.
-2. Address missing ATS terms naturally (max once each): ${(redTerms || []).join(', ') || 'none'}
-3. Mirror uncovered posting requirements with real experience from the original resume — never invent.
-4. Experience bullets: 4-5 for the most recent role, 3-4 for prior roles. Each bullet 220-360 chars with technologies, scope, and measurable outcomes.
-5. Expand thin roles by splitting combined accomplishments from the original resume into separate JD-aligned bullets.
+2. Keep EXACTLY the same number of jobs and the same bullet count per job as the original resume.
+3. Rewrite each bullet to align with the job description — substitute keywords/phrasing, keep the candidate's real facts.
+4. Address missing ATS terms naturally (max once each): ${(redTerms || []).join(', ') || 'none'}
+5. Mirror uncovered posting requirements with real experience from the original resume — never invent.
 6. Summary: 3 lines naming the target role and top qualifications from the posting.
 7. Cover letter: 4 sentences — ${job?.title || 'role'} at ${job?.company || 'company'}, fit, proof point, close.
 8. Return JSON only: { "sections": [...], "coverLetterParagraph": "..." }`;
@@ -626,6 +629,39 @@ async function polishExistingKit({
   });
 }
 
+async function perfectExperienceForKit({ userId, profile, job, jobDescription, kit }) {
+  if (!kit?.tailoredResumeText || !profile?.resumeText) return kit;
+
+  const client = userId ? await getClient(userId) : null;
+  const structure = parseResumeStructure(profile.resumeText);
+  const {
+    perfectExperienceBullets,
+    enforceExperienceIntegrity,
+  } = require('./resumeExperiencePerfectionService');
+
+  let text = enforceExperienceIntegrity(profile.resumeText, kit.tailoredResumeText);
+
+  if (client) {
+    text = await perfectExperienceBullets({
+      client,
+      originalResume: profile.resumeText,
+      tailoredText: text,
+      jobDescription,
+      job,
+      profile,
+    });
+  }
+
+  text = finalizeTailoredResume(profile.resumeText, structure, { tailoredResumeText: text });
+  const pageTarget = clampPageCount(kit.supplementPagesTarget || kit.pageCount || DEFAULT_SUPPLEMENT_PAGES);
+  const enriched = finalizeNormalizedKit(
+    { ...kit, tailoredResumeText: text },
+    pageTarget,
+    jobDescription
+  );
+  return applyAtsMetadata(enriched, jobDescription, job);
+}
+
 async function generateAdditiveKit({
   userId,
   profile,
@@ -668,8 +704,10 @@ async function generateAdditiveKit({
   const originalJobs = splitExperienceContentIntoJobs(expSection?.content || '');
   const jobCount = originalJobs.length;
   const jobEmployers = originalJobs.map((j) => j.company || j.title).filter(Boolean).join('; ');
+  const { buildExperienceBlueprint } = require('./resumeExperiencePerfectionService');
+  const experienceBlueprint = buildExperienceBlueprint(originalJobs);
 
-  const system = `You are an expert resume writer tailoring a resume for ONE job application. Goal: pass ATS, match the posting, get recruiter callbacks.
+  const system = `You are an expert resume writer tailoring a resume for ONE job application. Goal: pass ATS, match the posting, get recruiter callbacks — without losing resume integrity.
 
 OUTPUT: Structured tailored resume (same sections as original) + cover letter.
 
@@ -677,16 +715,16 @@ JOB-TARGET RULES:
 1. Summary must name "${job?.title || 'this role'}" fit and reflect top posting requirements.
 2. Experience bullets must prove qualifications from the posting using the candidate's real work only.
 3. Each critical keyword/requirement appears at most once — varied wording, no stuffing.
-4. Experience: keep ALL ${jobCount || 'original'} employer role(s) with titles, dates, and accomplishments (${jobEmployers || 'every employer from original'}); rewrite bullet wording for the target job — never delete roles or drop key points.
-5. Every accomplishment from the original resume must appear in the tailored output (rewritten for the job if needed). Do not summarize away prior roles.
-6. If a role has fewer bullets in the original, expand by splitting combined lines into separate JD-aligned accomplishments from the candidate's real work.
-7. Experience bullets: 4-5 substantive bullets for the most recent role, 3-4 for prior roles (~220-360 chars each). Complete sentences — never truncate or use ellipsis.
+4. Experience: keep ALL ${jobCount || 'original'} employer role(s) — titles, dates, companies unchanged (${jobEmployers || 'every employer from original'}).
+5. For EACH job, keep the EXACT same number of bullets as the original resume. Rewrite bullet wording to match the job description — never delete roles or drop bullets.
+6. Substitute phrasing and keywords in each bullet so prior jobs read relevant to the target role while staying truthful.
+7. Every bullet: one complete sentence (180-320 chars), action verb, scope, technology, outcome where possible.
 
 STRUCTURE RULES:
 1. EXACT section headings from original, same order.
 2. Header block unchanged — name, taglines, contact on separate lines (no stray pipe characters).
 3. Education, certifications, credentials: COPY VERBATIM — degree lines only under EDUCATION; never paste summary or certification paragraphs into EDUCATION.
-4. Experience: keep employer names, titles, dates exactly; rewrite bullets only.
+4. Experience headers (title, dates, company) copy exactly from original; rewrite accomplishment bullets only.
 5. Bullet style (${structure.headingStyle}) and ~${pageTarget} pages.
 6. ${jdAlignmentNote}
 7. Never invent employers, dates, certs, or metrics.
@@ -720,6 +758,9 @@ ${preservedCredentials.length ? preservedCredentials.join('\n') : 'All certifica
 
 ORIGINAL EMPLOYERS (${jobCount} role(s) — include every one in EXPERIENCE output):
 ${jobCount ? originalJobs.map((j, i) => `${i + 1}. ${j.title || 'Role'} — ${j.company || 'employer from original'}`).join('\n') : 'All roles from FULL ORIGINAL RESUME'}
+
+EXPERIENCE PERFECTION CONTRACT (mandatory — same job count and bullet count per job):
+${experienceBlueprint.length ? experienceBlueprint.map((b) => `Job ${b.index}: ${b.title || 'Role'} at ${b.company || 'employer'} — header unchanged, EXACTLY ${b.bulletCount} rewritten bullets aligned to the posting`).join('\n') : 'Keep every job and bullet from the original resume.'}
 
 TARGET ROLE: ${job?.title} at ${job?.company}
 TAILOR MODE: ${effectiveMode} (ATS + job-requirement alignment)
@@ -818,6 +859,7 @@ module.exports = {
   enrichKitForDisplay,
   finalizeNormalizedKit,
   applyAtsMetadata,
+  perfectExperienceForKit,
   perfectKitForJob,
   polishExistingKit,
   TECH_KEYWORDS,

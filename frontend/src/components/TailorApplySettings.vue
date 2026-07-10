@@ -210,12 +210,12 @@ onMounted(loadApplyPreview);
       </p>
 
       <div class="mt-4 rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-3 text-xs text-slate-400">
-        <p class="text-sm font-medium text-teal-200">Standard tailoring for everyone</p>
+        <p class="text-sm font-medium text-teal-200">Resume perfection for every user</p>
         <p class="mt-1">
-          Every tailored resume uses the same high-match pipeline — job-aligned wording, all employers kept, certifications preserved.
+          Every job from your original resume stays — same employers, titles, dates, and bullet count per role. We rewrite bullet wording to match each posting; credentials and structure stay intact.
         </p>
         <p class="mt-2">
-          <strong class="text-slate-300">Output:</strong> 4 pages · ATS high match · 100% quality target
+          <strong class="text-slate-300">Output:</strong> 4 pages · all jobs preserved · bullets tailored to the job · 90%+ ATS target
         </p>
       </div>
 

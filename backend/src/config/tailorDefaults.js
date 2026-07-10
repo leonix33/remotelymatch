@@ -33,7 +33,7 @@ function describeTailorQuality() {
     supplementPages: DEFAULT_SUPPLEMENT_PAGES,
     label: 'Standard high-match tailoring',
     description:
-      'Every tailored resume uses the same ATS-optimized pipeline: all employers preserved, credentials intact, job-aligned bullets (~4 pages).',
+      'Every tailored resume preserves all employers, titles, dates, credentials, and bullet count per job — bullet wording is rewritten to match the posting (~4 pages, 90%+ ATS).',
   };
 }
 

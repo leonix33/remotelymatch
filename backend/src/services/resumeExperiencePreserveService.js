@@ -8,7 +8,7 @@ const DATE_RANGE_RE = new RegExp(
 );
 
 const JOB_ROLE_WORD =
-  /\b(Engineer|Developer|Architect|Manager|Analyst|Consultant|Specialist|Administrator|Coordinator|Technician|Director|Supervisor|Associate|Intern|SRE|DevOps|Platform|Scientist|Technologist)\b/i;
+  /\b(Engineer|Developer|Architect|Manager|Analyst|Consultant|Specialist|Administrator|Coordinator|Technician|Director|Supervisor|Associate|Intern|SRE|DevOps|Platform|Scientist|Technologist|Teacher|Professor|Instructor|Educator|Nurse|Designer|Therapist|Attorney|Accountant|Representative|Executive|Lead|Chef|Officer|Agent|Clerk|Assistant|Secretary|Planner|Estimator|Producer|Editor|Writer|Superintendent|Principal|Counselor|Therapist|Pharmacist|Electrician|Mechanic|Operator|Driver|Sales|Marketing|Recruiter|Trainer|Coach|Tutor|Librarian|Paralegal|Auditor|Broker|Trader|Banker|Inspector|Surveyor|Foreman|Supervisor)\b/i;
 
 const MISPLACED_EDUCATION_BLOB_RE =
   /\b(certification portfolio|enterprise cloud platforms|Databricks SME|extensive certification|on-premises to cloud migration)\b/i;
@@ -362,4 +362,5 @@ module.exports = {
   jobAppearsInResume,
   rebuildExperienceSection,
   mergeMissingBulletsIntoBlock,
+  replaceExperienceSectionContent,
 };
