@@ -44,6 +44,13 @@ describe('resumeTailorService', () => {
     assert.ok(!kit.coverLetterParagraph.toLowerCase().includes('excited to'));
   });
 
+  it('respects explicit page target without inflating from resume length', () => {
+    const { inferResumePageTarget } = require('../services/resumeTailorService');
+    const longResume = 'word '.repeat(2000);
+    assert.equal(inferResumePageTarget(longResume, 2), 2);
+    assert.equal(inferResumePageTarget(longResume, 5), 5);
+  });
+
   it('formats kit as clean resume text', () => {
     const kit = buildDemoKit(profile, job, jd, contact);
     const text = formatKitAsText(kit);

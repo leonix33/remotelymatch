@@ -82,6 +82,8 @@ services:
         value: snowflake,openai,notion,ramp,linear,deel,supabase,cognition,vanta,plaid,harvey,cursor,perplexity,cerebras
       - key: JOB_LEVER_BOARDS
         value: palantir,spotify,binance
+      - key: TAILOR_GENERATE_MAX_PASSES
+        value: "1"
       - key: RESEND_API_KEY
         sync: false
       # Reliable delivery: Gmail App Password (recommended primary — works for Yahoo/iCloud/Gmail)

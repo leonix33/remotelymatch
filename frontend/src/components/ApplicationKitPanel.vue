@@ -55,7 +55,7 @@ async function generate() {
       tailorFocus: tailorFocus.value.trim(),
       supplementPages: supplementPages.value,
       tailorMode: tailorMode.value,
-      highMatchTarget: 100,
+      highMatchTarget: 95,
     });
     kit.value = data;
     useForApply.value = data.useForApply !== false;
@@ -178,6 +178,11 @@ watch(
       >
         {{ appliedLabel(kit) }}
       </div>
+
+      <p class="mt-3 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-400">
+        <strong class="text-slate-300">Faster tailoring:</strong> use <strong class="text-slate-200">Balanced</strong> and
+        <strong class="text-slate-200">2–3 pages</strong> for quick kits (~30s). Use <strong class="text-slate-200">Polish until ready</strong> in Queue when you want 95%+ ATS.
+      </p>
 
       <p class="mt-3 rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-teal-100/90">
         Your credentials and education stay intact. We rewrite experience bullets and summary for this role, score ATS fit,

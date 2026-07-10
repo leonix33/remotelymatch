@@ -73,8 +73,10 @@ function inferResumePageTarget(resumeText, requestedPages) {
     .split(/\s+/)
     .filter(Boolean).length;
   const fromLength = Math.max(1, Math.ceil(words / 350));
-  const requested = requestedPages || DEFAULT_SUPPLEMENT_PAGES;
-  return clampPageCount(Math.max(requested, fromLength));
+  if (requestedPages != null && Number.isFinite(Number(requestedPages))) {
+    return clampPageCount(Number(requestedPages));
+  }
+  return clampPageCount(Math.min(fromLength, DEFAULT_SUPPLEMENT_PAGES));
 }
 
 function extractMustPreserveFromResume(resumeText = '') {
@@ -363,7 +365,7 @@ RULES:
 1. ONLY edit summary/profile and experience bullets — never change employers, titles, dates, education, or certifications.
 2. Address missing ATS terms naturally (max once each): ${(redTerms || []).join(', ') || 'none'}
 3. Mirror uncovered posting requirements with real experience from the original resume — never invent.
-4. Experience bullets: 7-8 for the most recent role, 5-6 for prior roles. Each bullet 320-480 chars with technologies, scope, and measurable outcomes. Weave posting requirements and missing keywords naturally — complete sentences, never end with ellipsis.
+4. Experience bullets: 4-5 for the most recent role, 3-4 for prior roles. Each bullet 220-360 chars with technologies, scope, and measurable outcomes.
 5. Expand thin roles by splitting combined accomplishments from the original resume into separate JD-aligned bullets.
 6. Summary: 3 lines naming the target role and top qualifications from the posting.
 7. Cover letter: 4 sentences — ${job?.title || 'role'} at ${job?.company || 'company'}, fit, proof point, close.
@@ -391,7 +393,8 @@ MISSING ATS TERMS: ${(redTerms || []).join(', ') || 'none'}${tailorFocus ? `\nCa
       { role: 'user', content: user },
     ],
     temperature: 0.38,
-    max_tokens: Math.min(6000, 1000 + pageTarget * 800),
+    max_tokens: Math.min(3200, 700 + pageTarget * 450),
+    response_format: { type: 'json_object' },
   });
 
   const raw = response.choices[0]?.message?.content?.trim() || '';
@@ -594,7 +597,7 @@ async function polishExistingKit({
   if (!client) return kit;
 
   const pageTarget = inferResumePageTarget(profile?.resumeText, kit.supplementPagesTarget || kit.pageCount);
-  const options = { supplementPages: pageTarget, tailorMode, highMatchTarget, maxPasses };
+  const options = { supplementPages: pageTarget, tailorMode, highMatchTarget, maxPasses: maxPasses || env.tailorPolishMaxPasses };
   const missingKeywords = kit.missingKeywords || inferMissingKeywords(profile, jobDescription);
   const fullJd = String(jobDescription || '').slice(0, 14000);
   const working = applyAtsMetadata(enrichKitForDisplay(kit), fullJd, job);
@@ -632,7 +635,7 @@ async function generateAdditiveKit({
   const structureGuide = describeStructureForPrompt(structure);
   const sectionPayload = structureToSectionPayload(structure);
   const client = userId ? await getClient(userId) : null;
-  const fullJd = jobDescription.slice(0, 14000);
+  const fullJd = jobDescription.slice(0, 9000);
   const { buildJdMatchBrief } = require('./atsKeywordService');
   const jdBrief = buildJdMatchBrief(fullJd, job);
 
@@ -654,7 +657,7 @@ JOB-TARGET RULES:
 1. Summary must name "${job?.title || 'this role'}" fit and reflect top posting requirements.
 2. Experience bullets must prove qualifications from the posting using the candidate's real work only.
 3. Each critical keyword/requirement appears at most once — varied wording, no stuffing.
-4. Experience: 7-8 substantive bullets for the most recent role, 5-6 for prior roles (~320-480 chars each). Each bullet must include relevant tech stack, scope, and outcomes while addressing posting requirements. Complete sentences — never truncate or use ellipsis.
+4. Experience: 4-5 substantive bullets for the most recent role, 3-4 for prior roles (~220-360 chars each). Complete sentences — never truncate or use ellipsis.
 5. If a role has fewer bullets in the original, expand by splitting combined lines into separate JD-aligned accomplishments from the candidate's real work.
 
 STRUCTURE RULES:
@@ -688,7 +691,7 @@ ORIGINAL RESUME SECTIONS (use these headings exactly):
 ${JSON.stringify(sectionPayload, null, 2)}
 
 FULL ORIGINAL RESUME:
-${(profile?.resumeText || profile?.bio || 'No resume').slice(0, 12000)}
+${(profile?.resumeText || profile?.bio || 'No resume').slice(0, 8000)}
 
 MUST PRESERVE VERBATIM (never drop these lines):
 ${preservedCredentials.length ? preservedCredentials.join('\n') : 'All certification, education, and credential lines from the resume above'}
@@ -705,7 +708,7 @@ CRITICAL KEYWORDS: ${jdBrief.criticalTerms.slice(0, 18).join(', ')}
 JOB DESCRIPTION:
 ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice(0, 1500)}` : ''}`;
 
-  const maxTokens = Math.min(8000, 1200 + pageTarget * 900);
+  const maxTokens = Math.min(4500, 800 + pageTarget * 450);
 
   const response = await client.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -715,6 +718,7 @@ ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice
     ],
     temperature: effectiveMode === 'high_match' ? 0.42 : 0.5,
     max_tokens: maxTokens,
+    response_format: { type: 'json_object' },
   });
 
   const raw = response.choices[0]?.message?.content?.trim() || '';
@@ -731,14 +735,20 @@ ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice
       kit.resumeAddendum = kit.tailoredResumeText;
     }
     const normalized = normalizeKit(kit, profile, job, fullJd, missingKeywords, contact, options);
+    const scored = applyAtsMetadata(normalized, fullJd, job);
+    const maxRefinePasses =
+      options.maxRefinePasses != null
+        ? Math.max(0, Number(options.maxRefinePasses) || 0)
+        : env.tailorGenerateMaxPasses;
+    if (maxRefinePasses <= 0) return scored;
     return perfectKitForJob({
       client,
-      kit: normalized,
+      kit: scored,
       profile,
       job,
       jobDescription: fullJd,
       contact,
-      options,
+      options: { ...options, maxPasses: maxRefinePasses },
       missingKeywords,
       tailorFocus,
     });

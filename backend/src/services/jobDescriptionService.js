@@ -1,6 +1,25 @@
 const jobSourcesConfig = require('../config/jobSources');
 const { USER_AGENT } = require('../constants/brand');
 
+const JD_CACHE_MS = 15 * 60 * 1000;
+const jdCache = new Map();
+
+function cacheKeyForJob(job) {
+  return String(job?.url || job?.jobId || '').trim();
+}
+
+function readCachedJd(key) {
+  if (!key) return null;
+  const hit = jdCache.get(key);
+  if (!hit || Date.now() - hit.at > JD_CACHE_MS) return null;
+  return hit.text;
+}
+
+function writeCachedJd(key, text) {
+  if (!key || !text) return;
+  jdCache.set(key, { at: Date.now(), text });
+}
+
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), jobSourcesConfig.fetchTimeoutMs);
@@ -93,12 +112,22 @@ async function fetchAshbyDescription(url) {
 }
 
 async function resolveJobDescription(job) {
+  const cacheKey = cacheKeyForJob(job);
+  const cached = readCachedJd(cacheKey);
+  if (cached) return cached;
+
   const url = job?.url || '';
   const existing = (job?.description || '').trim();
-  if (existing.length >= 80) return existing.slice(0, 12000);
+  if (existing.length >= 80) {
+    const text = existing.slice(0, 12000);
+    writeCachedJd(cacheKey, text);
+    return text;
+  }
 
   if (!url) {
-    return `${job?.title || ''} at ${job?.company || ''}`.trim();
+    const text = `${job?.title || ''} at ${job?.company || ''}`.trim();
+    writeCachedJd(cacheKey, text);
+    return text;
   }
 
   const lower = url.toLowerCase();
@@ -107,7 +136,11 @@ async function resolveJobDescription(job) {
   else if (lower.includes('lever.co')) description = await fetchLeverDescription(url);
   else if (lower.includes('ashbyhq.com')) description = await fetchAshbyDescription(url);
 
-  if (description.length >= 80) return description.slice(0, 12000);
+  if (description.length >= 80) {
+    const text = description.slice(0, 12000);
+    writeCachedJd(cacheKey, text);
+    return text;
+  }
 
   const fallback = [
     job?.title,
@@ -118,7 +151,9 @@ async function resolveJobDescription(job) {
   ]
     .filter(Boolean)
     .join('\n');
-  return fallback.slice(0, 4000);
+  const text = fallback.slice(0, 4000);
+  writeCachedJd(cacheKey, text);
+  return text;
 }
 
 module.exports = { resolveJobDescription };
