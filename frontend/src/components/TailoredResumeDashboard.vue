@@ -4,6 +4,8 @@ import { RouterLink } from 'vue-router';
 import http from '../api/http';
 import TailoredResumePreview from './TailoredResumePreview.vue';
 
+const KIT_GENERATE_TIMEOUT_MS = 10 * 60 * 1000;
+
 const props = defineProps({
   refreshKey: { type: Number, default: 0 },
   preferredJobId: { type: String, default: '' },
@@ -15,6 +17,7 @@ const selectedJobId = ref('');
 const kitDetail = ref(null);
 const listLoading = ref(true);
 const detailLoading = ref(false);
+const regenerating = ref(false);
 const error = ref('');
 
 function kitListItem(kit) {
@@ -51,13 +54,46 @@ function applyPreferredSelection() {
   }
 }
 
-function setDetailFromSeed(jobId) {
-  const seeded = props.seedKits.find((k) => k.jobId === jobId && k.tailored);
-  if (seeded) {
-    kitDetail.value = seeded;
-    return true;
+async function regenerateKit(jobId) {
+  const { data } = await http.post(
+    `/applications/kit/${encodeURIComponent(jobId)}/generate`,
+    { tailorResume: true, force: true },
+    { timeout: KIT_GENERATE_TIMEOUT_MS }
+  );
+  return data;
+}
+
+async function loadKitDetail(jobId, { forceRegenerate = false } = {}) {
+  if (!jobId) {
+    kitDetail.value = null;
+    return;
   }
-  return false;
+
+  detailLoading.value = true;
+  error.value = '';
+  try {
+    const { data } = await http.get(`/applications/kit/${encodeURIComponent(jobId)}`);
+    if (forceRegenerate || data.needsRegeneration) {
+      regenerating.value = true;
+      kitDetail.value = { ...data, tailored: true };
+      kitDetail.value = await regenerateKit(jobId);
+    } else {
+      kitDetail.value = data;
+    }
+  } catch (e) {
+    kitDetail.value = null;
+    error.value = e.response?.data?.message || 'Could not load tailored resume';
+  } finally {
+    detailLoading.value = false;
+    regenerating.value = false;
+  }
+}
+
+async function refreshAll() {
+  await loadKits();
+  if (selectedJobId.value) {
+    await loadKitDetail(selectedJobId.value, { forceRegenerate: true });
+  }
 }
 
 async function loadKits() {
@@ -77,24 +113,6 @@ async function loadKits() {
   }
 }
 
-async function loadKitDetail(jobId) {
-  if (!jobId) {
-    kitDetail.value = null;
-    return;
-  }
-  if (setDetailFromSeed(jobId)) return;
-
-  detailLoading.value = true;
-  try {
-    const { data } = await http.get(`/applications/kit/${encodeURIComponent(jobId)}`);
-    kitDetail.value = data;
-  } catch {
-    kitDetail.value = props.seedKits.find((k) => k.jobId === jobId) || null;
-  } finally {
-    detailLoading.value = false;
-  }
-}
-
 const hasPreview = computed(() => Boolean(kitDetail.value?.tailored));
 
 watch(selectedJobId, (id) => {
@@ -104,9 +122,7 @@ watch(selectedJobId, (id) => {
 watch(
   () => props.refreshKey,
   () => {
-    loadKits().then(() => {
-      if (selectedJobId.value) loadKitDetail(selectedJobId.value);
-    });
+    refreshAll();
   }
 );
 
@@ -136,7 +152,7 @@ onMounted(async () => {
   if (selectedJobId.value) await loadKitDetail(selectedJobId.value);
 });
 
-defineExpose({ refresh: loadKits });
+defineExpose({ refresh: refreshAll });
 </script>
 
 <template>
@@ -146,10 +162,14 @@ defineExpose({ refresh: loadKits });
         <h3 class="font-semibold text-slate-100">Tailored resume preview</h3>
         <p class="mt-1 text-sm text-slate-500">Review the resume version for each job before you submit.</p>
       </div>
-      <button type="button" class="btn-secondary text-sm" :disabled="listLoading" @click="loadKits">
-        {{ listLoading ? 'Loading…' : 'Refresh' }}
+      <button type="button" class="btn-secondary text-sm" :disabled="listLoading || regenerating" @click="refreshAll">
+        {{ regenerating ? 'Regenerating…' : listLoading ? 'Loading…' : 'Refresh' }}
       </button>
     </div>
+
+    <p v-if="regenerating" class="mt-4 rounded-lg bg-violet-500/10 px-3 py-2 text-sm text-violet-200">
+      Rebuilding this resume with the latest pipeline — all jobs, education, and certs stay intact; only bullet wording changes. This can take up to a minute.
+    </p>
 
     <p v-if="error" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
 
@@ -174,7 +194,7 @@ defineExpose({ refresh: loadKits });
       </div>
 
       <div class="mt-5 rounded-xl border border-violet-900/30 bg-violet-950/10 p-4">
-        <TailoredResumePreview :kit="kitDetail" :loading="detailLoading && !hasPreview" />
+        <TailoredResumePreview :kit="kitDetail" :loading="(detailLoading || regenerating) && !hasPreview" />
       </div>
 
       <p class="mt-4 text-xs text-slate-500">

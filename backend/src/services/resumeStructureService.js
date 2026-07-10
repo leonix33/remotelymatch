@@ -195,7 +195,9 @@ function describeStructureForPrompt(structure) {
         `- [EXPERIENCE] "${label}" — keep EVERY employer and the EXACT bullet count per job from the original; copy titles, dates, and companies verbatim; rewrite bullet wording only to match the target job`
       );
     } else if (section.key === 'summary') {
-      lines.push(`- [SUMMARY] "${label}" — tailor sentences to the job; keep length similar`);
+      lines.push(
+        `- [SUMMARY] "${label}" — keep the candidate's real role and employers; weave a few JD keywords only; never invent a different job title or career path`
+      );
     } else {
       lines.push(`- [${section.key.toUpperCase()}] "${label}" — light edits only; keep facts and layout`);
     }

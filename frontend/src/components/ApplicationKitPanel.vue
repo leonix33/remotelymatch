@@ -4,6 +4,8 @@ import http from '../api/http';
 import TailoredResumePreview from './TailoredResumePreview.vue';
 import AtsKeywordScore from './AtsKeywordScore.vue';
 
+const KIT_GENERATE_TIMEOUT_MS = 10 * 60 * 1000;
+
 const props = defineProps({
   job: { type: Object, required: true },
   open: { type: Boolean, default: false },
@@ -28,11 +30,25 @@ async function loadKit() {
   error.value = '';
   try {
     const { data } = await http.get(`/applications/kit/${encodeURIComponent(props.job.jobId)}`);
-    kit.value = data;
-    useForApply.value = data.useForApply !== false;
-    tailorFocus.value = data.tailorFocus || '';
-    supplementPages.value = data.supplementPagesTarget || data.pageCount || 4;
-    tailorMode.value = data.tailorMode === 'high_match' ? 'high_match' : 'balanced';
+    if (data.needsRegeneration) {
+      generating.value = true;
+      const { data: regen } = await http.post(
+        `/applications/kit/${encodeURIComponent(props.job.jobId)}/generate`,
+        {
+          tailorResume: true,
+          force: true,
+          tailorFocus: tailorFocus.value.trim(),
+        },
+        { timeout: KIT_GENERATE_TIMEOUT_MS }
+      );
+      kit.value = regen;
+    } else {
+      kit.value = data;
+    }
+    useForApply.value = kit.value.useForApply !== false;
+    tailorFocus.value = kit.value.tailorFocus || '';
+    supplementPages.value = kit.value.supplementPagesTarget || kit.value.pageCount || 4;
+    tailorMode.value = kit.value.tailorMode === 'high_match' ? 'high_match' : 'balanced';
   } catch {
     kit.value = null;
     useForApply.value = true;
@@ -41,6 +57,7 @@ async function loadKit() {
     tailorMode.value = 'high_match';
   } finally {
     loading.value = false;
+    generating.value = false;
   }
 }
 

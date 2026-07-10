@@ -85,5 +85,7 @@ Cloud Platform Engineer Feb 2022 Present Bon Secours Mercy Health
     assert.ok(fixed.includes('Wimora Technology'));
     assert.ok(fixed.includes('PRIMUS Global Services'));
     assert.ok(fixed.includes('Azure: AKS, Data Factory'));
+    assert.ok(fixed.includes('Platform engineer with Azure experience'));
+    assert.ok(!fixed.includes('Partner manager summary'));
   });
 });

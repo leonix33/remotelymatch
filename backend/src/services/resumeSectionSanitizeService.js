@@ -80,7 +80,7 @@ function relocateMisplacedExperienceBullets(originalResume, tailoredText) {
   const misplaced = [];
   let text = tailoredText;
 
-  for (const key of ['education', 'certifications', 'credentials', 'summary']) {
+  for (const key of ['education', 'certifications', 'credentials']) {
     const slice = extractSectionBody(text, structure, key);
     if (slice.start < 0 || !slice.body) continue;
 
@@ -131,6 +131,7 @@ function restoreSectionFromOriginal(originalResume, tailoredText, sectionKey) {
 function sanitizeTailoredResume(originalResume, tailoredText, kit = {}) {
   let text = decodeHtmlEntities(tailoredText);
   text = restoreImmutableSections(originalResume, text);
+  text = restoreSectionFromOriginal(originalResume, text, 'summary');
   text = restoreSectionFromOriginal(originalResume, text, 'skills');
   text = relocateMisplacedExperienceBullets(originalResume, text);
 

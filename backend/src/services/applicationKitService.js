@@ -61,24 +61,27 @@ async function persistEnrichedKit(userId, jobId, kit) {
 
 async function getKit(userId, jobId) {
   let kit = await applicationKitStore.get(userId, jobId);
-  if (kit?.tailored && kit.pipelineVersion !== KIT_PIPELINE_VERSION) {
-    try {
-      kit = await generateForJob(userId, jobId, { tailorResume: true, force: true, recordActivity: false });
-    } catch (err) {
-      console.warn(`Kit auto-refresh failed for ${jobId}:`, err.message);
-    }
-  }
   if (!kit?.tailored) return kit;
+
+  const needsRegeneration = kit.pipelineVersion !== KIT_PIPELINE_VERSION;
   kit = await persistEnrichedKit(userId, jobId, kit);
 
   try {
     const job = await findJob(userId, jobId);
     if (job) {
       const jobDescription = await jobDescriptionService.resolveJobDescription(job);
-      return resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
+      kit = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
     }
   } catch {
     // keep stored kit scores if JD unavailable
+  }
+
+  if (needsRegeneration) {
+    return {
+      ...kit,
+      needsRegeneration: true,
+      targetPipelineVersion: KIT_PIPELINE_VERSION,
+    };
   }
   return kit;
 }
@@ -594,6 +597,9 @@ function kitListItem(kit) {
     formatted: display.formatted || '',
     contactName: display.contactName || '',
     resumeStructure: display.resumeStructure || null,
+    pipelineVersion: display.pipelineVersion || null,
+    atsScore: display.atsScore ?? null,
+    jdMatchPct: display.jdMatchPct ?? null,
   };
 }
 
