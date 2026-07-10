@@ -6,7 +6,7 @@ import { useProfileStore } from '../stores/profile';
 import { useAuthStore } from '../stores/auth';
 
 const resumeMode = defineModel('resumeMode', { type: String, default: 'tailored' });
-const supplementPages = defineModel('supplementPages', { type: Number, default: 3 });
+const supplementPages = defineModel('supplementPages', { type: Number, default: 4 });
 const tailorMode = defineModel('tailorMode', { type: String, default: 'high_match' });
 const digestEmail = defineModel('digestEmail', { type: String, default: '' });
 const contactPhone = defineModel('contactPhone', { type: String, default: '' });
@@ -215,7 +215,7 @@ onMounted(loadApplyPreview);
           Every tailored resume uses the same high-match pipeline — job-aligned wording, all employers kept, certifications preserved.
         </p>
         <p class="mt-2">
-          <strong class="text-slate-300">Output:</strong> {{ supplementPages }} page{{ supplementPages === 1 ? '' : 's' }} · ATS high match · 100% quality target
+          <strong class="text-slate-300">Output:</strong> 4 pages · ATS high match · 100% quality target
         </p>
       </div>
 

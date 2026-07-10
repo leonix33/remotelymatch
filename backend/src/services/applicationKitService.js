@@ -514,7 +514,7 @@ function kitListItem(kit) {
     company: display.company,
     jobUrl: display.jobUrl,
     pageCount: display.pageCount || display.supplementPages?.length || 0,
-    supplementPagesTarget: display.supplementPagesTarget || display.pageCount || 3,
+    supplementPagesTarget: display.supplementPagesTarget || display.pageCount || 4,
     tailorMode: display.tailorMode || 'high_match',
     highMatchTarget: display.highMatchTarget || 100,
     estimatedMatchPct: display.estimatedMatchPct || null,

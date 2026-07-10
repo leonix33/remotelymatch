@@ -84,6 +84,8 @@ services:
         value: palantir,spotify,binance
       - key: TAILOR_GENERATE_MAX_PASSES
         value: "1"
+      - key: TAILOR_DEFAULT_PAGES
+        value: "4"
       - key: RESEND_API_KEY
         sync: false
       # Reliable delivery: Gmail App Password (recommended primary — works for Yahoo/iCloud/Gmail)

@@ -61,7 +61,7 @@ export function summaryFromKitPayload(data) {
     hasKit: true,
     useForApply: data.useForApply !== false,
     pageCount: data.pageCount || data.supplementPages?.length || 0,
-    supplementPagesTarget: data.supplementPagesTarget || data.pageCount || 3,
+    supplementPagesTarget: data.supplementPagesTarget || data.pageCount || 4,
     tailorMode: data.tailorMode || 'high_match',
     estimatedMatchPct: data.estimatedMatchPct || null,
     generatedAt: data.generatedAt,

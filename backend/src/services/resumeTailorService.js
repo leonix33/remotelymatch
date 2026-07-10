@@ -1,6 +1,6 @@
 const openaiService = require('./openaiService');
 const env = require('../config/env');
-const { resolveTailorOptions, TAILOR_MODE } = require('../config/tailorDefaults');
+const { resolveTailorOptions, TAILOR_MODE, DEFAULT_SUPPLEMENT_PAGES } = require('../config/tailorDefaults');
 const { contactHeader, contactSignature } = require('./applicantContactService');
 const { HUMAN_WRITING_PROMPT, humanizeKit } = require('./humanizeWritingService');
 const { prepareResumeTextForParsing } = require('./resumeRepairService');
@@ -27,7 +27,6 @@ const TECH_KEYWORDS = [
 
 const MIN_SUPPLEMENT_PAGES = 1;
 const MAX_SUPPLEMENT_PAGES = 6;
-const DEFAULT_SUPPLEMENT_PAGES = 3;
 
 function clampPageCount(n) {
   const v = Number(n);

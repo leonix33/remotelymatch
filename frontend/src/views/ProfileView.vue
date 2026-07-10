@@ -82,7 +82,7 @@ const form = ref({
   applySummaryEmailsEnabled: true,
   followUpRemindersEnabled: true,
   contactPhone: '',
-  defaultSupplementPages: 3,
+  defaultSupplementPages: 4,
   defaultTailorMode: 'high_match',
 });
 
@@ -109,7 +109,7 @@ function loadForm(p) {
     applySummaryEmailsEnabled: p.applySummaryEmailsEnabled !== false,
     followUpRemindersEnabled: p.followUpRemindersEnabled !== false,
     contactPhone: p.contactPhone || '',
-    defaultSupplementPages: p.defaultSupplementPages || 3,
+    defaultSupplementPages: p.defaultSupplementPages || 4,
     defaultTailorMode: 'high_match',
   };
 }

@@ -2,7 +2,7 @@ const env = require('./env');
 
 const TAILOR_MODE = 'high_match';
 const HIGH_MATCH_TARGET = 100;
-const DEFAULT_SUPPLEMENT_PAGES = Math.min(6, Math.max(1, Number(process.env.TAILOR_DEFAULT_PAGES) || 3));
+const DEFAULT_SUPPLEMENT_PAGES = Math.min(6, Math.max(1, Number(process.env.TAILOR_DEFAULT_PAGES) || 4));
 
 function clampPageCount(n) {
   const v = Number(n);
@@ -31,7 +31,7 @@ function describeTailorQuality() {
     supplementPages: DEFAULT_SUPPLEMENT_PAGES,
     label: 'Standard high-match tailoring',
     description:
-      'Every tailored resume uses the same ATS-optimized pipeline: all employers preserved, credentials intact, job-aligned bullets.',
+      'Every tailored resume uses the same ATS-optimized pipeline: all employers preserved, credentials intact, job-aligned bullets (~4 pages).',
   };
 }
 

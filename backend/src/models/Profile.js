@@ -29,7 +29,7 @@ const profileSchema = new mongoose.Schema(
     applySummaryEmailsEnabled: { type: Boolean, default: true },
     followUpRemindersEnabled: { type: Boolean, default: true },
     contactPhone: { type: String, default: '' },
-    defaultSupplementPages: { type: Number, default: 3, min: 1, max: 6 },
+    defaultSupplementPages: { type: Number, default: 4, min: 1, max: 6 },
     defaultTailorMode: { type: String, enum: ['balanced', 'high_match'], default: 'high_match' },
     defaultQuickApplyCount: { type: Number, default: 3, min: 1, max: 15 },
     minCallbackScore: { type: Number, default: 25, min: 0, max: 95 },

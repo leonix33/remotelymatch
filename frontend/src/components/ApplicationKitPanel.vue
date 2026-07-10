@@ -19,9 +19,8 @@ const kit = ref(null);
 const tailor = ref(true);
 const useForApply = ref(true);
 const tailorFocus = ref('');
-const supplementPages = ref(3);
+const supplementPages = ref(4);
 const tailorMode = ref('high_match');
-const supplementPages = ref(3);
 const viewTab = ref('preview');
 
 async function loadKit() {
@@ -32,13 +31,13 @@ async function loadKit() {
     kit.value = data;
     useForApply.value = data.useForApply !== false;
     tailorFocus.value = data.tailorFocus || '';
-    supplementPages.value = data.supplementPagesTarget || data.pageCount || 3;
+    supplementPages.value = data.supplementPagesTarget || data.pageCount || 4;
     tailorMode.value = data.tailorMode === 'high_match' ? 'high_match' : 'balanced';
   } catch {
     kit.value = null;
     useForApply.value = true;
     tailorFocus.value = '';
-    supplementPages.value = 3;
+    supplementPages.value = 4;
     tailorMode.value = 'high_match';
   } finally {
     loading.value = false;
@@ -177,7 +176,7 @@ watch(
 
       <p class="mt-3 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-400">
         <strong class="text-slate-300">Faster tailoring:</strong> use <strong class="text-slate-200">Balanced</strong> and
-        <strong class="text-slate-200">2–3 pages</strong> for quick kits (~30s). Use <strong class="text-slate-200">Polish until ready</strong> in Queue when you want 95%+ ATS.
+        <strong class="text-slate-200">4 pages</strong> standard for every tailored kit. Use <strong class="text-slate-200">Polish until ready</strong> in Queue when you want 95%+ ATS.
       </p>
 
       <p class="mt-3 rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-teal-100/90">
@@ -244,7 +243,7 @@ watch(
 
         <div class="rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-slate-400">
           <strong class="text-teal-200">Standard tailoring for every user.</strong>
-          Each job gets the same high-match pipeline: all employers preserved, credentials intact, ATS-aligned bullets (~3 pages).
+          Each job gets the same high-match pipeline: all employers preserved, credentials intact, ATS-aligned bullets (4 pages).
         </div>
 
         <div>

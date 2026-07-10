@@ -359,7 +359,7 @@ async function getApplyPreview(req, res, next) {
       contact,
       tailoring: {
         defaultApplyResumeMode: profile.defaultApplyResumeMode || 'base',
-        defaultSupplementPages: profile.defaultSupplementPages || 3,
+        defaultSupplementPages: profile.defaultSupplementPages || 4,
         defaultTailorMode: profile.defaultTailorMode || 'high_match',
         highMatchTarget: profile.highMatchTarget || 100,
         autoApplyEnabled: profile.autoApplyEnabled === true,

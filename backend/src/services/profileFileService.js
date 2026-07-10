@@ -28,7 +28,7 @@ const DEFAULT = {
   applySummaryEmailsEnabled: true,
   followUpRemindersEnabled: true,
   contactPhone: '',
-  defaultSupplementPages: 3,
+  defaultSupplementPages: 4,
   defaultTailorMode: 'high_match',
   defaultQuickApplyCount: 5,
   highMatchTarget: 100,
