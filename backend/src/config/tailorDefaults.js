@@ -2,6 +2,7 @@ const env = require('./env');
 
 const TAILOR_MODE = 'high_match';
 const HIGH_MATCH_TARGET = 100;
+const ATS_TARGET_MIN = Math.min(100, Math.max(85, Number(process.env.TAILOR_ATS_TARGET_MIN) || 90));
 const DEFAULT_SUPPLEMENT_PAGES = Math.min(6, Math.max(1, Number(process.env.TAILOR_DEFAULT_PAGES) || 4));
 
 function clampPageCount(n) {
@@ -18,6 +19,7 @@ function resolveTailorOptions() {
   return {
     tailorMode: TAILOR_MODE,
     highMatchTarget: HIGH_MATCH_TARGET,
+    atsTargetMin: ATS_TARGET_MIN,
     supplementPages: clampPageCount(DEFAULT_SUPPLEMENT_PAGES),
     generateMaxPasses: env.tailorGenerateMaxPasses,
     polishMaxPasses: env.tailorPolishMaxPasses,
@@ -38,6 +40,7 @@ function describeTailorQuality() {
 module.exports = {
   TAILOR_MODE,
   HIGH_MATCH_TARGET,
+  ATS_TARGET_MIN,
   DEFAULT_SUPPLEMENT_PAGES,
   clampPageCount,
   resolveTailorOptions,

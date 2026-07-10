@@ -1,5 +1,5 @@
 export const READY_ATS_TARGET = 100;
-export const READY_ATS_MIN = 95;
+export const READY_ATS_MIN = 90;
 export const READY_JD_MIN = 80;
 
 export function isKitReadyToApply(kit) {

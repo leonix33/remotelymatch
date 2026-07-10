@@ -465,7 +465,7 @@ async function perfectKitForJob({
     const renormalized = normalizeKit(refined, profile, job, jobDescription, missingKeywords, contact, options);
     const next = applyAtsMetadata(renormalized, jobDescription, job);
 
-    if ((next.atsScore ?? 0) <= prevScore && (next.jdMatchPct ?? 0) <= prevJd && (next.atsScore ?? 0) >= 95) {
+    if ((next.atsScore ?? 0) <= prevScore && (next.jdMatchPct ?? 0) <= prevJd && (next.atsScore ?? 0) >= 90) {
       break;
     }
 

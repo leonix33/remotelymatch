@@ -176,7 +176,7 @@ watch(
 
       <p class="mt-3 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-400">
         <strong class="text-slate-300">Standard tailoring:</strong> every kit uses the same
-        <strong class="text-slate-200">4-page high-match</strong> pipeline. Use <strong class="text-slate-200">Polish until ready</strong> in Queue to push ATS toward 95%+.
+        <strong class="text-slate-200">4-page high-match</strong> pipeline with <strong class="text-slate-200">90%+ ATS</strong> target. Use <strong class="text-slate-200">Polish until ready</strong> in Queue to push toward 95%+.
       </p>
 
       <p class="mt-3 rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-teal-100/90">

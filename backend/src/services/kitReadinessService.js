@@ -1,5 +1,5 @@
 const READY_ATS_TARGET = 100;
-const READY_ATS_MIN = 95;
+const READY_ATS_MIN = 90;
 const READY_JD_MIN = 80;
 
 function isKitReadyToApply(kit) {

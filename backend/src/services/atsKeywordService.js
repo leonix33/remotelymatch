@@ -1,4 +1,5 @@
 const { TECH_KEYWORDS } = require('./resumeTailorService');
+const { READY_ATS_MIN } = require('./kitReadinessService');
 
 const STOP_WORDS = new Set([
   'with', 'that', 'this', 'from', 'have', 'will', 'your', 'their', 'about', 'years', 'experience',
@@ -239,7 +240,7 @@ function buildRecruiterTips(ats, jdCoverage) {
 
 function isRecruiterReady(ats, jdCoverage) {
   const jdOk = !jdCoverage?.jdRequirementsTotal || jdCoverage.jdMatchPct >= 75;
-  return Boolean(ats?.readyToSubmit && jdOk && (ats?.score ?? 0) >= 95);
+  return Boolean(ats?.readyToSubmit && jdOk && (ats?.score ?? 0) >= READY_ATS_MIN);
 }
 
 function termInResume(term, resumeBlob, resumeTokens) {
@@ -279,7 +280,7 @@ function scoreAtsKeywords({ resumeText = '', tailoredText = '', jobDescription =
     red,
     termCount,
     breakdown,
-    readyToSubmit: score >= 95 && red <= Math.max(1, Math.floor(termCount * 0.08)),
+    readyToSubmit: score >= READY_ATS_MIN && red <= Math.max(2, Math.floor(termCount * 0.15)),
   };
 }
 

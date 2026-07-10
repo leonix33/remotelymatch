@@ -86,6 +86,6 @@ module.exports = {
   jobMaxApplicants: Number(process.env.JOB_MAX_APPLICANTS) || 75,
   jobMaxSameCompanyRoles: Number(process.env.JOB_MAX_SAME_COMPANY_ROLES) || 5,
   jobDropLowYieldSources: process.env.JOB_DROP_LOW_YIELD_SOURCES === '1',
-  tailorGenerateMaxPasses: Math.min(3, Math.max(0, Number(process.env.TAILOR_GENERATE_MAX_PASSES) || 1)),
+  tailorGenerateMaxPasses: Math.min(3, Math.max(1, Number(process.env.TAILOR_GENERATE_MAX_PASSES) || 2)),
   tailorPolishMaxPasses: Math.min(8, Math.max(1, Number(process.env.TAILOR_POLISH_MAX_PASSES) || 6)),
 };

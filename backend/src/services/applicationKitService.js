@@ -10,7 +10,7 @@ const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
 const openaiService = require('./openaiService');
 const env = require('../config/env');
-const { resolveTailorOptions } = require('../config/tailorDefaults');
+const { resolveTailorOptions, ATS_TARGET_MIN } = require('../config/tailorDefaults');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
@@ -76,6 +76,39 @@ async function getKit(userId, jobId) {
   return kit;
 }
 
+async function ensureMinimumAtsScore(userId, kit, profile, job, jobDescription, contact, tailorFocus = '') {
+  if (!kit?.tailored) return kit;
+
+  let working = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
+  if ((working.atsScore ?? 0) >= ATS_TARGET_MIN) return working;
+
+  const { getRedTerms } = require('./atsKeywordService');
+  const maxRounds = 3;
+
+  for (let round = 0; round < maxRounds && (working.atsScore ?? 0) < ATS_TARGET_MIN; round += 1) {
+    const focusParts = [
+      ...(working.uncoveredRequirements || []),
+      ...getRedTerms(working, 12),
+    ].filter(Boolean);
+    const focus = focusParts.length ? focusParts.slice(0, 12).join(', ') : tailorFocus;
+
+    working = await resumeTailorService.polishExistingKit({
+      userId,
+      profile,
+      job,
+      jobDescription,
+      contact,
+      kit: working,
+      tailorFocus: focus,
+      highMatchTarget: ATS_TARGET_MIN,
+      maxPasses: 4,
+    });
+    working = resumeTailorService.applyAtsMetadata(working, jobDescription, job);
+  }
+
+  return working;
+}
+
 async function generateForJob(userId, jobId, options = {}) {
   const { tailorResume = true, force = false, authEmail, tailorFocus } = options;
 
@@ -129,7 +162,7 @@ async function generateForJob(userId, jobId, options = {}) {
     throw err;
   }
 
-  const kit = await resumeTailorService.generateAdditiveKit({
+  let kit = await resumeTailorService.generateAdditiveKit({
     userId,
     profile,
     job,
@@ -140,6 +173,16 @@ async function generateForJob(userId, jobId, options = {}) {
     tailorMode,
     highMatchTarget,
   });
+
+  kit = await ensureMinimumAtsScore(
+    userId,
+    kit,
+    profile,
+    job,
+    jobDescription,
+    contact,
+    tailorFocus || existing?.tailorFocus || ''
+  );
 
   const saved = await applicationKitStore.set(userId, jobId, {
     ...kit,
