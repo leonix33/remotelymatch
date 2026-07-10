@@ -216,9 +216,14 @@ function reassembleResume(structure, sectionOutputs) {
 
   for (const section of structure.sections) {
     const heading = section.heading.trim();
-    let content = byHeading.get(heading);
-    if (content === undefined) {
-      content = section.immutable ? section.content : byHeading.get(section.key) || section.content;
+    let content;
+    if (section.immutable) {
+      content = section.content;
+    } else {
+      content = byHeading.get(heading);
+      if (content === undefined) {
+        content = byHeading.get(section.key) || section.content;
+      }
     }
     if (!content && !heading) continue;
     if (heading) {

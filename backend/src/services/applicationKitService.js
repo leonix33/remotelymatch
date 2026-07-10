@@ -10,7 +10,7 @@ const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
 const openaiService = require('./openaiService');
 const env = require('../config/env');
-const { resolveTailorOptions, ATS_TARGET_MIN } = require('../config/tailorDefaults');
+const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION } = require('../config/tailorDefaults');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
@@ -61,6 +61,13 @@ async function persistEnrichedKit(userId, jobId, kit) {
 
 async function getKit(userId, jobId) {
   let kit = await applicationKitStore.get(userId, jobId);
+  if (kit?.tailored && kit.pipelineVersion !== KIT_PIPELINE_VERSION) {
+    try {
+      kit = await generateForJob(userId, jobId, { tailorResume: true, force: true, recordActivity: false });
+    } catch (err) {
+      console.warn(`Kit auto-refresh failed for ${jobId}:`, err.message);
+    }
+  }
   if (!kit?.tailored) return kit;
   kit = await persistEnrichedKit(userId, jobId, kit);
 
@@ -194,6 +201,7 @@ async function generateForJob(userId, jobId, options = {}) {
 
   const saved = await applicationKitStore.set(userId, jobId, {
     ...kit,
+    pipelineVersion: KIT_PIPELINE_VERSION,
     jobId,
     jobTitle: job.title,
     company: job.company,
@@ -455,10 +463,11 @@ async function prepareApplyItems(userId, jobs, options = {}) {
     const jobId = job.jobId || job.id;
     let kit = await applicationKitStore.get(userId, jobId);
     let generationFailed = false;
-    if (!kit?.tailored) {
+    if (!kit?.tailored || kit.pipelineVersion !== KIT_PIPELINE_VERSION) {
       try {
         kit = await generateForJob(userId, jobId, {
           tailorResume: true,
+          force: true,
           authEmail,
           job,
         });

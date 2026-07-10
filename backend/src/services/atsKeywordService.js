@@ -81,15 +81,25 @@ function addLineTerms(terms, line, weight = 1) {
   if (phraseMatch) phraseMatch.forEach((p) => terms.add(normalize(p)));
 }
 
+function isValidRequirementLine(line) {
+  const t = String(line || '').trim();
+  if (!t || t.length < 12 || t.length > 200) return false;
+  if (/&[a-z]+;|&quot;|&lt;|class\s*=|href\s*=|https?:\/\//i.test(t)) return false;
+  if (/\b(quot|href|class|link|nbsp|span|div)\b/i.test(t) && t.length < 80) return false;
+  if (/^[^a-zA-Z]*$/.test(t)) return false;
+  return true;
+}
+
 function extractPrioritySectionLines(jobDescription = '') {
   const lines = [];
-  const text = String(jobDescription || '');
+  const text = sanitizeJobDescriptionForAts(jobDescription);
   let match;
-  while ((match = PRIORITY_SECTION_RE.exec(text)) !== null) {
+  const re = new RegExp(PRIORITY_SECTION_RE.source, PRIORITY_SECTION_RE.flags);
+  while ((match = re.exec(text)) !== null) {
     const block = match[1] || '';
     for (const line of block.split(/[\n•·\-;]+/)) {
       const trimmed = line.trim();
-      if (trimmed.length > 8 && trimmed.length < 160) lines.push(trimmed);
+      if (isValidRequirementLine(trimmed)) lines.push(trimmed);
     }
   }
   return lines.slice(0, 20);
@@ -148,7 +158,11 @@ function buildJdMatchBrief(jobDescription = '', job = {}) {
   const extra = cleaned
     .split(/[\n•·]+/)
     .map((l) => l.trim())
-    .filter((l) => l.length > 15 && l.length < 140 && /\b(experience|required|must|years|proficient|knowledge|ability)\b/i.test(l))
+    .filter(
+      (l) =>
+        isValidRequirementLine(l) &&
+        /\b(experience|required|must|years|proficient|knowledge|ability)\b/i.test(l)
+    )
     .slice(0, 6);
   const merged = [...new Set([...requirements, ...extra])].slice(0, 12);
 

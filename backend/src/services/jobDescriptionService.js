@@ -2,10 +2,11 @@ const jobSourcesConfig = require('../config/jobSources');
 const { USER_AGENT } = require('../constants/brand');
 
 const JD_CACHE_MS = 15 * 60 * 1000;
+const JD_CACHE_VERSION = 'v2';
 const jdCache = new Map();
 
 function cacheKeyForJob(job) {
-  return String(job?.url || job?.jobId || '').trim();
+  return `${JD_CACHE_VERSION}:${String(job?.url || job?.jobId || '').trim()}`;
 }
 
 function readCachedJd(key) {
@@ -41,10 +42,25 @@ async function fetchJson(url, options = {}) {
 }
 
 function stripHtml(html = '') {
-  return String(html)
-    .replace(/<[^>]+>/g, ' ')
+  return decodeHtmlEntities(
+    String(html)
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\bclass\s*=\s*["'][^"']*["']/gi, ' ')
+      .replace(/\bhref\s*=\s*["'][^"']*["']/gi, ' ')
+  )
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function decodeHtmlEntities(text = '') {
+  return String(text || '')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, '&');
 }
 
 function parseGreenhouse(url) {

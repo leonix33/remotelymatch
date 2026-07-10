@@ -191,6 +191,13 @@ function finalizeTailoredResume(originalResume, structure, kit) {
   const { enforceExperienceIntegrity } = require('./resumeExperiencePerfectionService');
   text = enforceExperienceIntegrity(originalResume, text);
 
+  const { sanitizeTailoredResume } = require('./resumeSectionSanitizeService');
+  const sanitized = sanitizeTailoredResume(originalResume, text, kit);
+  text = sanitized.tailoredResumeText;
+  if (sanitized.coverLetterParagraph && kit) {
+    kit.coverLetterParagraph = sanitized.coverLetterParagraph;
+  }
+
   return text.trim();
 }
 
