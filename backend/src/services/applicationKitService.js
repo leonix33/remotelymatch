@@ -10,7 +10,7 @@ const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
 const openaiService = require('./openaiService');
 const env = require('../config/env');
-const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION } = require('../config/tailorDefaults');
+const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION, POLISH_INTERACTIVE_MAX_ROUNDS, POLISH_INTERACTIVE_MAX_PASSES } = require('../config/tailorDefaults');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
@@ -47,6 +47,30 @@ async function findJob(userId, jobId) {
       atsType: approval.atsType,
     };
   }
+
+  const app = await applicationService.getForUserAndJob(userId, jobId);
+  if (app) {
+    return {
+      jobId: app.jobId,
+      title: app.title,
+      company: app.company,
+      url: app.applyUrl || app.jobUrl || '',
+      matchPct: app.matchPct || app.personalMatchPct || 0,
+      source: app.source,
+    };
+  }
+
+  const kit = await applicationKitStore.get(userId, jobId);
+  if (kit?.tailored) {
+    return {
+      jobId,
+      title: kit.jobTitle || kit.title || 'Role',
+      company: kit.company || 'Company',
+      url: kit.jobUrl || kit.url || '',
+      source: kit.source,
+    };
+  }
+
   return null;
 }
 
@@ -243,11 +267,24 @@ async function polishUntilReady(userId, jobId, options = {}) {
   const profile = await profileService.getOrCreate(userId);
   const canonical = resolveTailorOptions();
   const { highMatchTarget, supplementPages, tailorMode } = canonical;
-  const maxRounds = Math.min(5, Math.max(1, Number(options.maxRounds) || 3));
+  const maxRounds = Math.min(
+    POLISH_INTERACTIVE_MAX_ROUNDS,
+    Math.max(1, Number(options.maxRounds) || POLISH_INTERACTIVE_MAX_ROUNDS)
+  );
+  const polishMaxPasses = Math.min(
+    POLISH_INTERACTIVE_MAX_PASSES,
+    Math.max(1, Number(options.maxPasses) || POLISH_INTERACTIVE_MAX_PASSES)
+  );
+
+  if (!(await openaiService.isLive(userId))) {
+    const err = new Error('OpenAI API key required — add your key in Profile → AI Integration.');
+    err.status = 400;
+    throw err;
+  }
 
   const job = options.job || (await findJob(userId, jobId));
   if (!job) {
-    const err = new Error('Job not found');
+    const err = new Error('Job not found — re-open the posting from your queue or re-apply to refresh this role.');
     err.status = 404;
     throw err;
   }
@@ -298,20 +335,29 @@ async function polishUntilReady(userId, jobId, options = {}) {
     ].filter(Boolean);
     if (focusParts.length) tailorFocus = focusParts.slice(0, 12).join(', ');
 
-    const polished = await resumeTailorService.polishExistingKit({
-      userId,
-      profile,
-      job,
-      jobDescription,
-      contact,
-      kit: scored,
-      tailorFocus,
-      highMatchTarget,
-      maxPasses: 8,
-    });
+    let polished;
+    try {
+      polished = await resumeTailorService.polishExistingKit({
+        userId,
+        profile,
+        job,
+        jobDescription,
+        contact,
+        kit: scored,
+        tailorFocus,
+        highMatchTarget,
+        maxPasses: polishMaxPasses,
+      });
+    } catch (err) {
+      console.warn(`Polish round ${round} failed for ${jobId}:`, err.message);
+      const wrapped = new Error(err.message || 'AI polish request failed — try again in a moment.');
+      wrapped.status = err.status || 502;
+      throw wrapped;
+    }
 
     kit = await applicationKitStore.set(userId, jobId, {
       ...polished,
+      pipelineVersion: KIT_PIPELINE_VERSION,
       jobId,
       jobTitle: job.title,
       company: job.company,

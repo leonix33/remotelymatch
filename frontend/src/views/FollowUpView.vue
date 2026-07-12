@@ -10,6 +10,7 @@ import {
   READY_ATS_TARGET,
   READY_ATS_MIN,
 } from '../utils/kitReadiness';
+import { formatApiError } from '../utils/formatApiError';
 import { useProfileStore } from '../stores/profile';
 
 const profileStore = useProfileStore();
@@ -201,7 +202,7 @@ async function polishKit(job) {
   } catch (e) {
     kitErrors.value = {
       ...kitErrors.value,
-      [jobId]: e.response?.data?.message || 'Polish kit failed',
+      [jobId]: formatApiError(e, 'Polish kit failed'),
     };
   } finally {
     polishing.value = '';

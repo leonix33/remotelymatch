@@ -4,6 +4,8 @@ const TAILOR_MODE = 'high_match';
 const HIGH_MATCH_TARGET = 100;
 const ATS_TARGET_MIN = Math.min(100, Math.max(85, Number(process.env.TAILOR_ATS_TARGET_MIN) || 90));
 const KIT_PIPELINE_VERSION = '2026-07-10-v4';
+const POLISH_INTERACTIVE_MAX_ROUNDS = 2;
+const POLISH_INTERACTIVE_MAX_PASSES = 3;
 const DEFAULT_SUPPLEMENT_PAGES = Math.min(6, Math.max(1, Number(process.env.TAILOR_DEFAULT_PAGES) || 4));
 
 function clampPageCount(n) {
@@ -43,6 +45,8 @@ module.exports = {
   HIGH_MATCH_TARGET,
   ATS_TARGET_MIN,
   KIT_PIPELINE_VERSION,
+  POLISH_INTERACTIVE_MAX_ROUNDS,
+  POLISH_INTERACTIVE_MAX_PASSES,
   DEFAULT_SUPPLEMENT_PAGES,
   clampPageCount,
   resolveTailorOptions,

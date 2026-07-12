@@ -410,6 +410,10 @@ MISSING ATS TERMS: ${(redTerms || []).join(', ') || 'none'}${tailorFocus ? `\nCa
     temperature: 0.38,
     max_tokens: Math.min(3200, 700 + pageTarget * 450),
     response_format: { type: 'json_object' },
+  }).catch((err) => {
+    const wrapped = new Error(err.message || 'OpenAI request failed during polish');
+    wrapped.status = err.status || 502;
+    throw wrapped;
   });
 
   const raw = response.choices[0]?.message?.content?.trim() || '';

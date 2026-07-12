@@ -16,6 +16,7 @@ import {
   READY_ATS_TARGET,
   READY_ATS_MIN,
 } from '../utils/kitReadiness';
+import { formatApiError } from '../utils/formatApiError';
 import { useProfileStore } from '../stores/profile';
 import { useAuthStore } from '../stores/auth';
 import { buildLinkedInSearchFromJob, isLinkedInJob, isLinkedInUrl, openLinkedIn } from '../utils/linkedin';
@@ -249,7 +250,7 @@ async function polishUntilReady(job) {
     }
     polishMsg.value = `Best achieved: ${passLine} — need ${READY_ATS_MIN}%+ to apply with tailored resume.`;
   } catch (e) {
-    error.value = e.response?.data?.message || 'Polish until ready failed';
+    error.value = formatApiError(e, 'Polish until ready failed');
   } finally {
     polishing.value = '';
   }
