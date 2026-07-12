@@ -408,7 +408,7 @@ MISSING ATS TERMS: ${(redTerms || []).join(', ') || 'none'}${tailorFocus ? `\nCa
       { role: 'user', content: user },
     ],
     temperature: 0.38,
-    max_tokens: Math.min(3200, 700 + pageTarget * 450),
+    max_tokens: Math.min(2200, 500 + pageTarget * 320),
     response_format: { type: 'json_object' },
   }).catch((err) => {
     const wrapped = new Error(err.message || 'OpenAI request failed during polish');

@@ -233,7 +233,7 @@ async function polishUntilReady(job) {
   error.value = '';
   const profile = profileStore.profile || {};
   try {
-    polishMsg.value = `Polishing on server (target ${READY_ATS_TARGET}%, min ${READY_ATS_MIN}%)…`;
+    polishMsg.value = `Running one polish pass (~20s) toward ${READY_ATS_MIN}%+ ATS…`;
     const { data } = await http.post(`/applications/kit/${encodeURIComponent(job.jobId)}/polish`, {
       highMatchTarget: READY_ATS_TARGET,
       supplementPages: profile.defaultSupplementPages || 3,
@@ -248,7 +248,7 @@ async function polishUntilReady(job) {
       polishMsg.value = `Ready to apply — ${passLine}`;
       return;
     }
-    polishMsg.value = `Best achieved: ${passLine} — need ${READY_ATS_MIN}%+ to apply with tailored resume.`;
+    polishMsg.value = `Best achieved: ${passLine} — click Polish again if still below ${READY_ATS_MIN}%.`;
   } catch (e) {
     error.value = formatApiError(e, 'Polish until ready failed');
   } finally {

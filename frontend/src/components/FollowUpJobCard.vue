@@ -3,7 +3,7 @@ import { ref, watch } from 'vue';
 import JobScoreBadges from './JobScoreBadges.vue';
 import KitReadinessBadges from './KitReadinessBadges.vue';
 import KitJdComparePanel from './KitJdComparePanel.vue';
-import { isKitReadyToApply } from '../utils/kitReadiness';
+import { isKitReadyToApply, READY_ATS_MIN } from '../utils/kitReadiness';
 
 const props = defineProps({
   job: { type: Object, required: true },
@@ -102,7 +102,7 @@ function formatDate(iso) {
       <section class="follow-up-section mb-5">
         <h4 class="follow-up-section__title">Application kit</h4>
         <p class="mt-1 text-xs text-slate-500">
-          Polish your tailored resume for this role, refresh the follow-up email, then reapply if the posting allows it.
+          One polish pass per click (~20s). Repeat until ATS is {{ READY_ATS_MIN }}%+ — then refresh the follow-up email.
         </p>
         <div class="mt-2">
           <KitReadinessBadges :kit="job.kit" />

@@ -10,7 +10,7 @@ const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
 const openaiService = require('./openaiService');
 const env = require('../config/env');
-const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION, POLISH_INTERACTIVE_MAX_ROUNDS, POLISH_INTERACTIVE_MAX_PASSES } = require('../config/tailorDefaults');
+const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION, POLISH_INTERACTIVE_MAX_PASSES } = require('../config/tailorDefaults');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
@@ -267,10 +267,6 @@ async function polishUntilReady(userId, jobId, options = {}) {
   const profile = await profileService.getOrCreate(userId);
   const canonical = resolveTailorOptions();
   const { highMatchTarget, supplementPages, tailorMode } = canonical;
-  const maxRounds = Math.min(
-    POLISH_INTERACTIVE_MAX_ROUNDS,
-    Math.max(1, Number(options.maxRounds) || POLISH_INTERACTIVE_MAX_ROUNDS)
-  );
   const polishMaxPasses = Math.min(
     POLISH_INTERACTIVE_MAX_PASSES,
     Math.max(1, Number(options.maxPasses) || POLISH_INTERACTIVE_MAX_PASSES)
@@ -323,89 +319,63 @@ async function polishUntilReady(userId, jobId, options = {}) {
   const jobDescription = await jobDescriptionService.resolveJobDescription(job);
   const contact = await applicantContactService.resolveApplicantContact(userId, profile, authEmail);
   let tailorFocus = initialFocus || kit.tailorFocus || '';
-  let lastAts = kit.atsScore ?? 0;
-  let plateau = 0;
+  const scored = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
 
-  for (let round = 1; round <= maxRounds; round += 1) {
-    const { getRedTerms } = require('./atsKeywordService');
-    const scored = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
-    const focusParts = [
-      ...(scored.uncoveredRequirements || []),
-      ...getRedTerms(scored, 12),
-    ].filter(Boolean);
-    if (focusParts.length) tailorFocus = focusParts.slice(0, 12).join(', ');
-
-    let polished;
-    try {
-      polished = await resumeTailorService.polishExistingKit({
-        userId,
-        profile,
-        job,
-        jobDescription,
-        contact,
-        kit: scored,
-        tailorFocus,
-        highMatchTarget,
-        maxPasses: polishMaxPasses,
-      });
-    } catch (err) {
-      console.warn(`Polish round ${round} failed for ${jobId}:`, err.message);
-      const wrapped = new Error(err.message || 'AI polish request failed — try again in a moment.');
-      wrapped.status = err.status || 502;
-      throw wrapped;
-    }
-
-    kit = await applicationKitStore.set(userId, jobId, {
-      ...polished,
-      pipelineVersion: KIT_PIPELINE_VERSION,
-      jobId,
-      jobTitle: job.title,
-      company: job.company,
-      jobUrl: job.url,
-      formatted: resumeTailorService.formatKitAsText(polished),
-      generatedAt: new Date().toISOString(),
-      useForApply: kit.useForApply !== false,
-      tailorFocus,
-      supplementPagesTarget: supplementPages,
-      tailorMode: 'high_match',
-      highMatchTarget,
-    });
-
-    passes.push({ round, phase: 'refine', atsScore: kit.atsScore ?? null, jdMatchPct: kit.jdMatchPct ?? null });
-
-    const ready = isKitReadyToApply({
+  if (
+    isKitReadyToApply({
       tailored: true,
       hasKit: true,
-      atsScore: kit.atsScore,
-      useForApply: kit.useForApply !== false,
-    });
-    if (ready) {
-      const result = { kit, passes, ready: true };
-      await activityService.recordActivity({
-        req: options.req,
-        userId,
-        type: 'polish_kit',
-        entityType: 'job',
-        entityId: jobId,
-        summary: `Polished kit — ATS ${kit.atsScore ?? '—'}%`,
-        meta: {
-          ready: true,
-          passes: passes.length,
-          atsScore: kit.atsScore ?? null,
-          company: kit.company,
-          title: kit.jobTitle,
-        },
-      });
-      return result;
-    }
-
-    const ats = kit.atsScore ?? 0;
-    if (ats <= lastAts) plateau += 1;
-    else plateau = 0;
-    if (plateau >= 2 && ats >= READY_ATS_MIN) break;
-    if (plateau >= 2) break;
-    lastAts = ats;
+      atsScore: scored.atsScore,
+      useForApply: scored.useForApply !== false,
+    })
+  ) {
+    return { kit: scored, passes, ready: true };
   }
+
+  const { getRedTerms } = require('./atsKeywordService');
+  const focusParts = [
+    ...(scored.uncoveredRequirements || []),
+    ...getRedTerms(scored, 12),
+  ].filter(Boolean);
+  if (focusParts.length) tailorFocus = focusParts.slice(0, 12).join(', ');
+
+  let polished;
+  try {
+    polished = await resumeTailorService.polishExistingKit({
+      userId,
+      profile,
+      job,
+      jobDescription,
+      contact,
+      kit: scored,
+      tailorFocus,
+      highMatchTarget: READY_ATS_MIN,
+      maxPasses: polishMaxPasses,
+    });
+  } catch (err) {
+    console.warn(`Polish failed for ${jobId}:`, err.message);
+    const wrapped = new Error(err.message || 'AI polish request failed — try again in a moment.');
+    wrapped.status = err.status || 502;
+    throw wrapped;
+  }
+
+  kit = await applicationKitStore.set(userId, jobId, {
+    ...polished,
+    pipelineVersion: KIT_PIPELINE_VERSION,
+    jobId,
+    jobTitle: job.title,
+    company: job.company,
+    jobUrl: job.url,
+    formatted: resumeTailorService.formatKitAsText(polished),
+    generatedAt: new Date().toISOString(),
+    useForApply: kit.useForApply !== false,
+    tailorFocus,
+    supplementPagesTarget: supplementPages,
+    tailorMode: 'high_match',
+    highMatchTarget,
+  });
+
+  passes.push({ round: 1, phase: 'refine', atsScore: kit.atsScore ?? null, jdMatchPct: kit.jdMatchPct ?? null });
 
   const result = {
     kit,

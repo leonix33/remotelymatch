@@ -175,7 +175,7 @@ async function polishKit(job) {
   try {
     polishMsgs.value = {
       ...polishMsgs.value,
-      [jobId]: `Polishing on server (target ${READY_ATS_TARGET}%, min ${READY_ATS_MIN}%)…`,
+      [jobId]: `Running one polish pass (~20s) toward ${READY_ATS_MIN}%+ ATS…`,
     };
     const { data } = await http.post(`/applications/kit/${encodeURIComponent(jobId)}/polish`, {
       highMatchTarget: READY_ATS_TARGET,
@@ -197,7 +197,7 @@ async function polishKit(job) {
     }
     polishMsgs.value = {
       ...polishMsgs.value,
-      [jobId]: `Best: ${passLine} — need ${READY_ATS_MIN}%+ to send or reapply. Try again or open Application kit.`,
+      [jobId]: `Best: ${passLine} — click Polish again if still below ${READY_ATS_MIN}%.`,
     };
   } catch (e) {
     kitErrors.value = {
