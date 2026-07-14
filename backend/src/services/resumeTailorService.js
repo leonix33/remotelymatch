@@ -1,6 +1,6 @@
 const openaiService = require('./openaiService');
 const env = require('../config/env');
-const { resolveTailorOptions, TAILOR_MODE, DEFAULT_SUPPLEMENT_PAGES } = require('../config/tailorDefaults');
+const { resolveTailorOptions, TAILOR_MODE, DEFAULT_SUPPLEMENT_PAGES, RESUME_INTEGRITY_CONTRACT } = require('../config/tailorDefaults');
 const { contactHeader, contactSignature } = require('./applicantContactService');
 const { HUMAN_WRITING_PROMPT, humanizeKit } = require('./humanizeWritingService');
 const { prepareResumeTextForParsing } = require('./resumeRepairService');
@@ -386,7 +386,9 @@ RULES:
 6. Mirror uncovered posting requirements with real experience from the original resume — never invent.
 7. Summary: 3 lines naming the target role and top qualifications from the posting.
 8. Cover letter: 4 sentences — ${job?.title || 'role'} at ${job?.company || 'company'}, fit, proof point, close.
-9. Return JSON only: { "sections": [...], "coverLetterParagraph": "..." }`;
+9. Return JSON only: { "sections": [...], "coverLetterParagraph": "..." }
+
+${RESUME_INTEGRITY_CONTRACT}`;
 
   const user = `TARGET: ${job?.title || 'Role'} at ${job?.company || 'Company'}
 ATS score: ${atsScore}% · Job requirement fit: ${jdMatchPct ?? '—'}%
@@ -769,6 +771,8 @@ STRUCTURE RULES:
 8. FORBIDDEN: addendum, supplement, JD mapping, match percentages, emojis.
 
 COVER LETTER: 4 sentences for ${job?.title} at ${job?.company} — hook, fit to posting, one proof point, close.
+
+${RESUME_INTEGRITY_CONTRACT}
 
 ${HUMAN_WRITING_PROMPT}
 

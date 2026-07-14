@@ -673,13 +673,33 @@ function kitListItem(kit, originalResume = '') {
   };
 }
 
+async function repairAllStoredKits(userId) {
+  const kits = await applicationKitStore.listForUser(userId);
+  let repairedCount = 0;
+  for (const kit of kits) {
+    if (!kit?.tailored || !kit.jobId) continue;
+    const saved = await persistEnrichedKit(userId, kit.jobId, kit);
+    if (saved?.pipelineVersion === KIT_PIPELINE_VERSION) repairedCount += 1;
+  }
+  return { total: kits.length, repairedCount };
+}
+
 async function listKits(userId) {
   const [kits, profile] = await Promise.all([
     applicationKitStore.listForUser(userId),
     profileService.getOrCreate(userId),
   ]);
   const originalResume = profile?.resumeText || '';
-  return kits.map((kit) => kitListItem(kit, originalResume));
+  const items = [];
+  for (const kit of kits) {
+    if (!kit?.tailored) {
+      items.push(kitListItem(kit, originalResume));
+      continue;
+    }
+    const saved = await persistEnrichedKit(userId, kit.jobId, kit);
+    items.push(kitListItem(saved, originalResume));
+  }
+  return items;
 }
 
 async function setKitPreference(userId, jobId, { useForApply, tailorFocus }) {
@@ -715,8 +735,11 @@ async function kitSummary(userId, jobId) {
 async function getKitsForJobIds(userId, jobIds = []) {
   const kits = [];
   for (const jobId of jobIds) {
-    const kit = await applicationKitStore.get(userId, jobId);
-    if (kit?.tailored) kits.push(kit);
+    let kit = await applicationKitStore.get(userId, jobId);
+    if (kit?.tailored) {
+      kit = await persistEnrichedKit(userId, jobId, kit);
+      kits.push(kit);
+    }
   }
   return kits;
 }
@@ -727,6 +750,7 @@ module.exports = {
   polishUntilReady,
   generateOnApprove,
   attachKitToApplyItem,
+  repairAllStoredKits,
   prepareApplyItems,
   schedulePrepareKits,
   findJob,

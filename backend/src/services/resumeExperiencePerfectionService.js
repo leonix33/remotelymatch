@@ -7,6 +7,7 @@ const {
   stripBulletPrefix,
   isFlatJobHeaderLine,
 } = require('./resumeExperiencePreserveService');
+const { RESUME_INTEGRITY_CONTRACT } = require('../config/tailorDefaults');
 
 const MONTH = '(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?';
 const YEAR = '\\d{4}';
@@ -239,6 +240,8 @@ NON-NEGOTIABLE RULES:
 5. Keep the same facts, scope, and metrics from originalBullets — substitute phrasing and keywords to match the posting.
 6. Never invent employers, dates, titles, certifications, or false metrics.
 7. Every bullet: one complete sentence, 180-320 characters, starts with a strong action verb, includes relevant JD keywords naturally.
+
+${RESUME_INTEGRITY_CONTRACT}
 
 Return JSON only:
 {

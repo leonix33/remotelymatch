@@ -12,6 +12,13 @@ const {
   isUnreadableResumeText,
 } = require('../services/resumeParseService');
 const { prepareResumeTextForParsing } = require('../services/resumeRepairService');
+const applicationKitService = require('../services/applicationKitService');
+
+function scheduleKitRepair(userId) {
+  applicationKitService.repairAllStoredKits(userId).catch((err) => {
+    console.warn(`Kit repair after resume update failed for ${userId}:`, err.message);
+  });
+}
 
 const updateSchema = z.object({
   displayName: z.string().min(2).optional(),
@@ -146,6 +153,7 @@ async function updateMe(req, res, next) {
       }
     }
     const profile = await profileService.update(req.user.sub, payload);
+    if (body.resumeText) scheduleKitRepair(req.user.sub);
     res.json(profile);
   } catch (err) {
     next(err);
@@ -239,6 +247,7 @@ async function parseResume(req, res, next) {
       }
 
       profile = await profileService.update(req.user.sub, patch);
+      scheduleKitRepair(req.user.sub);
     }
 
     res.json({

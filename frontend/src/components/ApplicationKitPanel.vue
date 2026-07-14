@@ -274,7 +274,7 @@ watch(
 
         <div class="rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-slate-400">
           <strong class="text-teal-200">Resume perfection for every user.</strong>
-          All jobs on your resume stay — however many you have. Same bullet count per role; only wording changes to match the posting. Credentials and structure intact. 4 pages · 90%+ ATS.
+          All jobs on your resume stay for every user — however many you have. Same bullet count per role; only wording changes to match the posting. Credentials and structure intact. 4 pages · 90%+ ATS.
         </div>
 
         <div>

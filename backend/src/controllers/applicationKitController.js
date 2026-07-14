@@ -51,9 +51,6 @@ async function generateKit(req, res, next) {
       force: Boolean(req.body?.force),
       authEmail: req.user.email,
       tailorFocus: req.body?.tailorFocus || req.body?.retailorNotes || '',
-      supplementPages: req.body?.supplementPages,
-      tailorMode: req.body?.tailorMode,
-      highMatchTarget: req.body?.highMatchTarget,
       req,
     });
     res.json(kit);
@@ -66,10 +63,8 @@ async function polishKit(req, res, next) {
   try {
     const result = await applicationKitService.polishUntilReady(req.user.sub, req.params.jobId, {
       authEmail: req.user.email,
-      highMatchTarget: req.body?.highMatchTarget,
-      supplementPages: req.body?.supplementPages,
       tailorFocus: req.body?.tailorFocus || '',
-      maxRounds: req.body?.maxRounds,
+      maxPasses: req.body?.maxPasses,
       req,
     });
     res.json(result);
