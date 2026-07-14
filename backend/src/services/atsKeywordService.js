@@ -309,4 +309,5 @@ module.exports = {
   scoreJdRequirementCoverage,
   requirementCovered,
   isRecruiterReady,
+  sanitizeJobDescriptionForAts,
 };

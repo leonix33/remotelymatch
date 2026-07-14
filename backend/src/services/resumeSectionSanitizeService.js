@@ -147,10 +147,6 @@ function restoreSectionFromOriginal(originalResume, tailoredText, sectionKey) {
 function sanitizeTailoredResume(originalResume, tailoredText, kit = {}) {
   let text = decodeHtmlEntities(tailoredText);
   text = restoreImmutableSections(originalResume, text);
-  text = restoreSectionFromOriginal(originalResume, text, 'summary');
-  text = restoreSectionFromOriginal(originalResume, text, 'skills');
-  text = restoreSectionFromOriginal(originalResume, text, 'education');
-  text = restoreSectionFromOriginal(originalResume, text, 'certifications');
   text = relocateMisplacedExperienceBullets(originalResume, text);
 
   const structure = parseResumeStructure(originalResume);
