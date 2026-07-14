@@ -3,7 +3,7 @@ const env = require('./env');
 const TAILOR_MODE = 'high_match';
 const HIGH_MATCH_TARGET = 100;
 const ATS_TARGET_MIN = Math.min(100, Math.max(85, Number(process.env.TAILOR_ATS_TARGET_MIN) || 90));
-const KIT_PIPELINE_VERSION = '2026-07-14-v7';
+const KIT_PIPELINE_VERSION = '2026-07-14-v8';
 
 const RESUME_INTEGRITY_CONTRACT = `RESUME INTEGRITY (every user, every job — non-negotiable):
 - Keep EVERY employer from the candidate's profile resume, in original order.

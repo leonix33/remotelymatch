@@ -16,6 +16,9 @@ const MISPLACED_EDUCATION_BLOB_RE =
 const DEGREE_LINE_RE =
   /\b(bachelor|master|b\.?s\.?|m\.?s\.?|ph\.?d|degree|university|college|gpa|expected\s+\w+\s+\d{4})\b/i;
 
+const ACTION_VERB_RE =
+  /\b(Architected|Built|Implemented|Designed|Led|Developed|Managed|Operated|Supported|Created|Established|Deployed|Migrated|Integrated|Improved|Automated|Configured|Enforced|Maintained|Coordinated|Delivered|Reduced|Optimized|Streamlined|Partnered|Authored|Conducted|Participated|Secured|Streamlined|Authored)\b/i;
+
 function cleanEducationSectionContent(content) {
   if (!content) return '';
   return content
@@ -66,14 +69,34 @@ function isFlatJobHeaderLine(line) {
   );
 }
 
+function isMetadataLine(line) {
+  const t = stripBulletPrefix(line);
+  if (!t) return false;
+  if (isFlatJobHeaderLine(line)) return false;
+  if (DATE_RANGE_RE.test(t) && JOB_ROLE_WORD.test(t)) return false;
+  if (ACTION_VERB_RE.test(t)) return false;
+
+  if (!/\|/.test(t)) {
+    return (
+      t.length <= 120 &&
+      /\b(Health|Technology|Services|Global|Systems|Group|Mercy|Secours|Solutions|Software|LLC|Inc|Corp|University|TX|CA|NY)\b/i.test(t)
+    );
+  }
+
+  const segments = t.split('|').map((s) => s.trim()).filter(Boolean);
+  return segments.length >= 2 && segments.every((s) => s.length < 90);
+}
+
 function isAccomplishmentLine(line) {
   const raw = String(line || '').trim();
   if (!raw) return false;
   if (isFlatJobHeaderLine(raw)) return false;
   const t = stripBulletPrefix(raw);
   if (DATE_RANGE_RE.test(t) && JOB_ROLE_WORD.test(t)) return false;
+  if (isMetadataLine(raw)) return false;
   if (/^[-•*●▪]/.test(raw)) return true;
-  return t.length >= 48;
+  if (t.length >= 48) return ACTION_VERB_RE.test(t);
+  return false;
 }
 
 function isDateLine(line) {

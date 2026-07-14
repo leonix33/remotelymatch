@@ -73,11 +73,18 @@ function inferResumePageTarget(resumeText, requestedPages) {
   const words = String(resumeText || '')
     .split(/\s+/)
     .filter(Boolean).length;
-  const fromLength = Math.max(1, Math.ceil(words / 350));
+  const structure = parseResumeStructure(resumeText || '');
+  const exp = structure.sections.find((s) => s.key === 'experience');
+  const { splitExperienceContentIntoJobs } = require('./resumeExperiencePreserveService');
+  const jobCount = splitExperienceContentIntoJobs(exp?.content || '').length;
+  const fromLength = Math.max(1, Math.ceil(words / 320));
+  const fromJobs = Math.max(1, Math.ceil(jobCount / 1.5));
+  const computed = Math.max(fromLength, fromJobs, DEFAULT_SUPPLEMENT_PAGES);
+
   if (requestedPages != null && Number.isFinite(Number(requestedPages))) {
     return clampPageCount(Number(requestedPages));
   }
-  return clampPageCount(Math.min(fromLength, DEFAULT_SUPPLEMENT_PAGES));
+  return clampPageCount(Math.min(computed, 6));
 }
 
 function extractMustPreserveFromResume(resumeText = '') {
@@ -135,6 +142,17 @@ function splitResumeIntoPages(resumeText, pageTarget) {
   }
   if (chunk.trim()) pages.push(chunk.trim());
 
+  if (pages.length > pageTarget) {
+    const head = pages.slice(0, Math.max(1, pageTarget - 1));
+    const tail = pages.slice(Math.max(1, pageTarget - 1)).join('\n\n').trim();
+    if (tail) head.push(tail);
+    return head.map((content, i) => ({
+      page: i + 1,
+      title: 'Resume',
+      content,
+    }));
+  }
+
   return pages.slice(0, pageTarget).map((content, i) => ({
     page: i + 1,
     title: 'Resume',
@@ -189,8 +207,8 @@ function finalizeTailoredResume(originalResume, structure, kit) {
   const { preserveExperienceFromOriginal } = require('./resumeExperiencePreserveService');
   text = preserveExperienceFromOriginal(originalResume, text);
 
-  const { enforceExperienceIntegrity } = require('./resumeExperiencePerfectionService');
-  text = enforceExperienceIntegrity(originalResume, text);
+  const { normalizeTailoredResumeLayout } = require('./resumeKitLayoutService');
+  text = normalizeTailoredResumeLayout(originalResume, text);
 
   const { sanitizeTailoredResume } = require('./resumeSectionSanitizeService');
   const sanitized = sanitizeTailoredResume(originalResume, text, kit);
