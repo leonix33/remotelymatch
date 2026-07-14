@@ -49,8 +49,8 @@ function isSectionHeading(line = '') {
 }
 
 function isRoleHeaderLine(line = '') {
-  const t = line.trim();
-  if (!t || BULLET_RE.test(t)) return false;
+  const t = line.trim().replace(/^[-•*●▪]+\s+/, '');
+  if (!t) return false;
   if (isSectionHeading(t)) return false;
   return (
     /\b(20\d{2}|19\d{2})\b/.test(t) ||
@@ -98,8 +98,6 @@ function reduceStackedTechLists(line = '') {
 
 function trimExperienceBullets(lines) {
   const out = [];
-  let bulletsInRole = 0;
-  const roleBullets = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -109,27 +107,22 @@ function trimExperienceBullets(lines) {
     }
 
     if (isRoleHeaderLine(trimmed)) {
-      bulletsInRole = 0;
-      roleBullets.length = 0;
-      out.push(line);
+      const normalized = trimmed.replace(/^[-•*●▪]+\s+/, '');
+      out.push(/^[-•*●▪]/.test(trimmed) ? normalized : line);
       continue;
     }
 
-    if (!BULLET_RE.test(trimmed)) {
-      out.push(line);
+    if (BULLET_RE.test(trimmed)) {
+      const bullet = reduceStackedTechLists(stripJdEcho(trimLongBullet(trimmed)));
+      if (!bullet.replace(/^[-•*●▪]+\s*/, '').trim() || bullet.replace(/^[-•*●▪]+\s*/, '').trim().length < 15) {
+        out.push(line);
+        continue;
+      }
+      out.push(bullet);
       continue;
     }
 
-    let bullet = reduceStackedTechLists(stripJdEcho(trimLongBullet(trimmed)));
-    if (!bullet.replace(/^[-•*●▪]+\s*/, '').trim() || bullet.replace(/^[-•*●▪]+\s*/, '').trim().length < 15) {
-      continue;
-    }
-    if (roleBullets.some((b) => bulletSimilarity(b, bullet) > 0.68)) continue;
-    if (bulletsInRole >= MAX_BULLETS_PER_ROLE) continue;
-
-    roleBullets.push(bullet);
-    bulletsInRole += 1;
-    out.push(bullet);
+    out.push(stripJdEcho(line));
   }
 
   return out;

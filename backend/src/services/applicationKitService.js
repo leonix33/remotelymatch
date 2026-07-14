@@ -411,6 +411,8 @@ async function polishUntilReady(userId, jobId, options = {}) {
     throw wrapped;
   }
 
+  polished = resumeTailorService.repairKitAgainstProfile(profile.resumeText, polished, jobDescription);
+
   kit = await applicationKitStore.set(userId, jobId, {
     ...polished,
     pipelineVersion: KIT_PIPELINE_VERSION,

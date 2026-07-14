@@ -3,6 +3,9 @@ const {
   splitExperienceContentIntoJobs,
   stripMisplacedEducationBlob,
   replaceExperienceSectionContent,
+  isAccomplishmentLine,
+  stripBulletPrefix,
+  isFlatJobHeaderLine,
 } = require('./resumeExperiencePreserveService');
 
 const MONTH = '(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?';
@@ -12,23 +15,8 @@ const DATE_RANGE_RE = new RegExp(
   'i'
 );
 
-function isAccomplishmentLine(line) {
-  const t = String(line || '').trim();
-  if (!t) return false;
-  if (DATE_RANGE_RE.test(t)) return false;
-  if (/^[-•*]/.test(t)) return true;
-  return t.length >= 48;
-}
-
-function normalizeBullet(line) {
-  const t = String(line || '').trim();
-  if (!t) return '';
-  return t.replace(/^[-•*]\s*/, '').trim();
-}
-
-function formatBullet(line) {
-  const t = normalizeBullet(line);
-  return t ? `- ${t}` : '';
+function isAccomplishmentLineLocal(line) {
+  return isAccomplishmentLine(line);
 }
 
 function splitJobHeaderAndBullets(block) {
@@ -40,11 +28,50 @@ function splitJobHeaderAndBullets(block) {
   const bullets = [];
 
   for (const line of lines) {
-    if (isAccomplishmentLine(line)) bullets.push(normalizeBullet(line));
-    else header.push(line);
+    if (isFlatJobHeaderLine(line) || (!isAccomplishmentLineLocal(line) && DATE_RANGE_RE.test(stripBulletPrefix(line)))) {
+      header.push(stripBulletPrefix(line));
+    } else if (isAccomplishmentLineLocal(line)) {
+      bullets.push(normalizeBullet(line));
+    } else {
+      header.push(stripBulletPrefix(line));
+    }
   }
 
   return { header: header.join('\n'), bullets };
+}
+
+function normalizeCompanyKey(company) {
+  return String(company || '')
+    .split(/\s*\|\s*/)[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchTailoredBlockForBlueprint(blueprintEntry, tailoredJobs) {
+  const companyKey = normalizeCompanyKey(blueprintEntry.company);
+  if (companyKey) {
+    const byCompany = tailoredJobs.find((job) => normalizeCompanyKey(job.company) === companyKey);
+    if (byCompany) return byCompany.text;
+  }
+  const titleKey = String(blueprintEntry.title || '').toLowerCase().trim();
+  if (titleKey) {
+    const byTitle = tailoredJobs.find((job) => String(job.title || '').toLowerCase().trim() === titleKey);
+    if (byTitle) return byTitle.text;
+  }
+  return '';
+}
+
+function normalizeBullet(line) {
+  const t = String(line || '').trim();
+  if (!t) return '';
+  return t.replace(/^[-•*]\s*/, '').trim();
+}
+
+function formatBullet(line) {
+  const t = normalizeBullet(line);
+  return t ? `- ${t}` : '';
 }
 
 function buildExperienceBlueprint(originalJobs) {
@@ -83,15 +110,48 @@ function extractExperienceContent(tailoredText, structure) {
   return tailoredText.slice(start, end).trim();
 }
 
+function bulletSimilarity(a, b) {
+  const normalize = (text) =>
+    String(text)
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const wa = new Set(normalize(a).split(' ').filter((w) => w.length > 3));
+  const wb = new Set(normalize(b).split(' ').filter((w) => w.length > 3));
+  if (!wa.size || !wb.size) return 0;
+  let inter = 0;
+  for (const w of wa) if (wb.has(w)) inter += 1;
+  return inter / Math.max(wa.size, wb.size);
+}
+
 function rebuildJobFromBlueprint(blueprintEntry, tailoredBlock) {
   const tailored = splitJobHeaderAndBullets(tailoredBlock || '');
   const header = blueprintEntry.header || tailored.header;
-  const targetCount = blueprintEntry.bulletCount || blueprintEntry.originalBullets?.length || 0;
-  const bullets = [];
+  const originalBullets = [...(blueprintEntry.originalBullets || [])];
+  const targetCount = blueprintEntry.bulletCount || originalBullets.length || 0;
+  const bullets = [...originalBullets];
 
-  for (let i = 0; i < targetCount; i += 1) {
-    if (tailored.bullets[i]) bullets.push(tailored.bullets[i]);
-    else if (blueprintEntry.originalBullets?.[i]) bullets.push(blueprintEntry.originalBullets[i]);
+  for (const tailoredBullet of tailored.bullets) {
+    let bestIdx = -1;
+    let bestSim = 0;
+    for (let i = 0; i < bullets.length; i += 1) {
+      const sim = bulletSimilarity(bullets[i], tailoredBullet);
+      if (sim > bestSim) {
+        bestSim = sim;
+        bestIdx = i;
+      }
+    }
+    if (bestIdx >= 0 && bestSim >= 0.2) {
+      bullets[bestIdx] = tailoredBullet;
+    } else if (bullets.length < targetCount) {
+      bullets.push(tailoredBullet);
+    }
+  }
+
+  while (bullets.length > targetCount) bullets.pop();
+  while (bullets.length < targetCount && originalBullets[bullets.length]) {
+    bullets.push(originalBullets[bullets.length]);
   }
 
   const lines = [header, ...bullets.map((b) => formatBullet(b)).filter(Boolean)].filter(Boolean);
@@ -111,8 +171,8 @@ function enforceExperienceIntegrity(originalResume, tailoredText) {
   const rebuilt = [];
 
   for (let i = 0; i < blueprint.length; i += 1) {
-    const tailoredJob = tailoredJobs[i];
-    rebuilt.push(rebuildJobFromBlueprint(blueprint[i], tailoredJob?.text || ''));
+    const matchedBlock = matchTailoredBlockForBlueprint(blueprint[i], tailoredJobs);
+    rebuilt.push(rebuildJobFromBlueprint(blueprint[i], matchedBlock));
   }
 
   let text = replaceExperienceSectionContent(tailoredText, structure, rebuilt.join('\n\n').trim());
@@ -174,10 +234,11 @@ async function perfectExperienceBullets({
 NON-NEGOTIABLE RULES:
 1. Return EXACTLY ${blueprint.length} job(s) — same employers, titles, and dates as the blueprint headers (copy headers verbatim).
 2. Each job must have EXACTLY the bulletCount from the blueprint — no more, no fewer.
-3. Rewrite bullet wording to mirror job description requirements and keywords using the candidate's real accomplishments only.
-4. Keep the same facts, scope, and metrics from originalBullets — substitute phrasing and keywords to match the posting.
-5. Never invent employers, dates, titles, certifications, or false metrics.
-6. Every bullet: one complete sentence, 180-320 characters, starts with a strong action verb, includes relevant JD keywords naturally.
+3. Job headers must NOT start with bullet characters (-, •, *). Put headers on their own lines; bullets only for accomplishments.
+4. Rewrite bullet wording to mirror job description requirements and keywords using the candidate's real accomplishments only.
+5. Keep the same facts, scope, and metrics from originalBullets — substitute phrasing and keywords to match the posting.
+6. Never invent employers, dates, titles, certifications, or false metrics.
+7. Every bullet: one complete sentence, 180-320 characters, starts with a strong action verb, includes relevant JD keywords naturally.
 
 Return JSON only:
 {
@@ -248,5 +309,5 @@ module.exports = {
   enforceExperienceIntegrity,
   experienceNeedsPerfection,
   perfectExperienceBullets,
-  isAccomplishmentLine,
+  isAccomplishmentLine: isAccomplishmentLineLocal,
 };

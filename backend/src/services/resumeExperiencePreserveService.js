@@ -52,14 +52,41 @@ function lineAppearsInResume(line, resumeText) {
   return hits / tokens.length >= 0.85;
 }
 
+function stripBulletPrefix(line) {
+  return String(line || '').trim().replace(/^[-•*●▪]+\s+/, '');
+}
+
+function isFlatJobHeaderLine(line) {
+  const t = stripBulletPrefix(line);
+  if (!t || t.length > 220) return false;
+  if (!DATE_RANGE_RE.test(t)) return false;
+  return (
+    JOB_ROLE_WORD.test(t) ||
+    /\b(Health|Technology|Services|Global|Systems|Group|Mercy|Secours|Solutions|Software|LLC|Inc|Corp)\b/i.test(t)
+  );
+}
+
+function isAccomplishmentLine(line) {
+  const raw = String(line || '').trim();
+  if (!raw) return false;
+  if (isFlatJobHeaderLine(raw)) return false;
+  const t = stripBulletPrefix(raw);
+  if (DATE_RANGE_RE.test(t) && JOB_ROLE_WORD.test(t)) return false;
+  if (/^[-•*●▪]/.test(raw)) return true;
+  return t.length >= 48;
+}
+
 function isDateLine(line) {
-  const t = String(line || '').trim();
+  const t = stripBulletPrefix(line);
+  if (isFlatJobHeaderLine(line)) return false;
   return t.length < 100 && DATE_RANGE_RE.test(t);
 }
 
 function isLikelyJobTitleLine(line) {
-  const t = String(line || '').trim();
-  if (!t || t.length > 140 || DATE_RANGE_RE.test(t) || /^[-•*]/.test(t)) return false;
+  const t = stripBulletPrefix(line);
+  if (!t || t.length > 140) return false;
+  if (isFlatJobHeaderLine(line)) return true;
+  if (DATE_RANGE_RE.test(t)) return false;
   return JOB_ROLE_WORD.test(t);
 }
 
@@ -102,15 +129,51 @@ function extractCompanyFromJobBlock(block) {
 
   for (const line of lines) {
     if (
-      /\b(Inc|LLC|Corp|Health|Technology|Services|Global|Systems|Group|Mercy|Secours)\b/i.test(line) &&
+      /\b(Inc|LLC|Corp|Health|Technology|Services|Global|Systems|Group|Mercy|Secours|Solutions)\b/i.test(
+        stripBulletPrefix(line)
+      ) &&
       !isDateLine(line) &&
-      !/^[-•*]/.test(line)
+      !isAccomplishmentLine(line)
     ) {
-      return line.split(/\s*\|\s*/)[0].trim();
+      return stripBulletPrefix(line).split(/\s*\|\s*/)[0].trim();
     }
   }
 
   return '';
+}
+
+function attachBulletsToHeaderOnlyChunks(chunkArrays) {
+  const out = chunkArrays.map((chunk) => [...chunk]);
+
+  for (let i = 0; i < out.length; i += 1) {
+    if (out[i].some(isAccomplishmentLine)) continue;
+    if (i + 1 >= out.length) continue;
+
+    const donor = out[i + 1];
+    const moved = [];
+    const kept = [];
+    let foundDonorHeader = false;
+
+    for (const line of donor) {
+      if (!foundDonorHeader && isFlatJobHeaderLine(line)) {
+        foundDonorHeader = true;
+        kept.push(line);
+        continue;
+      }
+      if (!foundDonorHeader && isAccomplishmentLine(line)) {
+        moved.push(line);
+        continue;
+      }
+      kept.push(line);
+    }
+
+    if (moved.length) {
+      out[i] = [...out[i], ...moved];
+      out[i + 1] = kept;
+    }
+  }
+
+  return out.filter((chunk) => chunk.length);
 }
 
 function splitExperienceContentIntoJobs(content) {
@@ -131,16 +194,14 @@ function splitExperienceContentIntoJobs(content) {
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
     const next = lines[i + 1] || '';
-    const currentHasDate = current.some((l) => DATE_RANGE_RE.test(l));
+    const currentHasJobHeader = current.some((l) => isFlatJobHeaderLine(l) || isLikelyJobTitleLine(l));
+    const currentHasBullets = current.some((l) => isAccomplishmentLine(l));
     const startsJob =
-      (isLikelyJobTitleLine(line) && isDateLine(next)) ||
-      (DATE_RANGE_RE.test(line) &&
-        JOB_ROLE_WORD.test(line) &&
-        line.length < 200 &&
-        current.length > 0 &&
-        currentHasDate);
+      (isFlatJobHeaderLine(line) && current.length > 0) ||
+      (isLikelyJobTitleLine(line) && isDateLine(next) && current.length > 0 && currentHasJobHeader) ||
+      (isLikelyJobTitleLine(line) && isDateLine(next) && current.length === 0);
 
-    if (startsJob) {
+    if (startsJob && current.length > 0) {
       flush();
     }
 
@@ -148,7 +209,9 @@ function splitExperienceContentIntoJobs(content) {
   }
   flush();
 
-  return chunks
+  const balanced = attachBulletsToHeaderOnlyChunks(chunks);
+
+  return balanced
     .map((chunkLines) => {
       const text = chunkLines.join('\n');
       return {
@@ -238,12 +301,7 @@ function extractAccomplishmentLines(block) {
   return String(block || '')
     .split('\n')
     .map((l) => l.trim())
-    .filter((l) => {
-      if (!l || isDateLine(l) || isLikelyJobTitleLine(l)) return false;
-      if (/^[-•*]/.test(l)) return true;
-      if (DATE_RANGE_RE.test(l)) return false;
-      return l.length >= 48;
-    });
+    .filter((l) => isAccomplishmentLine(l));
 }
 
 function normalizeCompanyKey(company) {
@@ -388,4 +446,7 @@ module.exports = {
   rebuildExperienceSection,
   mergeMissingBulletsIntoBlock,
   replaceExperienceSectionContent,
+  isFlatJobHeaderLine,
+  isAccomplishmentLine,
+  stripBulletPrefix,
 };

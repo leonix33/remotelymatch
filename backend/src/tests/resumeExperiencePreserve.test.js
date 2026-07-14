@@ -178,6 +178,34 @@ Bon Secours Mercy Health
     assert.ok(repaired.tailoredResumeText.includes('CKA'));
   });
 
+  it('restores bullets when polish puts job headers and accomplishments on bullet lines', () => {
+    const { enforceExperienceIntegrity } = require('../services/resumeExperiencePerfectionService');
+    const brokenPolish = `LEONIX ASONGWE
+
+PROFESSIONAL EXPERIENCE
+- Cloud Platform Engineer Feb 2022 Present Bon Secours Mercy Health | Houston, TX |
+- DevOps Engineer Aug 2020 Jan 2022 Wimora Technology | Kubernetes & DevSecOps | Azure & AWS
+- Built and secured Kubernetes clusters including deployments, scaling, ingress controllers, and network policies – Kubernetes platform availability maintained and production incidents resolved within SLA.
+- Cloud / DevOps Dec 2016 Jul 2020 PRIMUS Global Services | Multi-Account AWS | Enterprise & Regulated Clients
+- Built and operated multi-account AWS environments using EC2, VPC, IAM, S3, RDS, Lambda, and CloudFormation for enterprise and regulated clients – infrastructure availability and SOC 2-aligned security controls maintained across all managed client environments.
+- Architected and deployed secure Azure Databricks environments incorporating VNet injection and private endpoints.
+- Developed scalable ETL pipelines in Azure Databricks utilizing PySpark, optimizing data processing from ADLS Gen2.
+- Created Generative AI proof-of-concepts powered by Azure OpenAI, utilizing RAG and secure data access patterns.`;
+
+    const restored = enforceExperienceIntegrity(leonixResume, brokenPolish);
+    const bonIdx = restored.indexOf('Bon Secours Mercy Health');
+    const wimoraIdx = restored.indexOf('Wimora Technology');
+    const primusIdx = restored.indexOf('PRIMUS Global Services');
+    assert.ok(bonIdx >= 0 && wimoraIdx > bonIdx && primusIdx > wimoraIdx);
+    assert.ok(restored.includes('Architected Azure Databricks environments'));
+    assert.ok(
+      restored.includes('Implemented DevSecOps pipelines') ||
+        restored.includes('Built and secured Kubernetes clusters')
+    );
+    assert.ok(restored.includes('multi-account AWS environments'));
+    assert.ok(restored.includes('Led on-premises to cloud migration'));
+  });
+
   it('finalizeTailoredResume restores all jobs when AI returns only the latest role', () => {
     const structure = parseResumeStructure(leonixResume);
     const kit = {

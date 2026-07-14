@@ -380,12 +380,13 @@ async function refineKitForInterview({
 RULES:
 1. ONLY edit summary/profile and experience bullets — never change employers, titles, dates, education, or certifications.
 2. Keep EXACTLY the same number of jobs and the same bullet count per job as the original resume.
-3. Rewrite each bullet to align with the job description — substitute keywords/phrasing, keep the candidate's real facts.
-4. Address missing ATS terms naturally (max once each): ${(redTerms || []).join(', ') || 'none'}
-5. Mirror uncovered posting requirements with real experience from the original resume — never invent.
-6. Summary: 3 lines naming the target role and top qualifications from the posting.
-7. Cover letter: 4 sentences — ${job?.title || 'role'} at ${job?.company || 'company'}, fit, proof point, close.
-8. Return JSON only: { "sections": [...], "coverLetterParagraph": "..." }`;
+3. Job headers must NOT use bullet prefixes (-, •, *). Headers on their own lines; accomplishment bullets only under the correct employer.
+4. Rewrite each bullet to align with the job description — substitute keywords/phrasing, keep the candidate's real facts. Never delete bullets.
+5. Address missing ATS terms naturally (max once each): ${(redTerms || []).join(', ') || 'none'}
+6. Mirror uncovered posting requirements with real experience from the original resume — never invent.
+7. Summary: 3 lines naming the target role and top qualifications from the posting.
+8. Cover letter: 4 sentences — ${job?.title || 'role'} at ${job?.company || 'company'}, fit, proof point, close.
+9. Return JSON only: { "sections": [...], "coverLetterParagraph": "..." }`;
 
   const user = `TARGET: ${job?.title || 'Role'} at ${job?.company || 'Company'}
 ATS score: ${atsScore}% · Job requirement fit: ${jdMatchPct ?? '—'}%
