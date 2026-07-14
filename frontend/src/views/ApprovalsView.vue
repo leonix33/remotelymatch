@@ -616,7 +616,7 @@ onMounted(() => {
                 <div class="mt-2">
                   <KitReadinessBadges :kit="job.kit" />
                 </div>
-                <MatchCopilotBrief :job-id="job.jobId" />
+                <MatchCopilotBrief :job-id="job.jobId" :job="job" lazy compact />
                 <button
                   type="button"
                   class="mt-2 text-xs text-teal-400 hover:underline"

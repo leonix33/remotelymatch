@@ -4,22 +4,79 @@ const profileService = require('./profileService');
 const jobService = require('./jobService');
 const applicationKitService = require('./applicationKitService');
 
+const MATCH_CACHE_TTL_MS = 60 * 60 * 1000;
+const matchCache = new Map();
+
 function requireMongo() {
   if (!env.mongoUri) throw new Error('MongoDB is required');
+}
+
+function matchCacheKey(userId, jobId) {
+  return `${userId}:${jobId}`;
+}
+
+function readMatchCache(userId, jobId) {
+  const entry = matchCache.get(matchCacheKey(userId, jobId));
+  if (!entry) return null;
+  if (Date.now() - entry.at > MATCH_CACHE_TTL_MS) {
+    matchCache.delete(matchCacheKey(userId, jobId));
+    return null;
+  }
+  return entry.value;
+}
+
+function writeMatchCache(userId, jobId, value) {
+  matchCache.set(matchCacheKey(userId, jobId), { at: Date.now(), value });
+}
+
+function verdictFromPct(matchPct) {
+  if (matchPct >= 80) return 'strong';
+  if (matchPct >= 65) return 'good';
+  if (matchPct >= 50) return 'stretch';
+  return 'weak';
+}
+
+function buildFallbackAnalysis(job, profile = null) {
+  const matchPct = Number(job.matchPct ?? job.personalMatchPct ?? 0) || 0;
+  const strengths = (job.strengths || []).filter(Boolean).slice(0, 4);
+  const gaps = (job.gaps || []).filter(Boolean).slice(0, 3);
+  const target = (profile?.targetTitles || []).slice(0, 2).join(', ');
+  const oneLiner = target
+    ? `${job.title} at ${job.company} — ${matchPct}% overlap with your ${target} focus.`
+    : `${job.title} at ${job.company} — ${matchPct}% skill overlap.`;
+
+  return {
+    matchPct,
+    verdict: verdictFromPct(matchPct),
+    strengths: strengths.length ? strengths : ['Review your resume against the posting'],
+    gaps: gaps.length ? gaps : ['Open the job description for role-specific gaps'],
+    talkingPoints: [],
+    oneLiner,
+  };
 }
 
 async function aiComplete(userId, system, user, maxTokens = 500) {
   const live = await openaiService.isLive(userId);
   if (!live) {
-    return `[Demo mode — add your OpenAI API key in Profile → AI Integration]\n\n${user.slice(0, 200)}... Analysis would appear here with live AI.`;
+    return {
+      text: `[Demo mode — add your OpenAI API key in Profile → AI Integration]\n\n${user.slice(0, 200)}... Analysis would appear here with live AI.`,
+      live: false,
+    };
   }
-  return openaiService.chatCompletion(userId, {
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    max_tokens: maxTokens,
-  });
+  try {
+    const text = await openaiService.chatCompletion(userId, {
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+    });
+    return { text: text || '', live: true };
+  } catch (err) {
+    console.warn('aiComplete failed:', err.message);
+    return { text: null, live: true, error: err.message };
+  }
 }
 
 function profileBlock(profile) {
@@ -35,32 +92,47 @@ async function findJob(userId, jobId) {
 }
 
 async function matchCopilot(userId, jobId) {
+  const cached = readMatchCache(userId, jobId);
+  if (cached) return cached;
+
   const profile = await profileService.getOrCreate(userId);
   const job = await findJob(userId, jobId);
-  if (!job) throw new Error('Job not found');
+  if (!job) {
+    const err = new Error('Job not found');
+    err.status = 404;
+    throw err;
+  }
 
+  const fallback = buildFallbackAnalysis(job, profile);
   const system = `You are Match Copilot. Analyze job fit. Respond in JSON only:
 {"matchPct":number,"verdict":"strong|good|stretch|weak","strengths":["..."],"gaps":["..."],"talkingPoints":["..."],"oneLiner":"..."}`;
   const user = `PROFILE:\n${profileBlock(profile)}\n\nJOB:\nTitle: ${job.title}\nCompany: ${job.company}\nMatch: ${job.matchPct}%\nSource: ${job.source}\nATS: ${job.atsType}`;
 
-  const raw = await aiComplete(userId, system, user, 400);
-  const live = await openaiService.isLive(userId);
+  const { text: raw, live, error } = await aiComplete(userId, system, user, 400);
+  if (!raw) {
+    const result = { job, analysis: fallback, demo: false, fallback: true, error: error || 'AI unavailable' };
+    writeMatchCache(userId, jobId, result);
+    return result;
+  }
+
   try {
     const json = JSON.parse(raw.replace(/```json\n?|\n?```/g, ''));
-    return { job, analysis: json, demo: !live };
+    const result = { job, analysis: json, demo: !live };
+    writeMatchCache(userId, jobId, result);
+    return result;
   } catch {
-    return {
+    const result = {
       job,
       analysis: {
-        matchPct: job.matchPct,
-        verdict: job.matchPct >= 80 ? 'strong' : job.matchPct >= 65 ? 'good' : 'stretch',
-        strengths: ['Cloud infrastructure', 'Automation'],
-        gaps: ['Review job description for specifics'],
+        ...fallback,
         talkingPoints: [raw.slice(0, 300)],
-        oneLiner: raw.slice(0, 120),
+        oneLiner: raw.slice(0, 120) || fallback.oneLiner,
       },
       demo: !live,
+      fallback: Boolean(error),
     };
+    writeMatchCache(userId, jobId, result);
+    return result;
   }
 }
 
@@ -69,8 +141,8 @@ async function companyIntel(userId, company) {
   const profile = await profileService.getOrCreate(userId);
   const system = `You are a company intelligence analyst for job seekers. Provide concise intel in markdown sections: Culture, Interview Style, Comp Bands (ranges), Remote Policy, Tips for ${profile.targetTitles?.[0] || 'tech'} candidates.`;
   const content = await aiComplete(userId, system, `Company: ${company}`, 600);
-  const live = await openaiService.isLive(userId);
-  return { company, intel: content, demo: !live };
+  const live = content.live;
+  return { company, intel: content.text || '', demo: !live };
 }
 
 async function salaryOracle(userId, query) {
@@ -79,8 +151,8 @@ async function salaryOracle(userId, query) {
   const system = `You are a compensation advisor. Give US remote salary range (USD), equity note, and a 3-sentence negotiation script. Be realistic for 2025-2026.`;
   const user = `Query: ${query}\nCandidate context: ${profile.headline || profile.targetTitles?.[0] || 'engineer'}, skills: ${(profile.mustHaveSkills || []).slice(0, 5).join(', ')}`;
   const content = await aiComplete(userId, system, user, 450);
-  const live = await openaiService.isLive(userId);
-  return { query, report: content, demo: !live };
+  const live = content.live;
+  return { query, report: content.text || '', demo: !live };
 }
 
 async function resumeDiff(userId, jobId) {
@@ -119,7 +191,7 @@ async function agentWhisper(userId, limit = 10) {
 
   const raw = await aiComplete(userId, system, user, 500);
   try {
-    const items = JSON.parse(raw.replace(/```json\n?|\n?```/g, ''));
+    const items = JSON.parse((raw.text || '').replace(/```json\n?|\n?```/g, ''));
     return jobs.map((j) => {
       const w = items.find((i) => i.jobId === j.jobId) || {};
       return { ...j, rationale: w.rationale || 'Review manually', recommend: w.recommend || 'review' };
@@ -141,7 +213,7 @@ async function voiceApplyParse(userId, transcript) {
   const user = `Transcript: "${transcript}"\nTop jobs:\n${jobs.slice(0, 15).map((j) => `${j.jobId}|${j.title}|${j.company}`).join('\n')}`;
   const raw = await aiComplete(userId, system, user, 200);
   try {
-    return JSON.parse(raw.replace(/```json\n?|\n?```/g, ''));
+    return JSON.parse((raw.text || '').replace(/```json\n?|\n?```/g, ''));
   } catch {
     return { action: 'queue_top', count: 3, company: '', jobIds: jobs.slice(0, 3).map((j) => j.jobId) };
   }

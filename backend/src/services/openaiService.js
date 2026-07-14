@@ -32,15 +32,17 @@ async function getClient(userId) {
   return new OpenAI({ apiKey: key });
 }
 
-async function chatCompletion(userId, { messages, model, temperature = 0.6, max_tokens = 600 }) {
+async function chatCompletion(userId, { messages, model, temperature = 0.6, max_tokens = 600, response_format }) {
   const client = await getClient(userId);
   if (!client) return null;
-  const response = await client.chat.completions.create({
+  const payload = {
     model: model || defaultModel(),
     messages,
     temperature,
     max_tokens,
-  });
+  };
+  if (response_format) payload.response_format = response_format;
+  const response = await client.chat.completions.create(payload);
   return response.choices[0]?.message?.content?.trim() || '';
 }
 
