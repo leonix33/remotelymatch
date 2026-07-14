@@ -13,6 +13,30 @@ const JOB_ROLE_WORD =
 const MISPLACED_EDUCATION_BLOB_RE =
   /\b(certification portfolio|enterprise cloud platforms|Databricks SME|extensive certification|on-premises to cloud migration)\b/i;
 
+const DEGREE_LINE_RE =
+  /\b(bachelor|master|b\.?s\.?|m\.?s\.?|ph\.?d|degree|university|college|gpa|expected\s+\w+\s+\d{4})\b/i;
+
+function cleanEducationSectionContent(content) {
+  if (!content) return '';
+  return content
+    .split('\n')
+    .filter((line) => {
+      const t = line.trim();
+      if (!t) return true;
+      if (MISPLACED_EDUCATION_BLOB_RE.test(t)) return false;
+      if (
+        t.length > 100 &&
+        !DEGREE_LINE_RE.test(t) &&
+        /\b(certification|expertise|platforms|Databricks|DevSecOps|Kubernetes|Generative AI)\b/i.test(t)
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .join('\n')
+    .trim();
+}
+
 function normalizeForMatch(text) {
   return String(text).toLowerCase().replace(/\s+/g, ' ').trim();
 }
@@ -359,6 +383,7 @@ module.exports = {
   splitExperienceContentIntoJobs,
   preserveExperienceFromOriginal,
   stripMisplacedEducationBlob,
+  cleanEducationSectionContent,
   jobAppearsInResume,
   rebuildExperienceSection,
   mergeMissingBulletsIntoBlock,

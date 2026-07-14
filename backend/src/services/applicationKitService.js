@@ -76,11 +76,21 @@ async function findJob(userId, jobId) {
 
 async function persistEnrichedKit(userId, jobId, kit) {
   if (!kit?.tailored) return kit;
-  const enriched = resumeTailorService.enrichKitForDisplay(kit);
-  if (enriched.tailoredResumeText === kit.tailoredResumeText && enriched.pageCount === kit.pageCount) {
-    return enriched;
+  const profile = await profileService.getOrCreate(userId);
+  const originalResume = profile?.resumeText || '';
+  const enriched = resumeTailorService.enrichKitForDisplay(kit, originalResume);
+  const changed =
+    enriched.tailoredResumeText !== kit.tailoredResumeText ||
+    enriched.pageCount !== kit.pageCount ||
+    kit.pipelineVersion !== KIT_PIPELINE_VERSION;
+
+  if (changed) {
+    return applicationKitStore.set(userId, jobId, {
+      ...enriched,
+      pipelineVersion: KIT_PIPELINE_VERSION,
+    });
   }
-  return applicationKitStore.set(userId, jobId, enriched);
+  return enriched;
 }
 
 async function getKit(userId, jobId) {
@@ -110,14 +120,23 @@ async function getKit(userId, jobId) {
   return kit;
 }
 
-async function ensureMinimumAtsScore(userId, kit, profile, job, jobDescription, contact, tailorFocus = '') {
+async function ensureMinimumAtsScore(
+  userId,
+  kit,
+  profile,
+  job,
+  jobDescription,
+  contact,
+  tailorFocus = '',
+  options = {}
+) {
   if (!kit?.tailored) return kit;
 
   let working = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
   if ((working.atsScore ?? 0) >= ATS_TARGET_MIN) return working;
 
   const { getRedTerms } = require('./atsKeywordService');
-  const maxRounds = 3;
+  const maxRounds = Math.max(0, Number(options.maxRounds ?? 3));
 
   for (let round = 0; round < maxRounds && (working.atsScore ?? 0) < ATS_TARGET_MIN; round += 1) {
     const focusParts = [
@@ -135,12 +154,43 @@ async function ensureMinimumAtsScore(userId, kit, profile, job, jobDescription, 
       kit: working,
       tailorFocus: focus,
       highMatchTarget: ATS_TARGET_MIN,
-      maxPasses: 4,
+      maxPasses: options.maxPasses ?? 4,
     });
     working = resumeTailorService.applyAtsMetadata(working, jobDescription, job);
   }
 
   return working;
+}
+
+function formatKitGenerationError(err) {
+  const msg = String(err?.message || err || '');
+  if (err?.status) {
+    const error = new Error(msg);
+    error.status = err.status;
+    return error;
+  }
+  if (/abort|timeout|timed out|ETIMEDOUT|ECONNABORTED/i.test(msg)) {
+    const error = new Error(
+      'Resume tailoring timed out. Try again — if it keeps failing, use Queue → Polish until ready for this role.'
+    );
+    error.status = 504;
+    return error;
+  }
+  if (/rate limit|429|quota|insufficient/i.test(msg)) {
+    const error = new Error('OpenAI rate limit hit. Wait a minute and try Generate kit again.');
+    error.status = 429;
+    return error;
+  }
+  if (/invalid_api_key|authentication|401/i.test(msg)) {
+    const error = new Error(
+      'OpenAI key rejected. Update your key in Profile → AI Integration or ask admin to refresh the server key.'
+    );
+    error.status = 401;
+    return error;
+  }
+  const error = new Error(msg || 'Could not generate application kit');
+  error.status = 500;
+  return error;
 }
 
 async function generateForJob(userId, jobId, options = {}) {
@@ -172,7 +222,9 @@ async function generateForJob(userId, jobId, options = {}) {
 
   const job = options.job || (await findJob(userId, jobId));
   if (!job) {
-    const err = new Error('Job not found');
+    const err = new Error(
+      `Job not found (${jobId}). Re-open it from Browse jobs or your queue, then try Generate kit again.`
+    );
     err.status = 404;
     throw err;
   }
@@ -196,35 +248,35 @@ async function generateForJob(userId, jobId, options = {}) {
     throw err;
   }
 
-  let kit = await resumeTailorService.generateAdditiveKit({
-    userId,
-    profile,
-    job,
-    jobDescription,
-    contact,
-    tailorFocus: tailorFocus || existing?.tailorFocus || '',
-    supplementPages,
-    tailorMode,
-    highMatchTarget,
-  });
+  let kit;
+  try {
+    kit = await resumeTailorService.generateAdditiveKit({
+      userId,
+      profile,
+      job,
+      jobDescription,
+      contact,
+      tailorFocus: tailorFocus || existing?.tailorFocus || '',
+      supplementPages,
+      tailorMode,
+      highMatchTarget,
+    });
+  } catch (err) {
+    throw formatKitGenerationError(err);
+  }
 
-  kit = await resumeTailorService.perfectExperienceForKit({
-    userId,
-    profile,
-    job,
-    jobDescription,
-    kit,
-  });
+  if (!kit?.tailored || !kit?.tailoredResumeText) {
+    const err = new Error(
+      'Tailoring returned an empty kit. Re-upload your resume in Profile, then try Generate kit again.'
+    );
+    err.status = 500;
+    throw err;
+  }
 
-  kit = await ensureMinimumAtsScore(
-    userId,
-    kit,
-    profile,
-    job,
-    jobDescription,
-    contact,
-    tailorFocus || existing?.tailorFocus || ''
-  );
+  // Fast first pass: one OpenAI call + structural repair (fits Render free-tier timeouts).
+  // Queue → Polish until ready runs perfection + ATS boost for 95%+.
+  kit = resumeTailorService.repairKitAgainstProfile(profile.resumeText, kit, jobDescription);
+  kit = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
 
   const saved = await applicationKitStore.set(userId, jobId, {
     ...kit,
@@ -585,8 +637,8 @@ async function applicationMetaForJob(userId, jobId) {
   };
 }
 
-function kitListItem(kit) {
-  const display = kit?.tailored ? resumeTailorService.enrichKitForDisplay(kit) : kit;
+function kitListItem(kit, originalResume = '') {
+  const display = kit?.tailored ? resumeTailorService.enrichKitForDisplay(kit, originalResume) : kit;
   return {
     jobId: display.jobId,
     jobTitle: display.jobTitle,
@@ -620,8 +672,12 @@ function kitListItem(kit) {
 }
 
 async function listKits(userId) {
-  const kits = await applicationKitStore.listForUser(userId);
-  return kits.map((kit) => kitListItem(kit));
+  const [kits, profile] = await Promise.all([
+    applicationKitStore.listForUser(userId),
+    profileService.getOrCreate(userId),
+  ]);
+  const originalResume = profile?.resumeText || '';
+  return kits.map((kit) => kitListItem(kit, originalResume));
 }
 
 async function setKitPreference(userId, jobId, { useForApply, tailorFocus }) {

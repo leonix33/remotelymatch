@@ -21,9 +21,19 @@ function escapeRegExp(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const CERT_LINE_RE =
+  /\b(certified|certification|certificate|credential|associate|professional|expert|fundamentals|CKA|CKAD|Terraform|Security\+|Network\+|Cloud\+|AWS |Azure |GCP |Databricks)\b/i;
+
+function isCertificationLine(line) {
+  const t = String(line || '').trim();
+  if (!t) return false;
+  if (/^(certifications?|credentials|licenses?)\b/i.test(t)) return false;
+  return CERT_LINE_RE.test(t) && !/^[-•*]/.test(t);
+}
+
 function isMisplacedExperienceLine(line) {
   const t = String(line || '').trim();
-  if (!t || DEGREE_LINE_RE.test(t)) return false;
+  if (!t || DEGREE_LINE_RE.test(t) || isCertificationLine(t)) return false;
   if (!isAccomplishmentLine(t) && !EXPERIENCE_BULLET_RE.test(t)) return false;
   return (
     EXPERIENCE_BULLET_RE.test(t) ||
@@ -61,12 +71,18 @@ function restoreImmutableSections(originalResume, tailoredText) {
   for (const section of originalStructure.sections) {
     if (!section.immutable || !section.heading || !section.content) continue;
 
+    let sourceContent = section.content;
+    if (section.key === 'education') {
+      const { cleanEducationSectionContent } = require('./resumeExperiencePreserveService');
+      sourceContent = cleanEducationSectionContent(sourceContent);
+    }
+
     const slice = extractSectionBody(text, tailoredStructure, section.key);
     if (slice.start < 0) {
-      text = `${text.trim()}\n\n${section.heading}\n${section.content}`;
+      text = `${text.trim()}\n\n${section.heading}\n${sourceContent}`;
       continue;
     }
-    text = `${text.slice(0, slice.start)}${section.content}${text.slice(slice.end)}`;
+    text = `${text.slice(0, slice.start)}${sourceContent}${text.slice(slice.end)}`;
   }
 
   return text.trim();
@@ -133,6 +149,8 @@ function sanitizeTailoredResume(originalResume, tailoredText, kit = {}) {
   text = restoreImmutableSections(originalResume, text);
   text = restoreSectionFromOriginal(originalResume, text, 'summary');
   text = restoreSectionFromOriginal(originalResume, text, 'skills');
+  text = restoreSectionFromOriginal(originalResume, text, 'education');
+  text = restoreSectionFromOriginal(originalResume, text, 'certifications');
   text = relocateMisplacedExperienceBullets(originalResume, text);
 
   const structure = parseResumeStructure(originalResume);

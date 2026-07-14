@@ -25,6 +25,16 @@ const supplementPages = ref(4);
 const tailorMode = ref('high_match');
 const viewTab = ref('preview');
 
+function kitErrorMessage(err) {
+  if (err?.code === 'ECONNABORTED') {
+    return 'Tailoring timed out. The server may still be waking up — wait 30 seconds and try Generate kit again.';
+  }
+  if (!err?.response) {
+    return 'Network error while generating kit. Check your connection and try again.';
+  }
+  return err.response?.data?.message || err.message || 'Could not generate application kit';
+}
+
 async function loadKit() {
   loading.value = true;
   error.value = '';
@@ -66,18 +76,22 @@ async function generate() {
   error.value = '';
   prefMsg.value = '';
   try {
-    const { data } = await http.post(`/applications/kit/${encodeURIComponent(props.job.jobId)}/generate`, {
-      tailorResume: tailor.value,
-      force: true,
-      tailorFocus: tailorFocus.value.trim(),
-    });
+    const { data } = await http.post(
+      `/applications/kit/${encodeURIComponent(props.job.jobId)}/generate`,
+      {
+        tailorResume: tailor.value,
+        force: true,
+        tailorFocus: tailorFocus.value.trim(),
+      },
+      { timeout: KIT_GENERATE_TIMEOUT_MS }
+    );
     kit.value = data;
     useForApply.value = data.useForApply !== false;
     supplementPages.value = data.supplementPagesTarget || data.pageCount || supplementPages.value;
     tailorMode.value = data.tailorMode || tailorMode.value;
     emit('updated', data);
   } catch (e) {
-    error.value = e.response?.data?.message || 'Could not generate application kit';
+    error.value = kitErrorMessage(e);
   } finally {
     generating.value = false;
   }
@@ -282,6 +296,9 @@ watch(
         <button class="btn-primary text-sm" :disabled="generating" @click="generate">
           {{ generating ? 'Generating…' : kit?.tailored ? 'Re-tailor for this role' : 'Generate kit' }}
         </button>
+        <p v-if="generating" class="mt-2 text-xs text-slate-500">
+          First-time tailoring can take 1–2 minutes. Use Queue → Polish until ready afterward for 95%+ ATS.
+        </p>
       </div>
 
       <div v-if="viewTab === 'preview' && kit?.tailored" class="mt-4 flex flex-wrap gap-2">

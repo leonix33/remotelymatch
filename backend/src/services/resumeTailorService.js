@@ -81,34 +81,32 @@ function inferResumePageTarget(resumeText, requestedPages) {
 }
 
 function extractMustPreserveFromResume(resumeText = '') {
-  const lines = String(resumeText).split('\n');
+  const structure = parseResumeStructure(resumeText);
+  const { cleanEducationSectionContent } = require('./resumeExperiencePreserveService');
   const preserved = [];
-  const sectionStart =
-    /^(certifications?|credentials|licenses?|education|training|clearances?|professional development)\b/i;
+
+  for (const section of structure.sections) {
+    if (!['education', 'certifications', 'credentials', 'licenses', 'training', 'clearances'].includes(section.key)) {
+      continue;
+    }
+    if (section.heading) preserved.push(section.heading);
+    const content =
+      section.key === 'education' ? cleanEducationSectionContent(section.content) : section.content;
+    for (const line of String(content || '').split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed) preserved.push(trimmed);
+    }
+  }
+
   const certLine =
     /\b(certified|certification|certificate|license|licensed|credential|AWS |Azure |GCP |CKA|CKAD|PMP|CISSP|CompTIA|Security\+|Terraform Associate|associate|professional)\b/i;
-
-  let captureSection = false;
-  for (const line of lines) {
+  for (const line of String(resumeText).split('\n')) {
     const trimmed = line.trim();
-    if (!trimmed) {
-      if (captureSection) preserved.push('');
-      continue;
-    }
-    if (sectionStart.test(trimmed)) {
-      captureSection = true;
+    if (trimmed && certLine.test(trimmed) && !preserved.includes(trimmed)) {
       preserved.push(trimmed);
-      continue;
     }
-    if (captureSection) {
-      preserved.push(trimmed);
-      if (/^(experience|work history|employment|skills|projects|summary)\b/i.test(trimmed)) {
-        captureSection = false;
-      }
-      continue;
-    }
-    if (certLine.test(trimmed)) preserved.push(trimmed);
   }
+
   return [...new Set(preserved.filter(Boolean))];
 }
 
@@ -154,6 +152,9 @@ function finalizeTailoredResume(originalResume, structure, kit) {
   }
 
   if (!text) return text;
+
+  const { restoreImmutableSections } = require('./resumeSectionSanitizeService');
+  text = restoreImmutableSections(originalResume, text);
 
   const headerBlock = structure.headerLines.join('\n').trim();
   if (headerBlock && !text.includes(structure.headerLines[0]?.trim())) {
@@ -587,8 +588,33 @@ function finalizeNormalizedKit(kit, pageTarget, jobDescription = '') {
   return enriched;
 }
 
-function enrichKitForDisplay(kit) {
+function repairKitAgainstProfile(originalResume, kit, jobDescription = '') {
+  if (!kit?.tailored || !(originalResume || '').trim()) return kit;
+
+  const structure = parseResumeStructure(originalResume);
+  const raw =
+    kit.tailoredResumeText ||
+    kit.fullSupplementText ||
+    (Array.isArray(kit.supplementPages) ? kit.supplementPages.map((p) => p.content).join('\n\n') : '') ||
+    '';
+
+  if (!raw.trim()) return kit;
+
+  const repairedText = finalizeTailoredResume(originalResume, structure, {
+    ...kit,
+    tailoredResumeText: raw,
+  });
+  const pageTarget = clampPageCount(kit.supplementPagesTarget || kit.pageCount || DEFAULT_SUPPLEMENT_PAGES);
+  return finalizeNormalizedKit({ ...kit, tailoredResumeText: repairedText }, pageTarget, jobDescription);
+}
+
+function enrichKitForDisplay(kit, originalResume = '') {
   if (!kit?.tailored) return kit;
+
+  if ((originalResume || '').trim()) {
+    return repairKitAgainstProfile(originalResume, kit);
+  }
+
   const raw =
     kit.tailoredResumeText ||
     kit.fullSupplementText ||
@@ -785,7 +811,7 @@ CRITICAL KEYWORDS: ${jdBrief.criticalTerms.slice(0, 18).join(', ')}
 JOB DESCRIPTION:
 ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice(0, 1500)}` : ''}`;
 
-  const maxTokens = Math.min(4500, 800 + pageTarget * 450);
+  const maxTokens = Math.min(6000, 1200 + pageTarget * 450 + Math.max(0, jobCount) * 220);
 
   const response = await client.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -796,6 +822,10 @@ ${fullJd}${tailorFocus ? `\n\nNOTES FROM CANDIDATE:\n${String(tailorFocus).slice
     temperature: 0.42,
     max_tokens: maxTokens,
     response_format: { type: 'json_object' },
+  }).catch((err) => {
+    const wrapped = new Error(err?.message || 'OpenAI request failed');
+    wrapped.status = err?.status || 502;
+    throw wrapped;
   });
 
   const raw = response.choices[0]?.message?.content?.trim() || '';
@@ -868,6 +898,7 @@ module.exports = {
   clampPageCount,
   finalizeTailoredResume,
   enrichKitForDisplay,
+  repairKitAgainstProfile,
   finalizeNormalizedKit,
   applyAtsMetadata,
   perfectExperienceForKit,

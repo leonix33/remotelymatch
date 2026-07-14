@@ -168,10 +168,17 @@ function parseResumeStructure(resumeText = '') {
 
   return {
     headerLines: headerLines.map((l) => l.trimEnd()),
-    sections: reconciled.map((s) => ({
-      ...s,
-      content: s.contentLines.join('\n').trim(),
-    })),
+    sections: reconciled.map((s) => {
+      let content = s.contentLines.join('\n').trim();
+      if (s.key === 'education') {
+        const { cleanEducationSectionContent } = require('./resumeExperiencePreserveService');
+        content = cleanEducationSectionContent(content);
+      }
+      return {
+        ...s,
+        content,
+      };
+    }),
     sectionOrder: reconciled.map((s) => s.key),
     headingStyle,
   };

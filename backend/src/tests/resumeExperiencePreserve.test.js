@@ -75,6 +75,14 @@ Azure DevOps Engineer Expert | CKA`;
     assert.ok(restored.includes('multi-account AWS environments'));
   });
 
+  it('parseResumeStructure strips certification summary blobs from education', () => {
+    const structure = parseResumeStructure(leonixResume);
+    const edu = structure.sections.find((s) => s.key === 'education')?.content || '';
+    assert.ok(!edu.includes('certification portfolio across Azure'));
+    assert.ok(edu.includes('Western Governors University'));
+    assert.ok(edu.includes('University of Yaounde'));
+  });
+
   it('strips misplaced certification summary blob from education', () => {
     const structure = parseResumeStructure(leonixResume);
     const blobOnly = `LEONIX ASONGWE
@@ -129,6 +137,45 @@ DevOps Engineer Aug 2020 Jan 2022 Wimora Technology
     const wimoraIdx = restored.indexOf('Wimora Technology');
     const primusIdx = restored.indexOf('PRIMUS Global Services');
     assert.ok(bonIdx >= 0 && wimoraIdx > bonIdx && primusIdx > wimoraIdx);
+  });
+
+  it('repairKitAgainstProfile restores all employers and cleans education for Leonix-style resumes', () => {
+    const { repairKitAgainstProfile } = require('../services/resumeTailorService');
+    const brokenKit = {
+      tailored: true,
+      pageCount: 4,
+      supplementPagesTarget: 4,
+      tailoredResumeText: `LEONIX ASONGWE
+leonix23@gmail.com
+
+PROFESSIONAL SUMMARY
+Azure DevOps Engineer with over 9 years of experience.
+
+TECHNICAL SKILLS
+Azure Platform: AKS, Azure Data Factory, ADLS Gen2…
+
+EDUCATION
+🎓
+designing, automating, securing, and operating enterprise cloud platforms across Azure, AWS, and GCP. Deep expertise in Azure platform engineering.
+Master of Science Information Technology | Western Governors University | Expected Dec 2026 (In Progress)
+
+CERTIFICATIONS
+Azure DevOps Engineer Expert | Azure Data Engineer Associate |
+
+PROFESSIONAL EXPERIENCE
+Cloud Platform Engineer
+Feb 2022 – Present
+Bon Secours Mercy Health
+- Architected Azure Databricks environments from scratch.`,
+    };
+
+    const repaired = repairKitAgainstProfile(leonixResume, brokenKit);
+    assert.ok(repaired.tailoredResumeText.includes('Wimora Technology'));
+    assert.ok(repaired.tailoredResumeText.includes('PRIMUS Global Services'));
+    assert.ok(!repaired.tailoredResumeText.includes('enterprise cloud platforms across Azure, AWS, and GCP'));
+    assert.ok(repaired.tailoredResumeText.includes('Western Governors University'));
+    assert.ok(repaired.tailoredResumeText.includes('University of Yaounde'));
+    assert.ok(repaired.tailoredResumeText.includes('CKA'));
   });
 
   it('finalizeTailoredResume restores all jobs when AI returns only the latest role', () => {
