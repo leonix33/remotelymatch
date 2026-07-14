@@ -1,6 +1,6 @@
 const openaiService = require('./openaiService');
 const env = require('../config/env');
-const { resolveTailorOptions, TAILOR_MODE, DEFAULT_SUPPLEMENT_PAGES, RESUME_INTEGRITY_CONTRACT } = require('../config/tailorDefaults');
+const { resolveTailorOptions, TAILOR_MODE, DEFAULT_SUPPLEMENT_PAGES, RESUME_INTEGRITY_CONTRACT, TARGET_BULLETS_PER_JOB } = require('../config/tailorDefaults');
 const { contactHeader, contactSignature } = require('./applicantContactService');
 const { HUMAN_WRITING_PROMPT, humanizeKit } = require('./humanizeWritingService');
 const { prepareResumeTextForParsing } = require('./resumeRepairService');
@@ -79,7 +79,8 @@ function inferResumePageTarget(resumeText, requestedPages) {
   const jobCount = splitExperienceContentIntoJobs(exp?.content || '').length;
   const fromLength = Math.max(1, Math.ceil(words / 320));
   const fromJobs = Math.max(1, Math.ceil(jobCount / 1.5));
-  const computed = Math.max(fromLength, fromJobs, DEFAULT_SUPPLEMENT_PAGES);
+  const fromBullets = Math.max(1, Math.ceil((jobCount * TARGET_BULLETS_PER_JOB) / 7));
+  const computed = Math.max(fromLength, fromJobs, fromBullets, DEFAULT_SUPPLEMENT_PAGES);
 
   if (requestedPages != null && Number.isFinite(Number(requestedPages))) {
     return clampPageCount(Number(requestedPages));
@@ -397,7 +398,7 @@ async function refineKitForInterview({
 
 RULES:
 1. ONLY edit summary/profile and experience bullets — never change employers, titles, dates, education, or certifications.
-2. Keep EXACTLY the same number of jobs and the same bullet count per job as the original resume.
+2. Keep EXACTLY the same number of jobs. Target ${TARGET_BULLETS_PER_JOB} accomplishment bullets per role (expand by decomposing real accomplishments when the original has fewer).
 3. Job headers must NOT use bullet prefixes (-, •, *). Headers on their own lines; accomplishment bullets only under the correct employer.
 4. Rewrite each bullet to align with the job description — substitute keywords/phrasing, keep the candidate's real facts. Never delete bullets.
 5. Address missing ATS terms naturally (max once each): ${(redTerms || []).join(', ') || 'none'}
@@ -774,9 +775,10 @@ JOB-TARGET RULES:
 2. Experience bullets must prove qualifications from the posting using the candidate's real work only.
 3. Each critical keyword/requirement appears at most once — varied wording, no stuffing.
 4. Experience: keep ALL ${jobCount || 'original'} employer role(s) — titles, dates, companies unchanged (${jobEmployers || 'every employer from original'}).
-5. For EACH job, keep the EXACT same number of bullets as the original resume. Rewrite bullet wording to match the job description — never delete roles or drop bullets.
-6. Substitute phrasing and keywords in each bullet so prior jobs read relevant to the target role while staying truthful.
-7. Every bullet: one complete sentence (180-320 chars), action verb, scope, technology, outcome where possible.
+5. For EACH job, output EXACTLY ${TARGET_BULLETS_PER_JOB} accomplishment bullets (or more if the original already has more). If the original has fewer, decompose scope/technologies/outcomes from the same real work — never invent employers or metrics.
+6. Rewrite bullet wording to match the job description — never delete roles.
+7. Substitute phrasing and keywords in each bullet so prior jobs read relevant to the target role while staying truthful.
+8. Every bullet: one complete sentence (180-320 chars), action verb, scope, technology, outcome where possible.
 
 STRUCTURE RULES:
 1. EXACT section headings from original, same order.
@@ -819,8 +821,8 @@ ${preservedCredentials.length ? preservedCredentials.join('\n') : 'All certifica
 ORIGINAL EMPLOYERS (${jobCount} role(s) — include every one in EXPERIENCE output):
 ${jobCount ? originalJobs.map((j, i) => `${i + 1}. ${j.title || 'Role'} — ${j.company || 'employer from original'}`).join('\n') : 'All roles from FULL ORIGINAL RESUME'}
 
-EXPERIENCE PERFECTION CONTRACT (mandatory — same job count and bullet count per job):
-${experienceBlueprint.length ? experienceBlueprint.map((b) => `Job ${b.index}: ${b.title || 'Role'} at ${b.company || 'employer'} — header unchanged, EXACTLY ${b.bulletCount} rewritten bullets aligned to the posting`).join('\n') : 'Keep every job and bullet from the original resume.'}
+EXPERIENCE PERFECTION CONTRACT (mandatory — same job count, ~${TARGET_BULLETS_PER_JOB} bullets per role):
+${experienceBlueprint.length ? experienceBlueprint.map((b) => `Job ${b.index}: ${b.title || 'Role'} at ${b.company || 'employer'} — header unchanged, EXACTLY ${b.bulletCount} rewritten bullets aligned to the posting${b.needsAiExpansion ? ' (expand from original accomplishments — same facts only)' : ''}`).join('\n') : `Keep every job; target ${TARGET_BULLETS_PER_JOB} bullets per role.`}
 
 TARGET ROLE: ${job?.title} at ${job?.company}
 TAILOR MODE: ${effectiveMode} (ATS + job-requirement alignment)

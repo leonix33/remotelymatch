@@ -199,7 +199,7 @@ function describeStructureForPrompt(structure) {
       lines.push(`- [${section.key.toUpperCase()}] "${label}" — COPY VERBATIM, no edits`);
     } else if (section.key === 'experience') {
       lines.push(
-        `- [EXPERIENCE] "${label}" — keep EVERY employer and the EXACT bullet count per job from the original; copy titles, dates, and companies verbatim; rewrite bullet wording only to match the target job`
+        `- [EXPERIENCE] "${label}" — keep EVERY employer; target ~10 accomplishment bullets per role (expand from real accomplishments when the original has fewer); copy titles, dates, and companies verbatim; rewrite bullet wording only to match the target job`
       );
     } else if (section.key === 'summary') {
       lines.push(

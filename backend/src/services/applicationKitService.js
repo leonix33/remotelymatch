@@ -276,6 +276,16 @@ async function generateForJob(userId, jobId, options = {}) {
   // Fast first pass: one OpenAI call + structural repair (fits Render free-tier timeouts).
   // Queue → Polish until ready runs perfection + ATS boost for 95%+.
   kit = resumeTailorService.repairKitAgainstProfile(profile.resumeText, kit, jobDescription);
+  if (await openaiService.isLive(userId)) {
+    kit = await resumeTailorService.perfectExperienceForKit({
+      userId,
+      profile,
+      job,
+      jobDescription,
+      kit,
+    });
+  }
+  kit = resumeTailorService.repairKitAgainstProfile(profile.resumeText, kit, jobDescription);
   kit = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
 
   const saved = await applicationKitStore.set(userId, jobId, {
@@ -411,6 +421,16 @@ async function polishUntilReady(userId, jobId, options = {}) {
     throw wrapped;
   }
 
+  polished = resumeTailorService.repairKitAgainstProfile(profile.resumeText, polished, jobDescription);
+  if (await openaiService.isLive(userId)) {
+    polished = await resumeTailorService.perfectExperienceForKit({
+      userId,
+      profile,
+      job,
+      jobDescription,
+      kit: polished,
+    });
+  }
   polished = resumeTailorService.repairKitAgainstProfile(profile.resumeText, polished, jobDescription);
 
   kit = await applicationKitStore.set(userId, jobId, {

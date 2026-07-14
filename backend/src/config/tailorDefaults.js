@@ -3,12 +3,16 @@ const env = require('./env');
 const TAILOR_MODE = 'high_match';
 const HIGH_MATCH_TARGET = 100;
 const ATS_TARGET_MIN = Math.min(100, Math.max(85, Number(process.env.TAILOR_ATS_TARGET_MIN) || 90));
-const KIT_PIPELINE_VERSION = '2026-07-14-v8';
+const KIT_PIPELINE_VERSION = '2026-07-14-v9';
+const TARGET_BULLETS_PER_JOB = Math.min(
+  12,
+  Math.max(8, Number(process.env.TAILOR_BULLETS_PER_JOB) || 10)
+);
 
 const RESUME_INTEGRITY_CONTRACT = `RESUME INTEGRITY (every user, every job — non-negotiable):
 - Keep EVERY employer from the candidate's profile resume, in original order.
 - Keep EXACT job titles, companies, and date ranges unchanged.
-- Keep EXACT bullet count per role; rewrite wording only to match the posting.
+- Target ${TARGET_BULLETS_PER_JOB} accomplishment bullets per role (expand by decomposing real accomplishments when the original has fewer — never invent employers, dates, or false metrics).
 - Keep education, certifications, credentials, and contact block intact.
 - Job headers must NOT use bullet prefixes (-, •, *); bullets are accomplishments only.
 - Never invent employers, dates, certs, or metrics. Only adjust bullet phrasing for JD alignment.`;
@@ -44,7 +48,7 @@ function describeTailorQuality() {
     supplementPages: DEFAULT_SUPPLEMENT_PAGES,
     label: 'Standard high-match tailoring',
     description:
-      'Every user gets the same tailoring contract: all employers preserved, same bullet count per role, credentials intact — only bullet wording changes to match each posting (~4 pages, 90%+ ATS).',
+      `Every user gets the same tailoring contract: all employers preserved, ~${TARGET_BULLETS_PER_JOB} bullets per role, credentials intact — bullet wording tailored to each posting (~4 pages, 90%+ ATS).`,
   };
 }
 
@@ -52,6 +56,7 @@ module.exports = {
   TAILOR_MODE,
   HIGH_MATCH_TARGET,
   ATS_TARGET_MIN,
+  TARGET_BULLETS_PER_JOB,
   KIT_PIPELINE_VERSION,
   RESUME_INTEGRITY_CONTRACT,
   POLISH_INTERACTIVE_MAX_ROUNDS,

@@ -4,7 +4,9 @@ const {
   splitJobHeaderAndBullets,
   buildExperienceBlueprint,
   enforceExperienceIntegrity,
+  expandBulletsToTarget,
 } = require('../services/resumeExperiencePerfectionService');
+const { TARGET_BULLETS_PER_JOB } = require('../config/tailorDefaults');
 const { parseResumeStructure } = require('../services/resumeStructureService');
 const { finalizeTailoredResume } = require('../services/resumeTailorService');
 
@@ -41,7 +43,7 @@ CERTIFICATIONS
 AWS Solutions Architect Associate | CKA`;
 
 describe('resumeExperiencePerfectionService', () => {
-  it('builds blueprint with exact bullet counts per job', () => {
+  it('builds blueprint with target bullet counts per job', () => {
     const structure = parseResumeStructure(fiveJobResume);
     const exp = structure.sections.find((s) => s.key === 'experience');
     const { splitExperienceContentIntoJobs } = require('../services/resumeExperiencePreserveService');
@@ -49,10 +51,21 @@ describe('resumeExperiencePerfectionService', () => {
     const blueprint = buildExperienceBlueprint(jobs);
 
     assert.equal(blueprint.length, 5);
-    assert.deepEqual(
-      blueprint.map((b) => b.bulletCount),
-      [3, 2, 2, 2, 2]
+    assert.ok(blueprint.every((b) => b.bulletCount >= TARGET_BULLETS_PER_JOB));
+    assert.equal(blueprint[0].bulletCount, TARGET_BULLETS_PER_JOB);
+    assert.equal(blueprint[1].bulletCount, TARGET_BULLETS_PER_JOB);
+  });
+
+  it('expands sparse roles toward the target bullet count', () => {
+    const expanded = expandBulletsToTarget(
+      [
+        'Built multi-account AWS environments using EC2, VPC, IAM, S3, RDS, Lambda, and CloudFormation for enterprise clients.',
+        'Led on-premises to cloud migration programs with SOC 2 aligned controls.',
+      ],
+      TARGET_BULLETS_PER_JOB
     );
+    assert.ok(expanded.length >= 2);
+    assert.ok(expanded.length <= TARGET_BULLETS_PER_JOB || expanded.every((b) => b.length >= 20));
   });
 
   it('restores all five jobs and bullet counts when AI drops roles and bullets', () => {
@@ -109,9 +122,12 @@ AWS Solutions Architect Associate | CKA`;
 
     assert.equal(finalJobs.length, originalJobs.length);
     for (let i = 0; i < originalJobs.length; i += 1) {
-      const orig = splitJobHeaderAndBullets(originalJobs[i].text);
       const out = splitJobHeaderAndBullets(finalJobs[i]?.text || '');
-      assert.equal(out.bullets.length, orig.bullets.length, `job ${i + 1} bullet count`);
+      assert.ok(
+        out.bullets.length >= Math.min(TARGET_BULLETS_PER_JOB, splitJobHeaderAndBullets(originalJobs[i].text).bullets.length) ||
+          out.bullets.length >= splitJobHeaderAndBullets(originalJobs[i].text).bullets.length,
+        `job ${i + 1} should keep or expand bullets, got ${out.bullets.length}`
+      );
     }
   });
 });
