@@ -284,12 +284,24 @@ function cleanHeaderArtifacts(text) {
 function normalizeTailoredResumeLayout(originalResume, tailoredText) {
   if (!(originalResume || '').trim() || !(tailoredText || '').trim()) return tailoredText;
 
-  let text = preserveExperienceFromOriginal(originalResume, tailoredText);
+  const { parseResumeStructure } = require('./resumeStructureService');
+  const {
+    guardTailoredSummary,
+    rebuildResumeInOriginalOrder,
+    ensureSectionSpacing,
+    fixGluedSectionHeadings,
+  } = require('./resumeOrderGuardService');
+
+  let text = rebuildResumeInOriginalOrder(originalResume, tailoredText);
+  text = guardTailoredSummary(originalResume, text);
+  text = preserveExperienceFromOriginal(originalResume, text);
   text = enforceExperienceIntegrity(originalResume, text);
   text = normalizeExperienceLayout(originalResume, text);
   text = formatSkillsInResume(text, originalResume);
   text = formatEducationInResume(text, originalResume);
   text = cleanHeaderArtifacts(text);
+  text = ensureSectionSpacing(text, parseResumeStructure(originalResume));
+  text = fixGluedSectionHeadings(text, parseResumeStructure(originalResume));
   return text.replace(/\n{3,}/g, '\n\n').trim();
 }
 

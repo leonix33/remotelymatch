@@ -420,15 +420,17 @@ function replaceExperienceSectionContent(text, structure, newExperienceContent) 
   const heading = expSection?.heading || 'PROFESSIONAL EXPERIENCE';
   if (!heading || !newExperienceContent) return text;
 
+  const { extractSectionContentByHeading } = require('./resumeOrderGuardService');
+  const headings = structure.sections.map((s) => s.heading).filter(Boolean);
   const headingRe = new RegExp(`(${escapeRegExp(heading)}\\s*\\n)`, 'i');
   const match = text.match(headingRe);
   if (!match) return `${text.trim()}\n\n${heading}\n${newExperienceContent}`;
 
   const startIdx = match.index + match[0].length;
   let endIdx = text.length;
-  for (const section of structure.sections) {
-    if (!section.heading || section.key === 'experience') continue;
-    const re = new RegExp(`\\n${escapeRegExp(section.heading)}\\s*\\n`, 'i');
+  for (const other of headings) {
+    if (!other || other === heading) continue;
+    const re = new RegExp(`${escapeRegExp(other)}\\s*\\n`, 'i');
     const sectionMatch = text.slice(startIdx).match(re);
     if (sectionMatch?.index != null) {
       const absolute = startIdx + sectionMatch.index;

@@ -57,6 +57,8 @@ function buildSystemPrompt({ job, pageTarget, jobCount, experienceBlueprint }) {
 
 NON-NEGOTIABLE RULES:
 - Do not invent employers, dates, titles, certifications, or metrics.
+- Do not invent a different career path in the summary (keep the candidate's real platform/engineering identity).
+- Never move EXPERIENCE below EDUCATION or CERTIFICATIONS — section order is fixed by the backend.
 - Do not change employers or date ranges.
 - Keep ALL ${jobCount} job(s) in experience — headers (title, dates, company) unchanged.
 - Target ${TARGET_BULLETS_PER_JOB} accomplishment bullets per role (expand by decomposing real accomplishments when fewer exist).
