@@ -1,6 +1,7 @@
 const { z } = require('zod');
 const aiCoachService = require('../services/aiCoachService');
 const openaiService = require('../services/openaiService');
+const llmService = require('../services/llmService');
 const teamService = require('../services/teamService');
 
 const chatSchema = z.object({
@@ -39,7 +40,7 @@ async function clear(req, res, next) {
 
 async function status(req, res, next) {
   try {
-    const data = await openaiService.statusForUser(req.user.sub);
+    const data = await llmService.statusForUser(req.user.sub);
     res.json(data);
   } catch (err) {
     next(err);

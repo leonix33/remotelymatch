@@ -300,13 +300,17 @@ function parsePerfectionJson(raw) {
 
 async function perfectExperienceBullets({
   client,
+  userId,
   originalResume,
   tailoredText,
   jobDescription,
   job = {},
   profile = {},
 }) {
-  if (!client || !tailoredText) return tailoredText;
+  if (!tailoredText) return tailoredText;
+  const llmService = require('./llmService');
+  const live = await llmService.isLive(userId || profile?.userId);
+  if (!live && !client) return tailoredText;
 
   const structure = parseResumeStructure(originalResume);
   const expSection = structure.sections.find((s) => s.key === 'experience');
@@ -360,18 +364,20 @@ ORIGINAL RESUME TRUTH SOURCE:
 ${String(profile?.resumeText || originalResume || '').slice(0, 6000)}`;
 
   try {
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const env = require('../config/env');
+    const llmService = require('./llmService');
+    const result = await llmService.createJsonCompletion({
+      userId: profile?.userId || null,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
       temperature: 0.35,
       max_tokens: Math.min(5000, 900 + blueprint.reduce((n, j) => n + j.bulletCount, 0) * 120),
-      response_format: { type: 'json_object' },
+      prefer: env.tailorLlmPrefer || 'claude',
     });
 
-    const jobs = parsePerfectionJson(response.choices[0]?.message?.content?.trim() || '');
+    const jobs = parsePerfectionJson(result.content || '');
     if (!jobs.length) return enforceExperienceIntegrity(originalResume, tailoredText);
 
     const rebuilt = [];

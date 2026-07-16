@@ -371,6 +371,7 @@ function applyAtsMetadata(kit, jobDescription, job = {}) {
 
 async function refineKitForInterview({
   client,
+  userId,
   kit,
   profile,
   structure,
@@ -383,7 +384,9 @@ async function refineKitForInterview({
   atsScore,
   jdMatchPct,
 }) {
-  if (!client || (!redTerms?.length && !uncoveredRequirements?.length)) return kit;
+  const llmService = require('./llmService');
+  const live = await llmService.isLive(userId || profile?.userId);
+  if ((!live && !client) || (!redTerms?.length && !uncoveredRequirements?.length)) return kit;
 
   const sectionSource =
     kit.resumeSections?.length
@@ -424,28 +427,30 @@ ${jobDescription.slice(0, 7000)}
 
 MISSING ATS TERMS: ${(redTerms || []).join(', ') || 'none'}${tailorFocus ? `\nCandidate notes: ${String(tailorFocus).slice(0, 1200)}` : ''}`;
 
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
+  const env = require('../config/env');
+  const result = await llmService.createJsonCompletion({
+    userId: profile?.userId || userId || null,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
     temperature: 0.38,
     max_tokens: Math.min(2200, 500 + pageTarget * 320),
-    response_format: { type: 'json_object' },
+    prefer: env.tailorLlmPrefer || 'claude',
   }).catch((err) => {
-    const wrapped = new Error(err.message || 'OpenAI request failed during polish');
+    const wrapped = new Error(err.message || 'LLM request failed during polish');
     wrapped.status = err.status || 502;
     throw wrapped;
   });
 
-  const raw = response.choices[0]?.message?.content?.trim() || '';
+  const raw = result.content?.trim() || '';
   try {
     const refined = parseKitJson(raw);
     if (!refined.sections?.length) return kit;
     refined.tailoredResumeText = finalizeTailoredResume(profile?.resumeText, structure, refined);
     refined.coverLetterParagraph = refined.coverLetterParagraph || kit.coverLetterParagraph;
     refined.resumeSections = refined.sections;
+    refined.llmProvider = result.provider;
     return refined;
   } catch {
     return kit;
@@ -472,7 +477,9 @@ async function perfectKitForJob({
     const needsAts = !result.atsReady || (result.atsScore ?? 0) < threshold;
     const needsJd = (result.jdMatchPct ?? 100) < 80 && (result.jdRequirementsTotal ?? 0) > 0;
     if (!needsAts && !needsJd) break;
-    if (!client) break;
+    const llmService = require('./llmService');
+    const live = await llmService.isLive(options.userId || profile?.userId);
+    if (!live && !client) break;
 
     const { getRedTerms } = require('./atsKeywordService');
     const redTerms = getRedTerms(result, 8);
@@ -484,6 +491,7 @@ async function perfectKitForJob({
 
     const refined = await refineKitForInterview({
       client,
+      userId: options.userId || profile?.userId,
       kit: result,
       profile,
       structure,
@@ -660,9 +668,11 @@ async function polishExistingKit({
   tailorMode = 'high_match',
 }) {
   if (!kit?.tailored && !kit?.tailoredResumeText) return kit;
-  const client = userId ? await getClient(userId) : null;
-  if (!client) return kit;
+  const llmService = require('./llmService');
+  const live = await llmService.isLive(userId);
+  if (!live) return kit;
 
+  const client = userId ? await getClient(userId) : null;
   const canonical = resolveTailorOptions();
   const pageTarget = inferResumePageTarget(profile?.resumeText, kit.supplementPagesTarget || kit.pageCount);
   const options = {
@@ -670,6 +680,7 @@ async function polishExistingKit({
     tailorMode: canonical.tailorMode,
     highMatchTarget: canonical.highMatchTarget,
     maxPasses: maxPasses || canonical.polishMaxPasses,
+    userId,
   };
   const missingKeywords = kit.missingKeywords || inferMissingKeywords(profile, jobDescription);
   const fullJd = String(jobDescription || '').slice(0, 14000);
@@ -678,7 +689,7 @@ async function polishExistingKit({
   return perfectKitForJob({
     client,
     kit: working,
-    profile,
+    profile: { ...profile, userId },
     job,
     jobDescription: fullJd,
     contact,
@@ -697,17 +708,19 @@ async function perfectExperienceForKit({ userId, profile, job, jobDescription, k
     perfectExperienceBullets,
     enforceExperienceIntegrity,
   } = require('./resumeExperiencePerfectionService');
+  const llmService = require('./llmService');
 
   let text = enforceExperienceIntegrity(profile.resumeText, kit.tailoredResumeText);
 
-  if (client) {
+  if (await llmService.isLive(userId)) {
     text = await perfectExperienceBullets({
       client,
+      userId,
       originalResume: profile.resumeText,
       tailoredText: text,
       jobDescription,
       job,
-      profile,
+      profile: { ...profile, userId },
     });
   }
 
@@ -748,8 +761,9 @@ async function generateAdditiveKit({
   const expSection = structure.sections.find((s) => s.key === 'experience');
   const { buildExperienceBlueprint } = require('./resumeExperiencePerfectionService');
   const { generateSectionTailoredContent, refineSectionTailoredContent } = require('./sectionTailorService');
+  const llmService = require('./llmService');
 
-  if (!client) {
+  if (!(await llmService.isLive(userId))) {
     return buildDemoKit(profile, job, fullJd, contact, options);
   }
 
@@ -759,12 +773,13 @@ async function generateAdditiveKit({
 
   try {
     const tailorResult = await generateSectionTailoredContent({
+      userId,
       client,
       structure,
       experienceBlueprint,
       jobDescription: fullJd,
       job,
-      profile,
+      profile: { ...profile, userId },
       tailorFocus,
       pageTarget,
       jobCount,
@@ -779,6 +794,7 @@ async function generateAdditiveKit({
       tailorChanges: tailorResult.tailorChanges,
       tailorValidation: tailorResult.validation,
       pipeline: 'section-only-v1',
+      llmProvider: tailorResult.llmProvider || null,
     };
 
     if (kit.sections?.length) {
@@ -803,12 +819,13 @@ async function generateAdditiveKit({
 
     if ((scored.atsScore ?? 0) < canonical.highMatchTarget) {
       const refined = await refineSectionTailoredContent({
+        userId,
         client,
         structure,
         experienceBlueprint,
         jobDescription: fullJd,
         job,
-        profile,
+        profile: { ...profile, userId },
         kit: scored,
         tailorFocus,
         pageTarget,
@@ -831,11 +848,11 @@ async function generateAdditiveKit({
     return perfectKitForJob({
       client,
       kit: scored,
-      profile,
+      profile: { ...profile, userId },
       job,
       jobDescription: fullJd,
       contact,
-      options: { ...options, maxPasses: maxRefinePasses },
+      options: { ...options, maxPasses: maxRefinePasses, userId },
       missingKeywords,
       tailorFocus,
     });

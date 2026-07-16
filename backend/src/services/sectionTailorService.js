@@ -133,22 +133,27 @@ function buildUserPrompt({
 }
 
 async function callSectionTailor({
-  client,
+  userId,
   system,
   user,
   maxTokens = 4500,
 }) {
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
+  const env = require('../config/env');
+  const llmService = require('./llmService');
+  const result = await llmService.createJsonCompletion({
+    userId,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
     temperature: 0.38,
     max_tokens: maxTokens,
-    response_format: { type: 'json_object' },
+    prefer: env.tailorLlmPrefer || 'claude',
   });
-  return parseTailorJson(response.choices[0]?.message?.content?.trim() || '{}');
+  const parsed = parseTailorJson(result.content || '{}');
+  parsed.llmProvider = result.provider;
+  parsed.llmModel = result.model;
+  return parsed;
 }
 
 /**
@@ -156,6 +161,7 @@ async function callSectionTailor({
  * Validator-driven second pass when the first response fails structural checks.
  */
 async function generateSectionTailoredContent({
+  userId,
   client,
   structure,
   experienceBlueprint,
@@ -178,7 +184,7 @@ async function generateSectionTailoredContent({
     tailorFocus,
   });
 
-  let tailorResponse = await callSectionTailor({ client, system, user: firstUser });
+  let tailorResponse = await callSectionTailor({ userId, system, user: firstUser });
   let validation = validateTailorResponse(tailorResponse, { structure, experienceBlueprint });
 
   if (!validation.valid) {
@@ -190,7 +196,7 @@ async function generateSectionTailoredContent({
       tailorFocus,
       validationErrors: formatValidationErrors(validation),
     });
-    tailorResponse = await callSectionTailor({ client, system, user: secondUser });
+    tailorResponse = await callSectionTailor({ userId, system, user: secondUser });
     validation = validateTailorResponse(tailorResponse, { structure, experienceBlueprint });
   }
 
@@ -204,6 +210,7 @@ async function generateSectionTailoredContent({
     validation,
     missingKeywords: jdAnalysis.atsKeywords?.slice(0, 12) || [],
     estimatedMatchPct: null,
+    llmProvider: tailorResponse.llmProvider || null,
   };
 }
 
@@ -211,6 +218,7 @@ async function generateSectionTailoredContent({
  * ATS validator pass: score output and run a keyword-focused second pass if needed.
  */
 async function refineSectionTailoredContent({
+  userId,
   client,
   structure,
   experienceBlueprint,
@@ -249,7 +257,7 @@ async function refineSectionTailoredContent({
     missingKeywords: [...new Set([...redTerms, ...uncovered.slice(0, 5)])],
   });
 
-  const tailorResponse = await callSectionTailor({ client, system, user });
+  const tailorResponse = await callSectionTailor({ userId, system, user });
   const sections = buildKitSectionsFromTailorResponse(structure, tailorResponse);
 
   return {

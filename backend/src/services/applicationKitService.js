@@ -8,7 +8,7 @@ const activityService = require('./activityService');
 const jobDescriptionService = require('./jobDescriptionService');
 const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
-const openaiService = require('./openaiService');
+const llmService = require('./llmService');
 const env = require('../config/env');
 const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION, POLISH_INTERACTIVE_MAX_PASSES } = require('../config/tailorDefaults');
 
@@ -237,12 +237,12 @@ async function generateForJob(userId, jobId, options = {}) {
     throw err;
   }
 
-  const aiLive = await openaiService.isLive(userId);
+  const aiLive = await llmService.isLive(userId);
   if (!aiLive) {
     const err = new Error(
       env.nodeEnv === 'production'
         ? 'Resume tailoring is temporarily unavailable. Please try again shortly.'
-        : 'Add OPENAI_API_KEY on the server or your personal key in Profile → AI Integration before generating a tailored kit.'
+        : 'Add ANTHROPIC_API_KEY or OPENAI_API_KEY on the server (or your OpenAI key in Profile → AI Integration) before generating a tailored kit.'
     );
     err.status = env.nodeEnv === 'production' ? 503 : 400;
     throw err;
@@ -276,7 +276,7 @@ async function generateForJob(userId, jobId, options = {}) {
   // Fast first pass: one OpenAI call + structural repair (fits Render free-tier timeouts).
   // Queue → Polish until ready runs perfection + ATS boost for 95%+.
   kit = resumeTailorService.repairKitAgainstProfile(profile.resumeText, kit, jobDescription);
-  if (await openaiService.isLive(userId)) {
+  if (await llmService.isLive(userId)) {
     kit = await resumeTailorService.perfectExperienceForKit({
       userId,
       profile,
@@ -334,8 +334,10 @@ async function polishUntilReady(userId, jobId, options = {}) {
     Math.max(1, Number(options.maxPasses) || POLISH_INTERACTIVE_MAX_PASSES)
   );
 
-  if (!(await openaiService.isLive(userId))) {
-    const err = new Error('OpenAI API key required — add your key in Profile → AI Integration.');
+  if (!(await llmService.isLive(userId))) {
+    const err = new Error(
+      'AI API key required — add ANTHROPIC_API_KEY (recommended) or OPENAI_API_KEY on the server, or your OpenAI key in Profile → AI Integration.'
+    );
     err.status = 400;
     throw err;
   }
@@ -422,7 +424,7 @@ async function polishUntilReady(userId, jobId, options = {}) {
   }
 
   polished = resumeTailorService.repairKitAgainstProfile(profile.resumeText, polished, jobDescription);
-  if (await openaiService.isLive(userId)) {
+  if (await llmService.isLive(userId)) {
     polished = await resumeTailorService.perfectExperienceForKit({
       userId,
       profile,
