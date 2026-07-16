@@ -119,6 +119,32 @@ export function parseExperienceChunkLines(chunkLines) {
   const lines = chunkLines.map((l) => String(l).trim()).filter(Boolean);
   if (!lines.length) return [];
 
+  // Prefer already-structured multi-line jobs (title / dates / company / bullets).
+  // Joining first and re-parsing flattens neat kits into 1–2 bullets.
+  const dateIdx = lines.findIndex(
+    (l, i) => isDateOnlyLine(l) && (i === 0 || isLikelyJobTitleLine(lines[i - 1]) || i <= 2)
+  );
+  if (
+    dateIdx >= 0 &&
+    (dateIdx === 0 ||
+      isLikelyJobTitleLine(lines[0]) ||
+      lines.slice(0, dateIdx).every((l) => isLikelyJobTitleLine(l) || TITLE_PREFIX_RE.test(l)))
+  ) {
+    return parseMultilineJob(lines, dateIdx);
+  }
+
+  // Flat header on line 1 + bullet lines below
+  if (
+    lines.length >= 2 &&
+    tryParseJobBlock(lines[0]) &&
+    lines.slice(1).some((l) => /^[-•*●▪]/.test(l) || ACTION_LINE_START.test(l))
+  ) {
+    const header = tryParseJobBlock(lines[0]);
+    const rows = [{ ...header, tags: (header.tags || []).slice(0, 4) }];
+    pushExperienceBodyLines(lines.slice(1), rows);
+    return rows;
+  }
+
   const singleLine = lines.join(' ');
   const inline = tryParseJobBlock(singleLine);
   if (inline) {
@@ -129,11 +155,6 @@ export function parseExperienceChunkLines(chunkLines) {
       else rows.push({ type: 'text', text: condenseCarBullet(inline.bodyText) });
     }
     return rows;
-  }
-
-  const dateIdx = lines.findIndex((l, i) => isDateOnlyLine(l) && (i === 0 || isLikelyJobTitleLine(lines[i - 1]) || i <= 2));
-  if (dateIdx >= 0 && (dateIdx === 0 || isLikelyJobTitleLine(lines[0]) || lines.slice(0, dateIdx).every((l) => isLikelyJobTitleLine(l) || TITLE_PREFIX_RE.test(l)))) {
-    return parseMultilineJob(lines, dateIdx);
   }
 
   if (singleLine.length > 100) {
@@ -170,15 +191,20 @@ export function groupExperienceLinesIntoChunks(contentLines) {
       continue;
     }
 
-    if (current.length && isLikelyJobTitleLine(line) && isDateOnlyLine(next)) {
+    if (current.length && isLikelyJobTitleLine(line) && isDateOnlyLine(next) && JOB_ROLE_WORD.test(line)) {
       flush();
       current = [line];
       continue;
     }
 
-    if (current.length && isLikelyJobTitleLine(line)) {
+    // Company/location lines are often Title Case ("Bon Secours Mercy Health") and
+    // must NOT start a new job — that orphaned all bullets under a fake second chunk.
+    if (current.length && isLikelyJobTitleLine(line) && JOB_ROLE_WORD.test(line)) {
       const hasDate = current.some((l) => isDateOnlyLine(l));
-      if (hasDate) {
+      const hasBullets = current.some(
+        (l) => /^[-•*●▪]/.test(l) || ACTION_LINE_START.test(l)
+      );
+      if (hasDate && (hasBullets || isDateOnlyLine(next))) {
         flush();
         current = [line];
         continue;

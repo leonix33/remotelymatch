@@ -3,7 +3,6 @@ const env = require('../config/env');
 const { resolveTailorOptions, TAILOR_MODE, DEFAULT_SUPPLEMENT_PAGES, RESUME_INTEGRITY_CONTRACT, TARGET_BULLETS_PER_JOB } = require('../config/tailorDefaults');
 const { contactHeader, contactSignature } = require('./applicantContactService');
 const { HUMAN_WRITING_PROMPT, humanizeKit } = require('./humanizeWritingService');
-const { prepareResumeTextForParsing } = require('./resumeRepairService');
 const { polishTailoredResumeText, stripJdEcho } = require('./resumePolishService');
 const {
   parseResumeStructure,
@@ -602,7 +601,12 @@ function normalizeKit(kit, profile, job, jobDescription, missingKeywords, contac
 
 function finalizeNormalizedKit(kit, pageTarget, jobDescription = '') {
   if (!kit?.tailoredResumeText) return kit;
-  let tailoredResumeText = prepareResumeTextForParsing(kit.tailoredResumeText);
+  // Layout is already fixed by finalizeTailoredResume / normalizeTailoredResumeLayout.
+  // Do NOT re-run PDF extraction repair here — it collapses multi-line jobs and sections.
+  let tailoredResumeText = String(kit.tailoredResumeText || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   tailoredResumeText = polishTailoredResumeText(tailoredResumeText, jobDescription);
   const supplementPages = splitResumeIntoPages(tailoredResumeText, pageTarget);
   const enriched = {

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import ResumeDocumentPreview from './ResumeDocumentPreview.vue';
-import { prepareResumeTextForParsing } from '../utils/resumeRepair';
+import { prepareTailoredResumeForDisplay } from '../utils/resumeRepair';
 import { parseResumeHeader } from '../utils/resumeDocument';
 
 const props = defineProps({
@@ -19,7 +19,8 @@ let copiedTimer = null;
 
 const displayText = computed(() => {
   const raw = (props.text || '').trim();
-  return raw ? prepareResumeTextForParsing(raw) : '';
+  // Text is already prepared by TailoredResumePreview; only light normalize again.
+  return raw ? prepareTailoredResumeForDisplay(raw) : '';
 });
 
 const downloadName = computed(() => {

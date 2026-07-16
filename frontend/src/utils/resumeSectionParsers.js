@@ -385,10 +385,19 @@ export function parseCertificationsSectionLines(contentLines) {
 
 export function parseExperienceSectionLines(contentLines) {
   const lines = contentLines.map((l) => String(l).trim()).filter(Boolean);
-  const flat = lines.join(' ');
-  const blobChunks = splitExperienceBlob(flat);
   const lineChunks = groupExperienceLinesIntoChunks(lines);
-  const chunks = blobChunks || lineChunks;
+  const hasStructuredDates = lines.some((l) =>
+    /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}\b/i.test(l) &&
+    l.length < 100
+  );
+  const hasBullets = lines.some((l) => /^[-•*●▪]/.test(l));
+
+  // Prefer line-based chunks when backend already produced multi-line jobs.
+  // Flattening into a blob was collapsing 8–10 bullets down to 1–2.
+  const chunks =
+    hasStructuredDates || hasBullets || lineChunks.length >= 2
+      ? lineChunks
+      : splitExperienceBlob(lines.join(' ')) || lineChunks;
 
   const rows = [];
   for (const chunk of chunks) {

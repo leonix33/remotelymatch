@@ -171,3 +171,24 @@ export function prepareResumeTextForParsing(text) {
   const dechunked = insertExperienceBulletBreaks(normalized);
   return sanitizeResumeText(repairResumeText(dechunked));
 }
+
+/** True when text already has section headings + multi-line jobs (backend-tailored). */
+export function isStructuredTailoredResume(text = '') {
+  const t = String(text || '');
+  if (!t.trim()) return false;
+  const hasExperience = /\b(PROFESSIONAL EXPERIENCE|WORK EXPERIENCE|EMPLOYMENT)\b/i.test(t);
+  const hasDateLine = /\n(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}/i.test(t);
+  const bulletCount = (t.match(/^\s*[-•*●▪]\s+/gm) || []).length;
+  return hasExperience && (hasDateLine || bulletCount >= 4);
+}
+
+/** Light cleanup only — do not re-flatten backend-tailored resumes. */
+export function prepareTailoredResumeForDisplay(text = '') {
+  const raw = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (!raw) return '';
+  if (isStructuredTailoredResume(raw)) return raw;
+  return prepareResumeTextForParsing(raw);
+}

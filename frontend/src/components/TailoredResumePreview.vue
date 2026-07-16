@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import ResumePreviewModal from './ResumePreviewModal.vue';
-import { prepareResumeTextForParsing } from '../utils/resumeRepair';
+import { prepareTailoredResumeForDisplay } from '../utils/resumeRepair';
 
 const props = defineProps({
   kit: { type: Object, default: null },
@@ -21,7 +21,7 @@ const resumeText = computed(() => {
     k.supplementPages?.map((p) => p.content).join('\n\n') ||
     k.formatted ||
     '';
-  return raw ? prepareResumeTextForParsing(raw) : '';
+  return raw ? prepareTailoredResumeForDisplay(raw) : '';
 });
 
 const previewTitle = computed(() => {

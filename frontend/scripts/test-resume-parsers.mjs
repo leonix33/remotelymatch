@@ -53,12 +53,18 @@ const jobBlocks = experience?.lines?.filter((r) => r.type === 'job-block') || []
 const eduBlocks = education?.lines?.filter((r) => r.type === 'education-block') || [];
 const certGroups = certs?.lines?.filter((r) => r.type === 'cert-group') || [];
 
+const bullets = experience?.lines?.filter((r) => r.type === 'bullet') || [];
 console.log('jobs parsed:', jobBlocks.length, jobBlocks.map((j) => j.title));
+console.log('experience bullets:', bullets.length);
 console.log('education blocks:', eduBlocks.length, eduBlocks.map((e) => e.degree?.slice(0, 40)));
 console.log('cert groups:', certGroups.length, certGroups.map((c) => `${c.label} (${c.items.length})`));
 
 if (jobBlocks.length < 3) {
   console.error('FAIL: expected 3 jobs, got', jobBlocks.length);
+  process.exit(1);
+}
+if (bullets.length < 5) {
+  console.error('FAIL: expected 5+ experience bullets from structured resume, got', bullets.length);
   process.exit(1);
 }
 if (eduBlocks.length < 2) {

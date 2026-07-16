@@ -1,4 +1,4 @@
-import { prepareResumeTextForParsing } from './resumeRepair';
+import { prepareResumeTextForParsing, prepareTailoredResumeForDisplay, isStructuredTailoredResume } from './resumeRepair';
 import {
   parseExperienceSectionLines,
   parseSkillsSectionLines,
@@ -161,7 +161,10 @@ function reconcileSpuriousToolsSections(sections) {
 }
 
 export function parseResumeForDisplay(resumeText = '') {
-  const repaired = prepareResumeTextForParsing(resumeText);
+  // Backend-tailored kits are already structured — heavy PDF repair flattens bullets.
+  const repaired = isStructuredTailoredResume(resumeText)
+    ? prepareTailoredResumeForDisplay(resumeText)
+    : prepareResumeTextForParsing(resumeText);
   const lines = repaired.split('\n');
   const sections = [];
   let headerLines = [];

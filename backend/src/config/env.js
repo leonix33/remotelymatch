@@ -68,7 +68,7 @@ module.exports = {
   teamEmail: resolveTeamEmail(trim(process.env.CUSTOM_DOMAIN) || CANONICAL_DOMAIN),
   agentHome: process.env.AGENT_HOME || require('path').resolve(__dirname, '../../../..'),
   appName: trim(process.env.APP_NAME) || DISPLAY_NAME,
-  deployTag: 'sync-v15',
+  deployTag: 'sync-v16',
   resendApiKey: trim(process.env.RESEND_API_KEY) || '',
   gmailSmtpUser: trim(process.env.GMAIL_SMTP_USER) || '',
   gmailSmtpPass: trim(process.env.GMAIL_SMTP_PASS) || '',

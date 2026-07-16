@@ -3,7 +3,7 @@ const env = require('./env');
 const TAILOR_MODE = 'high_match';
 const HIGH_MATCH_TARGET = 100;
 const ATS_TARGET_MIN = Math.min(100, Math.max(85, Number(process.env.TAILOR_ATS_TARGET_MIN) || 90));
-const KIT_PIPELINE_VERSION = '2026-07-15-v12';
+const KIT_PIPELINE_VERSION = '2026-07-16-v13';
 const TARGET_BULLETS_PER_JOB = Math.min(
   12,
   Math.max(8, Number(process.env.TAILOR_BULLETS_PER_JOB) || 10)
