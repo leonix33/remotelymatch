@@ -151,6 +151,31 @@ function dedupeEducationLines(content) {
     .trim();
 }
 
+/**
+ * Truncate resume at the first repeated section heading (e.g. duplicate CERTIFICATIONS blocks).
+ */
+function stripDuplicateSectionBlocks(text, structure) {
+  const headings = structure.sections.map((s) => s.heading).filter(Boolean);
+  let cutAt = text.length;
+
+  for (const heading of headings) {
+    const re = new RegExp(`(?:^|\\n)(${escapeRegExp(heading)})\\s*\\n`, 'gi');
+    let count = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      count += 1;
+      if (count === 2 && match.index < cutAt) {
+        cutAt = match.index;
+      }
+    }
+  }
+
+  const glued = text.search(/CERTIFICATIONS\s*CERTIFICATIONS/i);
+  if (glued >= 0 && glued < cutAt) cutAt = glued;
+
+  return text.slice(0, cutAt).replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function ensureSectionSpacing(text, structure) {
   let out = String(text || '').trim();
   for (const section of structure.sections) {
@@ -168,4 +193,5 @@ module.exports = {
   rebuildResumeInOriginalOrder,
   ensureSectionSpacing,
   fixGluedSectionHeadings,
+  stripDuplicateSectionBlocks,
 };

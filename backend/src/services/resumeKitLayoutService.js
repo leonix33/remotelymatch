@@ -5,6 +5,7 @@ const {
   replaceExperienceSectionContent,
   stripBulletPrefix,
   preserveExperienceFromOriginal,
+  isFlatJobHeaderLine,
 } = require('./resumeExperiencePreserveService');
 const {
   buildExperienceBlueprint,
@@ -150,51 +151,74 @@ function parseFlatJobHeaderLine(line) {
   };
 }
 
+function buildCanonicalJobHeader(blueprintEntry) {
+  const title = String(blueprintEntry.title || '').trim();
+  const company = String(blueprintEntry.company || '').split('|')[0].trim();
+  const headerText = String(blueprintEntry.header || '').trim();
+  const headerLines = headerText.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  let dateLine = '';
+  let tagline = '';
+
+  for (const line of headerLines) {
+    const stripped = stripBulletPrefix(line);
+    if (DATE_RANGE_RE.test(stripped)) {
+      const parsed = parseFlatJobHeaderLine(stripped);
+      dateLine = parsed.dates || stripped.match(DATE_RANGE_RE)?.[0] || stripped;
+      continue;
+    }
+    if (isFlatJobHeaderLine(stripped)) {
+      const parsed = parseFlatJobHeaderLine(stripped);
+      if (parsed.dates) dateLine = parsed.dates;
+      continue;
+    }
+    if (stripped.includes('|') && !ACTION_VERB_RE.test(stripped) && stripped.length < 200) {
+      tagline = stripped;
+    }
+  }
+
+  if (!dateLine) {
+    for (const line of headerLines) {
+      const match = stripBulletPrefix(line).match(DATE_RANGE_RE);
+      if (match) {
+        dateLine = normalizeDateRange(match[0]);
+        break;
+      }
+    }
+  }
+
+  const lines = [];
+  if (title) lines.push(title);
+  if (dateLine) lines.push(normalizeDateRange(dateLine));
+  if (company) lines.push(company);
+  if (tagline && !lines.some((l) => l.toLowerCase().includes(tagline.toLowerCase().slice(0, 12)))) {
+    lines.push(tagline);
+  }
+
+  return dedupeSimilarHeaderLines(lines);
+}
+
+function dedupeSimilarHeaderLines(lines) {
+  const out = [];
+  for (const line of lines) {
+    const key = line.toLowerCase().replace(/\s+/g, ' ').trim();
+    const duplicate = out.some((existing) => {
+      const ek = existing.toLowerCase().replace(/\s+/g, ' ').trim();
+      return ek === key || ek.includes(key) || key.includes(ek);
+    });
+    if (!duplicate) out.push(line);
+  }
+  return out;
+}
+
 function formatJobBlockFromBlueprint(blueprintEntry, bullets) {
   const cleanedBullets = bullets
     .filter((b) => b && !isRoleTagline(b))
     .map((b) => formatBullet(b))
     .filter(Boolean);
 
-  const title = String(blueprintEntry.title || '').trim();
-  const company = String(blueprintEntry.company || '').trim();
-  const headerText = String(blueprintEntry.header || '').trim();
-  const headerLines = headerText.split('\n').map((l) => l.trim()).filter(Boolean);
-
-  const dateLine =
-    headerLines.find((l) => DATE_RANGE_RE.test(l)) ||
-    (headerLines.length === 1 && DATE_RANGE_RE.test(headerLines[0]) ? headerLines[0] : '');
-
-  const hasTitle = headerLines.some((l) => title && l.toLowerCase() === title.toLowerCase());
-  const hasCompany =
-    company &&
-    headerLines.some((l) => normalizeCompanyKey(l) === normalizeCompanyKey(company));
-
-  if (dateLine && title && !hasTitle) {
-    const lines = [title, dateLine];
-    if (company && !hasCompany) lines.push(company);
-    return [...lines, ...cleanedBullets].filter(Boolean).join('\n');
-  }
-
-  if (headerLines.length >= 2) {
-    return [...headerLines, ...cleanedBullets].join('\n');
-  }
-
-  const flatLine = headerLines[0] || '';
-  if (DATE_RANGE_RE.test(flatLine)) {
-    const parsed = parseFlatJobHeaderLine(flatLine);
-    const resolvedTitle = parsed.title || title;
-    const resolvedCompany = parsed.company || company;
-    return [resolvedTitle, parsed.dates || flatLine, resolvedCompany, ...cleanedBullets]
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  if (title || company) {
-    return [title, company, ...cleanedBullets].filter(Boolean).join('\n');
-  }
-
-  return [headerText, ...cleanedBullets].filter(Boolean).join('\n');
+  const headerLines = buildCanonicalJobHeader(blueprintEntry);
+  return [...headerLines, ...cleanedBullets].filter(Boolean).join('\n');
 }
 
 function mergeBulletsForJob(blueprintEntry, tailoredBlock) {
@@ -310,11 +334,23 @@ function cleanHeaderArtifacts(text) {
 function applyFinalResumeFormatting(originalResume, tailoredText) {
   if (!(originalResume || '').trim() || !(tailoredText || '').trim()) return tailoredText;
 
-  let text = tailoredText;
+  const { parseResumeStructure } = require('./resumeStructureService');
+  const {
+    rebuildResumeInOriginalOrder,
+    ensureSectionSpacing,
+    fixGluedSectionHeadings,
+    stripDuplicateSectionBlocks,
+  } = require('./resumeOrderGuardService');
+
+  let text = rebuildResumeInOriginalOrder(originalResume, tailoredText);
   text = normalizeExperienceLayout(originalResume, text);
   text = formatSkillsInResume(text, originalResume);
   text = formatEducationInResume(text, originalResume);
   text = cleanHeaderArtifacts(text);
+  const structure = parseResumeStructure(originalResume);
+  text = stripDuplicateSectionBlocks(text, structure);
+  text = ensureSectionSpacing(text, structure);
+  text = fixGluedSectionHeadings(text, structure);
   return text.replace(/\n{3,}/g, '\n\n').trim();
 }
 

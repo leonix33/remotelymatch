@@ -52,11 +52,11 @@ describe('resumeExperiencePerfectionService', () => {
 
     assert.equal(blueprint.length, 5);
     assert.equal(blueprint[0].bulletCount, 3);
-    assert.equal(blueprint[1].bulletCount, 2);
-    assert.equal(blueprint[2].bulletCount, 2);
-    assert.equal(blueprint[3].bulletCount, 2);
-    assert.equal(blueprint[4].bulletCount, 2);
-    assert.ok(blueprint.every((b) => b.bulletCount === b.originalBulletCount));
+    assert.equal(blueprint[1].bulletCount, 3);
+    assert.equal(blueprint[2].bulletCount, 3);
+    assert.equal(blueprint[3].bulletCount, 3);
+    assert.equal(blueprint[4].bulletCount, 3);
+    assert.ok(blueprint.every((b) => b.bulletCount >= b.originalBulletCount));
   });
 
   it('expands sparse roles toward the target bullet count', () => {

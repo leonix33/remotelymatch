@@ -244,15 +244,17 @@ function rebalanceExperienceBulletDistribution(jobs) {
     else buckets[0].push(bullet);
   }
 
+  const { buildExperienceBlueprint } = require('./resumeExperiencePerfectionService');
+  const { formatJobBlockFromBlueprint } = require('./resumeKitLayoutService');
+  const blueprint = buildExperienceBlueprint(jobs);
+
   return jobs.map((job, idx) => {
-    const header = parsed[idx].header;
     const chosen = buckets[idx].length ? buckets[idx] : parsed[idx].bullets;
-    const lines = chosen.map((bullet) => (bullet.startsWith('-') ? bullet : `- ${bullet}`));
-    const text = [header, ...lines].filter(Boolean).join('\n');
+    const text = formatJobBlockFromBlueprint(blueprint[idx], chosen);
     return {
       text,
-      title: extractTitleFromJobBlock(text),
-      company: extractCompanyFromJobBlock(text),
+      title: job.title || blueprint[idx].title,
+      company: job.company || blueprint[idx].company,
     };
   });
 }

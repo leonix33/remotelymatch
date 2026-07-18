@@ -78,7 +78,7 @@ function formatBullet(line) {
 
 function resolveTargetBulletCount(originalCount) {
   if (!originalCount || originalCount < 1) return TARGET_BULLETS_PER_JOB;
-  return originalCount;
+  return Math.max(originalCount, Math.min(3, TARGET_BULLETS_PER_JOB));
 }
 
 function splitCompoundBullet(bullet) {

@@ -85,8 +85,14 @@ describe('Leonix messy resume regression', () => {
     const structure = parseResumeStructure(leonixProfile);
     const expHeading = structure.sections.find((s) => s.key === 'experience').heading;
     const expStart = fixed.indexOf(expHeading);
-    const eduStart = fixed.indexOf('EDUCATION');
-    const exp = fixed.slice(expStart + expHeading.length, eduStart);
+    assert.ok(expStart >= 0);
+    let expEnd = fixed.length;
+    for (const section of structure.sections) {
+      if (!section.heading || section.key === 'experience') continue;
+      const idx = fixed.indexOf(section.heading, expStart + expHeading.length);
+      if (idx > expStart && idx < expEnd) expEnd = idx;
+    }
+    const exp = fixed.slice(expStart + expHeading.length, expEnd);
     const jobs = splitExperienceJobsNormalized(exp);
     assert.equal(jobs.length, 3);
 
@@ -97,5 +103,29 @@ describe('Leonix messy resume regression', () => {
     assert.ok(splitJobHeaderAndBullets(wimora.text).bullets.length >= 1);
     assert.ok(splitJobHeaderAndBullets(primus.text).bullets.length >= 1);
     assert.ok(!fixed.match(/\nTerraform\nKubernetes/));
+  });
+
+  it('removes duplicate certifications and experience blocks appended after polish', () => {
+    const duplicated = `${leonixProfile}
+
+PROFESSIONAL EXPERIENCE
+Cloud Platform Engineer
+Cloud Platform Engineer Feb 2022 Present
+- Built and secured Kubernetes clusters including deployments, scaling, ingress controllers, and network policies – Kubernetes platform availability maintained and production incidents resolved within SLA.
+CERTIFICATIONS
+CERTIFICATIONS
+Azure DevOps Engineer Expert | CKA | Terraform Associate
+
+PROFESSIONAL EXPERIENCE
+Cloud Platform Engineer Feb 2022 Present
+- Built and operated multi-account AWS environments using EC2, VPC, IAM, S3, RDS, Lambda, and CloudFormation for enterprise and regulated clients – infrastructure availability and SOC 2-aligned security controls maintained across all managed client environments.CERTIFICATIONS`;
+
+    const fixed = assembleBlueprintResume(leonixProfile, duplicated).tailoredResumeText;
+    const certMatches = fixed.match(/\nCERTIFICATIONS\s*\n/gi) || [];
+    const expMatches = fixed.match(/\nPROFESSIONAL EXPERIENCE\s*\n/gi) || [];
+    assert.equal(certMatches.length, 1, 'should keep one certifications section');
+    assert.equal(expMatches.length, 1, 'should keep one experience section');
+    assert.ok(!fixed.includes('CERTIFICATIONSCERTIFICATIONS'));
+    assert.ok(!/Cloud Platform Engineer\nCloud Platform Engineer Feb 2022 Present\nCloud Platform Engineer Feb 2022 Present/m.test(fixed));
   });
 });
