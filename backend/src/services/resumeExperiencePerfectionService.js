@@ -383,11 +383,10 @@ ${String(profile?.resumeText || originalResume || '').slice(0, 6000)}`;
     const rebuilt = [];
     for (let i = 0; i < blueprint.length; i += 1) {
       const perfect = jobs[i] || {};
-      const header = perfect.header || blueprint[i].header;
       const bullets = Array.isArray(perfect.bullets) ? perfect.bullets : [];
       const block = rebuildJobFromBlueprint(
-        { ...blueprint[i], header },
-        `${header}\n${bullets.map((b) => formatBullet(b)).join('\n')}`
+        blueprint[i],
+        `${blueprint[i].header}\n${bullets.map((b) => formatBullet(b)).join('\n')}`
       );
       rebuilt.push(block);
     }

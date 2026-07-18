@@ -659,86 +659,59 @@ function enrichKitForDisplay(kit, originalResume = '') {
   return finalizeNormalizedKit({ ...kit, tailoredResumeText: raw }, pageTarget);
 }
 
-async function polishExistingKit({
-  userId,
-  profile,
-  job,
-  jobDescription,
-  contact = {},
-  kit,
-  tailorFocus = '',
-  highMatchTarget = 100,
-  maxPasses = 8,
-  tailorMode = 'high_match',
-}) {
+async function polishExistingKit({ userId, profile, job, jobDescription, kit, tailorFocus = '' }) {
   if (!kit?.tailored && !kit?.tailoredResumeText) return kit;
   const llmService = require('./llmService');
-  const live = await llmService.isLive(userId);
-  if (!live) return kit;
+  if (!(await llmService.isLive(userId))) return kit;
 
-  const client = userId ? await getClient(userId) : null;
-  const canonical = resolveTailorOptions();
-  const pageTarget = inferResumePageTarget(profile?.resumeText, kit.supplementPagesTarget || kit.pageCount);
-  const options = {
-    supplementPages: pageTarget,
-    tailorMode: canonical.tailorMode,
-    highMatchTarget: canonical.highMatchTarget,
-    maxPasses: maxPasses || canonical.polishMaxPasses,
+  return perfectExperienceForKit({
     userId,
-  };
-  const missingKeywords = kit.missingKeywords || inferMissingKeywords(profile, jobDescription);
-  const fullJd = String(jobDescription || '').slice(0, 14000);
-  const working = applyAtsMetadata(enrichKitForDisplay(kit), fullJd, job);
-
-  return perfectKitForJob({
-    client,
-    kit: working,
-    profile: { ...profile, userId },
+    profile,
     job,
-    jobDescription: fullJd,
-    contact,
-    options,
-    missingKeywords,
-    tailorFocus,
+    jobDescription,
+    kit,
   });
 }
 
 async function perfectExperienceForKit({ userId, profile, job, jobDescription, kit }) {
   if (!kit?.tailoredResumeText || !profile?.resumeText) return kit;
 
-  const client = userId ? await getClient(userId) : null;
-  const structure = parseResumeStructure(profile.resumeText);
-  const {
-    perfectExperienceBullets,
-    enforceExperienceIntegrity,
-  } = require('./resumeExperiencePerfectionService');
   const llmService = require('./llmService');
+  const { assembleBlueprintResume, tailorExperienceBullets } = require('./resumeBlueprintService');
+  const pageTarget = clampPageCount(kit.supplementPagesTarget || kit.pageCount || DEFAULT_SUPPLEMENT_PAGES);
 
-  let text = enforceExperienceIntegrity(profile.resumeText, kit.tailoredResumeText);
-
-  if (await llmService.isLive(userId)) {
-    text = await perfectExperienceBullets({
-      client,
-      userId,
-      originalResume: profile.resumeText,
-      tailoredText: text,
+  if (!(await llmService.isLive(userId))) {
+    const assembled = assembleBlueprintResume(profile.resumeText, kit.tailoredResumeText, kit);
+    return applyAtsMetadata(
+      finalizeNormalizedKit({ ...kit, tailoredResumeText: assembled.tailoredResumeText }, pageTarget, jobDescription),
       jobDescription,
-      job,
-      profile: { ...profile, userId },
-    });
+      job
+    );
   }
 
-  text = finalizeTailoredResume(profile.resumeText, structure, { tailoredResumeText: text });
-  const pageTarget = clampPageCount(kit.supplementPagesTarget || kit.pageCount || DEFAULT_SUPPLEMENT_PAGES);
+  const { getRedTerms } = require('./atsKeywordService');
+  const scored = applyAtsMetadata(kit, jobDescription, job);
+  const focusParts = [...(scored.uncoveredRequirements || []), ...getRedTerms(scored, 10)].filter(Boolean);
+  const tailorFocus = focusParts.slice(0, 10).join(', ');
+
+  const tailoredResumeText = await tailorExperienceBullets({
+    userId,
+    profile,
+    job,
+    jobDescription,
+    baseText: kit.tailoredResumeText,
+    tailorFocus,
+  });
+  const assembled = assembleBlueprintResume(profile.resumeText, tailoredResumeText, kit);
   const enriched = finalizeNormalizedKit(
-    { ...kit, tailoredResumeText: text },
+    { ...kit, tailoredResumeText: assembled.tailoredResumeText, perfectionPasses: (kit.perfectionPasses || 0) + 1 },
     pageTarget,
     jobDescription
   );
   return applyAtsMetadata(enriched, jobDescription, job);
 }
 
-async function generateAdditiveKit({
+async function generateBlueprintKit({
   userId,
   profile,
   job,
@@ -751,121 +724,106 @@ async function generateAdditiveKit({
 }) {
   const canonical = resolveTailorOptions();
   const pageTarget = inferResumePageTarget(profile?.resumeText, canonical.supplementPages);
-  const effectiveMode = canonical.tailorMode;
   const options = {
     supplementPages: pageTarget,
-    tailorMode: effectiveMode,
+    tailorMode: canonical.tailorMode,
     highMatchTarget: canonical.highMatchTarget,
-    maxRefinePasses: canonical.generateMaxPasses,
+    maxRefinePasses: 0,
   };
   const missingKeywords = inferMissingKeywords(profile, jobDescription);
-  const structure = parseResumeStructure(profile?.resumeText || '');
-  const client = userId ? await getClient(userId) : null;
-  const fullJd = jobDescription.slice(0, 9000);
-  const expSection = structure.sections.find((s) => s.key === 'experience');
-  const { buildExperienceBlueprint } = require('./resumeExperiencePerfectionService');
-  const { generateSectionTailoredContent, refineSectionTailoredContent } = require('./sectionTailorService');
+  const fullJd = String(jobDescription || '').slice(0, 9000);
   const llmService = require('./llmService');
+  const {
+    tailorResumeFromBlueprint,
+    tailorExperienceBullets,
+    assembleBlueprintResume,
+    generateCoverLetter,
+  } = require('./resumeBlueprintService');
+  const { ATS_TARGET_MIN } = require('../config/tailorDefaults');
 
   if (!(await llmService.isLive(userId))) {
     return buildDemoKit(profile, job, fullJd, contact, options);
   }
 
-  const originalJobs = splitExperienceContentIntoJobs(expSection?.content || '');
-  const jobCount = originalJobs.length;
-  const experienceBlueprint = buildExperienceBlueprint(originalJobs);
-
   try {
-    const tailorResult = await generateSectionTailoredContent({
+    let { tailoredResumeText } = await tailorResumeFromBlueprint({
       userId,
-      client,
-      structure,
-      experienceBlueprint,
-      jobDescription: fullJd,
+      profile,
       job,
-      profile: { ...profile, userId },
+      jobDescription: fullJd,
       tailorFocus,
-      pageTarget,
-      jobCount,
     });
 
-    let kit = {
-      sections: tailorResult.sections,
-      coverLetterParagraph: tailorResult.coverLetterParagraph,
-      missingKeywords: tailorResult.missingKeywords,
-      estimatedMatchPct: tailorResult.estimatedMatchPct,
-      jdAnalysis: tailorResult.jdAnalysis,
-      tailorChanges: tailorResult.tailorChanges,
-      tailorValidation: tailorResult.validation,
-      pipeline: 'section-only-v1',
-      llmProvider: tailorResult.llmProvider || null,
-    };
+    let kit = humanizeKit({
+      mode: 'full_resume',
+      tailored: true,
+      pipeline: 'blueprint-v1',
+      tailorMode: canonical.tailorMode,
+      supplementPagesTarget: pageTarget,
+      highMatchTarget: canonical.highMatchTarget,
+      tailoredResumeText,
+      missingKeywords,
+      skillsToHighlight: (profile?.mustHaveSkills || []).slice(0, 12),
+      contactEmail: contact.email || '',
+      contactName: contact.name || profile?.displayName || '',
+    });
 
-    if (kit.sections?.length) {
-      kit.tailoredResumeText = finalizeTailoredResume(profile?.resumeText, structure, kit);
-    }
-    if (kit.tailoredResumeText) {
-      kit.supplementPages = splitResumeIntoPages(kit.tailoredResumeText, pageTarget);
-      kit.fullSupplementText = kit.tailoredResumeText;
-      kit.resumeAddendum = kit.tailoredResumeText;
-    }
+    kit = normalizeKit(kit, profile, job, fullJd, missingKeywords, contact, options);
+    let scored = applyAtsMetadata(kit, fullJd, job);
 
-    let scored = applyAtsMetadata(
-      normalizeKit(kit, profile, job, fullJd, missingKeywords, contact, options),
-      fullJd,
-      job
-    );
-
-    const maxRefinePasses =
-      options.maxRefinePasses != null
-        ? Math.max(0, Number(options.maxRefinePasses) || 0)
-        : canonical.generateMaxPasses;
-
-    if ((scored.atsScore ?? 0) < canonical.highMatchTarget) {
-      const refined = await refineSectionTailoredContent({
-        userId,
-        client,
-        structure,
-        experienceBlueprint,
-        jobDescription: fullJd,
-        job,
-        profile: { ...profile, userId },
-        kit: scored,
+    if ((scored.atsScore ?? 0) < ATS_TARGET_MIN) {
+      const { getRedTerms } = require('./atsKeywordService');
+      const focusParts = [
+        ...(scored.uncoveredRequirements || []),
+        ...getRedTerms(scored, 10),
         tailorFocus,
-        pageTarget,
-        jobCount,
+      ].filter(Boolean);
+      const atsFocus = focusParts.slice(0, 10).join(', ');
+      tailoredResumeText = await tailorExperienceBullets({
+        userId,
+        profile,
+        job,
+        jobDescription: fullJd,
+        baseText: scored.tailoredResumeText,
+        tailorFocus: atsFocus,
       });
-      if (refined.sections?.length) {
-        refined.tailoredResumeText = finalizeTailoredResume(profile?.resumeText, structure, refined);
-        refined.supplementPages = splitResumeIntoPages(refined.tailoredResumeText, pageTarget);
-        refined.fullSupplementText = refined.tailoredResumeText;
-        refined.resumeAddendum = refined.tailoredResumeText;
-      }
+      const assembled = assembleBlueprintResume(profile.resumeText, tailoredResumeText, scored);
       scored = applyAtsMetadata(
-        normalizeKit(refined, profile, job, fullJd, missingKeywords, contact, options),
+        normalizeKit(
+          { ...scored, tailoredResumeText: assembled.tailoredResumeText },
+          profile,
+          job,
+          fullJd,
+          missingKeywords,
+          contact,
+          options
+        ),
         fullJd,
         job
       );
     }
 
-    if (maxRefinePasses <= 0) return scored;
-    return perfectKitForJob({
-      client,
-      kit: scored,
+    scored.coverLetterParagraph = await generateCoverLetter({
+      userId,
       profile: { ...profile, userId },
       job,
       jobDescription: fullJd,
       contact,
-      options: { ...options, maxPasses: maxRefinePasses, userId },
-      missingKeywords,
-      tailorFocus,
+      resumeText: scored.tailoredResumeText,
     });
+    scored.pipeline = 'blueprint-v1';
+    scored.perfectionPasses = 1;
+    return applyAtsMetadata(scored, fullJd, job);
   } catch (err) {
     if (err?.status) throw err;
     const demo = buildDemoKit(profile, job, fullJd, contact, options);
     demo.parseError = true;
     return demo;
   }
+}
+
+async function generateAdditiveKit(params) {
+  return generateBlueprintKit(params);
 }
 
 function formatKitAsText(kit) {
@@ -892,6 +850,7 @@ function formatKitAsText(kit) {
 
 module.exports = {
   generateAdditiveKit,
+  generateBlueprintKit,
   buildDemoKit,
   inferMissingKeywords,
   extractMustPreserveFromResume,

@@ -10,7 +10,7 @@ const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
 const llmService = require('./llmService');
 const env = require('../config/env');
-const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION, POLISH_INTERACTIVE_MAX_PASSES } = require('../config/tailorDefaults');
+const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION } = require('../config/tailorDefaults');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
@@ -273,18 +273,7 @@ async function generateForJob(userId, jobId, options = {}) {
     throw err;
   }
 
-  // Fast first pass: one OpenAI call + structural repair (fits Render free-tier timeouts).
-  // Queue → Polish until ready runs perfection + ATS boost for 95%+.
-  kit = resumeTailorService.repairKitAgainstProfile(profile.resumeText, kit, jobDescription);
-  if (await llmService.isLive(userId)) {
-    kit = await resumeTailorService.perfectExperienceForKit({
-      userId,
-      profile,
-      job,
-      jobDescription,
-      kit,
-    });
-  }
+  // Blueprint pipeline: generate already tailors bullets + optional ATS pass.
   kit = resumeTailorService.repairKitAgainstProfile(profile.resumeText, kit, jobDescription);
   kit = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
 
@@ -329,10 +318,6 @@ async function polishUntilReady(userId, jobId, options = {}) {
   const profile = await profileService.getOrCreate(userId);
   const canonical = resolveTailorOptions();
   const { highMatchTarget, supplementPages, tailorMode } = canonical;
-  const polishMaxPasses = Math.min(
-    POLISH_INTERACTIVE_MAX_PASSES,
-    Math.max(1, Number(options.maxPasses) || POLISH_INTERACTIVE_MAX_PASSES)
-  );
 
   if (!(await llmService.isLive(userId))) {
     const err = new Error(
@@ -405,16 +390,12 @@ async function polishUntilReady(userId, jobId, options = {}) {
 
   let polished;
   try {
-    polished = await resumeTailorService.polishExistingKit({
+    polished = await resumeTailorService.perfectExperienceForKit({
       userId,
       profile,
       job,
       jobDescription,
-      contact,
       kit: scored,
-      tailorFocus,
-      highMatchTarget: READY_ATS_MIN,
-      maxPasses: polishMaxPasses,
     });
   } catch (err) {
     console.warn(`Polish failed for ${jobId}:`, err.message);
@@ -423,16 +404,6 @@ async function polishUntilReady(userId, jobId, options = {}) {
     throw wrapped;
   }
 
-  polished = resumeTailorService.repairKitAgainstProfile(profile.resumeText, polished, jobDescription);
-  if (await llmService.isLive(userId)) {
-    polished = await resumeTailorService.perfectExperienceForKit({
-      userId,
-      profile,
-      job,
-      jobDescription,
-      kit: polished,
-    });
-  }
   polished = resumeTailorService.repairKitAgainstProfile(profile.resumeText, polished, jobDescription);
 
   kit = await applicationKitStore.set(userId, jobId, {
