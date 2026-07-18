@@ -159,17 +159,19 @@ function expandBulletsToTarget(bullets, targetCount) {
 }
 
 function buildExperienceBlueprint(originalJobs) {
+  const { isRoleTagline } = require('./resumeKitLayoutService');
   return originalJobs.map((job, index) => {
     const { header, bullets } = splitJobHeaderAndBullets(job.text);
-    const targetCount = resolveTargetBulletCount(bullets.length);
-    const expanded = expandBulletsToTarget(bullets, targetCount);
+    const accomplishmentBullets = bullets.filter((b) => !isRoleTagline(b));
+    const targetCount = resolveTargetBulletCount(accomplishmentBullets.length);
+    const expanded = expandBulletsToTarget(accomplishmentBullets, targetCount);
     return {
       index: index + 1,
       title: job.title || '',
       company: job.company || '',
       header,
       bulletCount: targetCount,
-      originalBulletCount: bullets.length,
+      originalBulletCount: accomplishmentBullets.length,
       originalBullets: expanded,
       needsAiExpansion: expanded.length < targetCount,
     };
@@ -221,6 +223,8 @@ function rebuildJobFromBlueprint(blueprintEntry, tailoredBlock) {
   const bullets = [...originalBullets];
 
   for (const tailoredBullet of tailored.bullets) {
+    const { isRoleTagline } = require('./resumeKitLayoutService');
+    if (isRoleTagline(tailoredBullet)) continue;
     let bestIdx = -1;
     let bestSim = 0;
     for (let i = 0; i < bullets.length; i += 1) {
@@ -250,7 +254,8 @@ function rebuildJobFromBlueprint(blueprintEntry, tailoredBlock) {
     bullets.push(originalBullets[bullets.length]);
   }
 
-  const lines = [header, ...bullets.map((b) => formatBullet(b)).filter(Boolean)].filter(Boolean);
+  const { isRoleTagline } = require('./resumeKitLayoutService');
+  const lines = [header, ...bullets.filter((b) => !isRoleTagline(b)).map((b) => formatBullet(b)).filter(Boolean)].filter(Boolean);
   return lines.join('\n');
 }
 

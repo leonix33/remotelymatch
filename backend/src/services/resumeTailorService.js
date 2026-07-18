@@ -625,7 +625,6 @@ function finalizeNormalizedKit(kit, pageTarget, jobDescription = '') {
 function repairKitAgainstProfile(originalResume, kit, jobDescription = '') {
   if (!kit?.tailored || !(originalResume || '').trim()) return kit;
 
-  const structure = parseResumeStructure(originalResume);
   const raw =
     kit.tailoredResumeText ||
     kit.fullSupplementText ||
@@ -634,12 +633,18 @@ function repairKitAgainstProfile(originalResume, kit, jobDescription = '') {
 
   if (!raw.trim()) return kit;
 
-  const repairedText = finalizeTailoredResume(originalResume, structure, {
-    ...kit,
-    tailoredResumeText: raw,
-  });
+  const { assembleBlueprintResume } = require('./resumeBlueprintService');
+  const assembled = assembleBlueprintResume(originalResume, raw, kit);
   const pageTarget = clampPageCount(kit.supplementPagesTarget || kit.pageCount || DEFAULT_SUPPLEMENT_PAGES);
-  return finalizeNormalizedKit({ ...kit, tailoredResumeText: repairedText }, pageTarget, jobDescription);
+  return finalizeNormalizedKit(
+    {
+      ...kit,
+      tailoredResumeText: assembled.tailoredResumeText,
+      coverLetterParagraph: assembled.coverLetterParagraph || kit.coverLetterParagraph,
+    },
+    pageTarget,
+    jobDescription
+  );
 }
 
 function enrichKitForDisplay(kit, originalResume = '') {

@@ -229,8 +229,11 @@ function mergeBulletsForJob(blueprintEntry, tailoredBlock) {
   const bullets = [];
 
   for (let i = 0; i < targetCount; i += 1) {
-    if (tailored.bullets[i]) bullets.push(tailored.bullets[i]);
-    else if (blueprintEntry.originalBullets?.[i]) bullets.push(blueprintEntry.originalBullets[i]);
+    const candidate = tailored.bullets[i] || blueprintEntry.originalBullets?.[i];
+    if (candidate && !isRoleTagline(candidate)) bullets.push(candidate);
+    else if (blueprintEntry.originalBullets?.[i] && !isRoleTagline(blueprintEntry.originalBullets[i])) {
+      bullets.push(blueprintEntry.originalBullets[i]);
+    }
   }
 
   return bullets;
@@ -359,25 +362,8 @@ function applyFinalResumeFormatting(originalResume, tailoredText) {
 function normalizeTailoredResumeLayout(originalResume, tailoredText) {
   if (!(originalResume || '').trim() || !(tailoredText || '').trim()) return tailoredText;
 
-  const { parseResumeStructure } = require('./resumeStructureService');
-  const {
-    guardTailoredSummary,
-    rebuildResumeInOriginalOrder,
-    ensureSectionSpacing,
-    fixGluedSectionHeadings,
-  } = require('./resumeOrderGuardService');
-
-  let text = rebuildResumeInOriginalOrder(originalResume, tailoredText);
-  text = guardTailoredSummary(originalResume, text);
-  text = preserveExperienceFromOriginal(originalResume, text);
-  text = enforceExperienceIntegrity(originalResume, text);
-  text = normalizeExperienceLayout(originalResume, text);
-  text = formatSkillsInResume(text, originalResume);
-  text = formatEducationInResume(text, originalResume);
-  text = cleanHeaderArtifacts(text);
-  text = ensureSectionSpacing(text, parseResumeStructure(originalResume));
-  text = fixGluedSectionHeadings(text, parseResumeStructure(originalResume));
-  return text.replace(/\n{3,}/g, '\n\n').trim();
+  const { assembleBlueprintResume } = require('./resumeBlueprintService');
+  return assembleBlueprintResume(originalResume, tailoredText).tailoredResumeText;
 }
 
 module.exports = {

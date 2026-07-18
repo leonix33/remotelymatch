@@ -171,6 +171,10 @@ function polishExperienceText(text = '') {
         out.push(line);
         continue;
       }
+      if (isJobMetaLine(trimmed)) {
+        out.push(line);
+        continue;
+      }
       const raw = trimmed.replace(/^[-•*●▪]\s+/, '');
       const bullets = splitExperienceParagraph(raw);
       if (bullets?.length) {

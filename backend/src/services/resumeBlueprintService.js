@@ -112,6 +112,8 @@ function pickTailoredBullet(fromAi, seed, originalBullets) {
   const ai = normalizeBulletText(fromAi);
   const fallback = normalizeBulletText(seed);
   if (ai.length < 15) return fallback;
+  const { isRoleTagline } = require('./resumeKitLayoutService');
+  if (isRoleTagline(ai)) return fallback;
   if (isFabricatedBullet(ai, originalBullets)) return fallback;
   return ai;
 }

@@ -97,12 +97,18 @@ function reduceStackedTechLists(line = '') {
 }
 
 function trimExperienceBullets(lines) {
+  const { isRoleTagline } = require('./resumeKitLayoutService');
   const out = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) {
       out.push(line);
+      continue;
+    }
+
+    if (isRoleTagline(trimmed)) {
+      out.push(trimmed.replace(/^[-•*●▪]+\s+/, ''));
       continue;
     }
 

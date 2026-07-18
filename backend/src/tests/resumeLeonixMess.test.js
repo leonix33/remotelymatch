@@ -165,4 +165,40 @@ Feb 2022 – Present
     assert.ok(fixed.includes('Wimora Technology'));
     assert.ok(!/- Healthcare \| Azure & Databricks Platform/i.test(fixed));
   });
+
+  it('repairKitAgainstProfile uses unified assembly (same as polish save path)', () => {
+    const { repairKitAgainstProfile } = require('../services/resumeTailorService');
+    const brokenKit = {
+      tailored: true,
+      tailoredResumeText: `${leonixProfile.split('PROFESSIONAL EXPERIENCE')[0]}PROFESSIONAL EXPERIENCE
+Cloud Platform Engineer
+Feb 2022 – Present
+Bon Secours Mercy Health
+- Healthcare | Azure & Databricks Platform | On-Call Rotation | SOC 2 / NIST / ISO 27001
+- Architected and deployed Azure Databricks environments from scratch including secure workspace architecture, cluster policies, VNet injection, private endpoints, and integration with Azure Data Lake, Key Vault, and Azure Data Factory – enterprise data platform supporting analytics, data engineering, and AI workloads running reliably since deployment.
+DevOps Engineer
+Aug 2020 Jan 2022
+Wimora Technology
+- Built and secured Kubernetes clusters including deployments, scaling, ingress controllers, and network policies – Kubernetes platform availability maintained and production incidents resolved within SLA.
+Cloud Engineer / DevOps
+Dec 2016 Jul 2020
+PRIMUS Global Services
+- Supported on-premises to AWS migration initiatives modernizing legacy workloads and improving scalability – legacy workloads migrated with operational continuity maintained across all client migration programs.CERTIFICATIONS
+CERTIFICATIONS
+Azure DevOps Engineer Expert | CKA
+
+PROFESSIONAL EXPERIENCE
+Cloud Platform Engineer
+Feb 2022 – Present
+- Built and secured Kubernetes clusters including deployments, scaling, ingress controllers, and network policies – Kubernetes platform availability maintained and production incidents resolved within SLA.CERTIFICATIONS`,
+    };
+
+    const repaired = repairKitAgainstProfile(leonixProfile, brokenKit);
+    const text = repaired.tailoredResumeText;
+    assert.equal((text.match(/\nCERTIFICATIONS\s*\n/gi) || []).length, 1);
+    assert.equal((text.match(/\nPROFESSIONAL EXPERIENCE\s*\n/gi) || []).length, 1);
+    assert.ok(text.includes('Wimora Technology'));
+    assert.ok(!text.includes('CERTIFICATIONSCERTIFICATIONS'));
+    assert.ok(!/- Healthcare \| Azure & Databricks Platform/i.test(text));
+  });
 });
