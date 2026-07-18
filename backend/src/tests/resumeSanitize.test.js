@@ -26,4 +26,14 @@ Healthcare | Azure & Databricks Platform | SOC 2 Architected and deployed Azure 
     assert.ok(/Architected and deployed Azure Databricks/.test(out));
     assert.ok(!/SOC 2 Architected/.test(out));
   });
+
+  it('splits long flat job header with trailing accomplishment', () => {
+    const input = `PROFESSIONAL EXPERIENCE
+DevOps Engineer Aug 2020 Jan 2022 Wimora Technology | Kubernetes & DevSecOps | Azure & AWS Built and secured Kubernetes clusters including deployments, scaling, ingress controllers, and network policies – Kubernetes platform availability maintained and production incidents resolved within SLA.`;
+
+    const out = sanitizeResumeText(input);
+    assert.ok(out.includes('DevOps Engineer Aug 2020 Jan 2022 Wimora Technology'));
+    assert.ok(out.includes('Built and secured Kubernetes clusters'));
+    assert.ok(!/AWS Built and secured/.test(out));
+  });
 });

@@ -61,7 +61,12 @@ function stripBulletPrefix(line) {
 
 function isFlatJobHeaderLine(line) {
   const t = stripBulletPrefix(line);
-  if (!t || t.length > 220) return false;
+  if (!t) return false;
+  const actionMatch = t.match(
+    /\s+(Architected|Built|Implemented|Designed|Led|Developed|Managed|Operated|Supported|Created|Established|Deployed|Migrated|Integrated|Improved|Automated|Configured|Enforced|Maintained|Coordinated|Delivered|Reduced|Optimized|Streamlined|Partnered|Authored|Conducted|Participated|Secured|Streamlined|Authored)\b/i
+  );
+  if (actionMatch && actionMatch.index >= 15) return false;
+  if (t.length > 220) return false;
   if (!DATE_RANGE_RE.test(t)) return false;
   return (
     JOB_ROLE_WORD.test(t) ||
@@ -197,6 +202,80 @@ function attachBulletsToHeaderOnlyChunks(chunkArrays) {
   }
 
   return out.filter((chunk) => chunk.length);
+}
+
+function splitExperienceJobsNormalized(content) {
+  const { normalizeExperienceSectionContent } = require('./resumeSanitizeService');
+  const normalized = normalizeExperienceSectionContent(content);
+  let jobs = splitExperienceContentIntoJobs(normalized);
+  jobs = rebalanceExperienceBulletDistribution(jobs);
+  return jobs;
+}
+
+function rebalanceExperienceBulletDistribution(jobs) {
+  if (jobs.length < 2) return jobs;
+
+  const parsed = jobs.map((job) => splitJobHeaderAndBulletsFromBlock(job.text));
+  const allBullets = parsed.flatMap((entry) => entry.bullets);
+  if (allBullets.length < 4) return jobs;
+
+  const emptyJobs = parsed.some((entry) => entry.bullets.length === 0);
+  const lastHasMany = parsed[parsed.length - 1].bullets.length >= Math.max(4, allBullets.length - 2);
+  if (!emptyJobs && !lastHasMany) return jobs;
+
+  const buckets = parsed.map(() => []);
+  const leftovers = [];
+
+  for (const bullet of allBullets) {
+    if (/\b(databricks|pyspark|delta lake|fabric|azure data factory|openai|genai|adls)\b/i.test(bullet)) {
+      buckets[0].push(bullet);
+    } else if (jobs.length > 1 && /\b(kubernetes|devsecops|sast|dast|helm)\b/i.test(bullet)) {
+      buckets[1].push(bullet);
+    } else if (/\b(aws|cloudformation|multi-account|ec2|vpc|lambda|migration)\b/i.test(bullet)) {
+      buckets[buckets.length - 1].push(bullet);
+    } else {
+      leftovers.push(bullet);
+    }
+  }
+
+  for (const bullet of leftovers) {
+    const target = buckets.findIndex((bucket) => bucket.length < 2);
+    if (target >= 0) buckets[target].push(bullet);
+    else buckets[0].push(bullet);
+  }
+
+  return jobs.map((job, idx) => {
+    const header = parsed[idx].header;
+    const chosen = buckets[idx].length ? buckets[idx] : parsed[idx].bullets;
+    const lines = chosen.map((bullet) => (bullet.startsWith('-') ? bullet : `- ${bullet}`));
+    const text = [header, ...lines].filter(Boolean).join('\n');
+    return {
+      text,
+      title: extractTitleFromJobBlock(text),
+      company: extractCompanyFromJobBlock(text),
+    };
+  });
+}
+
+function splitJobHeaderAndBulletsFromBlock(block) {
+  const lines = String(block || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const header = [];
+  const bullets = [];
+
+  for (const line of lines) {
+    if (isFlatJobHeaderLine(line) || (!isAccomplishmentLine(line) && DATE_RANGE_RE.test(stripBulletPrefix(line)))) {
+      header.push(stripBulletPrefix(line));
+    } else if (isAccomplishmentLine(line)) {
+      bullets.push(stripBulletPrefix(line));
+    } else {
+      header.push(stripBulletPrefix(line));
+    }
+  }
+
+  return { header: header.join('\n'), bullets };
 }
 
 function splitExperienceContentIntoJobs(content) {
@@ -464,6 +543,8 @@ function preserveExperienceFromOriginal(originalResume, tailoredText) {
 
 module.exports = {
   splitExperienceContentIntoJobs,
+  splitExperienceJobsNormalized,
+  rebalanceExperienceBulletDistribution,
   preserveExperienceFromOriginal,
   stripMisplacedEducationBlob,
   cleanEducationSectionContent,
@@ -474,4 +555,5 @@ module.exports = {
   isFlatJobHeaderLine,
   isAccomplishmentLine,
   stripBulletPrefix,
+  splitJobHeaderAndBulletsFromBlock,
 };

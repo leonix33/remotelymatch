@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const {
   buildResumeBlueprint,
   assembleBlueprintResume,
+  restoreContactHeader,
+  rebuildExperienceFromBulletOutput,
 } = require('../services/resumeBlueprintService');
 
 const resume = `LEONIX ASONGWE
@@ -67,5 +69,36 @@ Cloud Platform Engineer Feb 2022 Present Bon Secours Mercy Health
     assert.ok(!fixed.includes('Partner manager'));
     assert.ok(fixed.includes('Wimora Technology'));
     assert.ok(fixed.includes('PRIMUS Global Services'));
+  });
+
+  it('restoreContactHeader puts pipe-delimited tagline back on one line', () => {
+    const original = `LEONIX ASONGWE
+Terraform | Kubernetes | Delta Lake | DevSecOps
+leonix23@gmail.com | 713-875-2809
+
+PROFESSIONAL SUMMARY
+Senior Platform Engineer.`;
+
+    const mangled = `LEONIX ASONGWE
+Terraform
+Kubernetes
+Delta Lake
+DevSecOps
+leonix23@gmail.com
+
+PROFESSIONAL SUMMARY
+Senior Platform Engineer.`;
+
+    const fixed = restoreContactHeader(original, mangled);
+    assert.ok(fixed.includes('Terraform | Kubernetes | Delta Lake | DevSecOps'));
+    assert.ok(!fixed.match(/\nTerraform\nKubernetes/));
+  });
+
+  it('rebuildExperienceFromBulletOutput restores title and company when header is date-only', () => {
+    const brokenJobs = [{ bullets: ['- Led enterprise observability platform migrations across Azure and AWS.'] }];
+    const merged = rebuildExperienceFromBulletOutput(resume, brokenJobs);
+    assert.ok(merged.includes('Cloud Platform Engineer'));
+    assert.ok(merged.includes('Bon Secours Mercy Health'));
+    assert.ok(merged.includes('Feb 2022'));
   });
 });

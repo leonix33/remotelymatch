@@ -17,9 +17,9 @@ function isGarbageLine(line = '') {
 function isJobMetaLine(line = '') {
   const t = String(line).trim().replace(/^[-•*●▪]+\s*/, '');
   if (!t) return false;
-  if (DATE_RANGE_RE.test(t)) return true;
   const actionMatch = t.match(ACTION_IN_LINE_RE);
   if (actionMatch && actionMatch.index !== undefined && actionMatch.index >= 15) return false;
+  if (DATE_RANGE_RE.test(t)) return true;
   if (t.includes('|') && t.length < 200) return true;
   return false;
 }
@@ -91,4 +91,14 @@ function sanitizeResumeText(text = '') {
     .trim();
 }
 
-module.exports = { sanitizeResumeText, sanitizeExperienceLines };
+function normalizeExperienceSectionContent(content = '') {
+  if (!String(content || '').trim()) return '';
+  const wrapped = `PROFESSIONAL EXPERIENCE\n${String(content).trim()}`;
+  return sanitizeExperienceLines(wrapped).replace(/^PROFESSIONAL EXPERIENCE\n/i, '').trim();
+}
+
+module.exports = {
+  sanitizeResumeText,
+  sanitizeExperienceLines,
+  normalizeExperienceSectionContent,
+};

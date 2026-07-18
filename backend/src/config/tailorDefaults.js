@@ -3,7 +3,7 @@ const env = require('./env');
 const TAILOR_MODE = 'high_match';
 const HIGH_MATCH_TARGET = 100;
 const ATS_TARGET_MIN = Math.min(100, Math.max(85, Number(process.env.TAILOR_ATS_TARGET_MIN) || 90));
-const KIT_PIPELINE_VERSION = '2026-07-18-v14-blueprint';
+const KIT_PIPELINE_VERSION = '2026-07-18-v16-experience-rebalance';
 const TARGET_BULLETS_PER_JOB = Math.min(
   12,
   Math.max(8, Number(process.env.TAILOR_BULLETS_PER_JOB) || 10)
@@ -11,11 +11,11 @@ const TARGET_BULLETS_PER_JOB = Math.min(
 
 const RESUME_INTEGRITY_CONTRACT = `RESUME INTEGRITY (every user, every job — non-negotiable):
 - Keep EVERY employer from the candidate's profile resume, in original order.
-- Keep EXACT job titles, companies, and date ranges unchanged.
-- Target ${TARGET_BULLETS_PER_JOB} accomplishment bullets per role (expand by decomposing real accomplishments when the original has fewer — never invent employers, dates, or false metrics).
-- Keep education, certifications, credentials, and contact block intact.
+- Keep EXACT job titles, companies, date ranges, education, certifications, credentials, and contact block unchanged.
+- Keep the SAME accomplishment bullet count per role as the original resume — rewrite bullet wording only for JD alignment.
+- Keep the professional summary unchanged; only experience bullets are tailored.
 - Job headers must NOT use bullet prefixes (-, •, *); bullets are accomplishments only.
-- Never invent employers, dates, certs, or metrics. Only adjust bullet phrasing for JD alignment.`;
+- Never invent employers, dates, certs, or metrics.`;
 const POLISH_INTERACTIVE_MAX_ROUNDS = 1;
 const POLISH_INTERACTIVE_MAX_PASSES = 1;
 const DEFAULT_SUPPLEMENT_PAGES = Math.min(6, Math.max(1, Number(process.env.TAILOR_DEFAULT_PAGES) || 4));

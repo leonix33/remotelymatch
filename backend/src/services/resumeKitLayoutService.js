@@ -1,6 +1,7 @@
 const { parseResumeStructure } = require('./resumeStructureService');
 const {
   splitExperienceContentIntoJobs,
+  splitExperienceJobsNormalized,
   replaceExperienceSectionContent,
   stripBulletPrefix,
   preserveExperienceFromOriginal,
@@ -155,8 +156,25 @@ function formatJobBlockFromBlueprint(blueprintEntry, bullets) {
     .map((b) => formatBullet(b))
     .filter(Boolean);
 
+  const title = String(blueprintEntry.title || '').trim();
+  const company = String(blueprintEntry.company || '').trim();
   const headerText = String(blueprintEntry.header || '').trim();
   const headerLines = headerText.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  const dateLine =
+    headerLines.find((l) => DATE_RANGE_RE.test(l)) ||
+    (headerLines.length === 1 && DATE_RANGE_RE.test(headerLines[0]) ? headerLines[0] : '');
+
+  const hasTitle = headerLines.some((l) => title && l.toLowerCase() === title.toLowerCase());
+  const hasCompany =
+    company &&
+    headerLines.some((l) => normalizeCompanyKey(l) === normalizeCompanyKey(company));
+
+  if (dateLine && title && !hasTitle) {
+    const lines = [title, dateLine];
+    if (company && !hasCompany) lines.push(company);
+    return [...lines, ...cleanedBullets].filter(Boolean).join('\n');
+  }
 
   if (headerLines.length >= 2) {
     return [...headerLines, ...cleanedBullets].join('\n');
@@ -164,8 +182,16 @@ function formatJobBlockFromBlueprint(blueprintEntry, bullets) {
 
   const flatLine = headerLines[0] || '';
   if (DATE_RANGE_RE.test(flatLine)) {
-    const { title, dates, company } = parseFlatJobHeaderLine(flatLine);
-    return [title, dates, company, ...cleanedBullets].filter(Boolean).join('\n');
+    const parsed = parseFlatJobHeaderLine(flatLine);
+    const resolvedTitle = parsed.title || title;
+    const resolvedCompany = parsed.company || company;
+    return [resolvedTitle, parsed.dates || flatLine, resolvedCompany, ...cleanedBullets]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (title || company) {
+    return [title, company, ...cleanedBullets].filter(Boolean).join('\n');
   }
 
   return [headerText, ...cleanedBullets].filter(Boolean).join('\n');
@@ -189,7 +215,7 @@ function normalizeExperienceLayout(originalResume, tailoredText) {
   const expSection = structure.sections.find((s) => s.key === 'experience');
   if (!expSection?.content) return tailoredText;
 
-  const originalJobs = splitExperienceContentIntoJobs(expSection.content);
+  const originalJobs = splitExperienceJobsNormalized(expSection.content);
   if (!originalJobs.length) return tailoredText;
 
   const blueprint = buildExperienceBlueprint(originalJobs);
@@ -281,6 +307,17 @@ function cleanHeaderArtifacts(text) {
     .replace(/[ \t]{2,}/g, ' ');
 }
 
+function applyFinalResumeFormatting(originalResume, tailoredText) {
+  if (!(originalResume || '').trim() || !(tailoredText || '').trim()) return tailoredText;
+
+  let text = tailoredText;
+  text = normalizeExperienceLayout(originalResume, text);
+  text = formatSkillsInResume(text, originalResume);
+  text = formatEducationInResume(text, originalResume);
+  text = cleanHeaderArtifacts(text);
+  return text.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function normalizeTailoredResumeLayout(originalResume, tailoredText) {
   if (!(originalResume || '').trim() || !(tailoredText || '').trim()) return tailoredText;
 
@@ -307,8 +344,10 @@ function normalizeTailoredResumeLayout(originalResume, tailoredText) {
 
 module.exports = {
   normalizeTailoredResumeLayout,
+  applyFinalResumeFormatting,
   normalizeExperienceLayout,
   formatSkillsSectionContent,
   formatJobBlockFromBlueprint,
+  mergeBulletsForJob,
   isRoleTagline,
 };

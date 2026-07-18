@@ -1,6 +1,7 @@
 const { parseResumeStructure } = require('./resumeStructureService');
 const {
   splitExperienceContentIntoJobs,
+  splitExperienceJobsNormalized,
   stripMisplacedEducationBlob,
   replaceExperienceSectionContent,
   isAccomplishmentLine,
@@ -76,7 +77,8 @@ function formatBullet(line) {
 }
 
 function resolveTargetBulletCount(originalCount) {
-  return Math.max(originalCount, TARGET_BULLETS_PER_JOB);
+  if (!originalCount || originalCount < 1) return TARGET_BULLETS_PER_JOB;
+  return originalCount;
 }
 
 function splitCompoundBullet(bullet) {
@@ -229,9 +231,12 @@ function rebuildJobFromBlueprint(blueprintEntry, tailoredBlock) {
       }
     }
     if (bestIdx >= 0 && bestSim >= 0.2) {
-      bullets[bestIdx] = tailoredBullet;
+      const { pickTailoredBullet } = require('./resumeBlueprintService');
+      bullets[bestIdx] = pickTailoredBullet(tailoredBullet, bullets[bestIdx], originalBullets);
     } else if (bullets.length < targetCount) {
-      bullets.push(tailoredBullet);
+      const { pickTailoredBullet } = require('./resumeBlueprintService');
+      const extra = pickTailoredBullet(tailoredBullet, originalBullets[0] || '', originalBullets);
+      if (extra) bullets.push(extra);
     }
   }
 
@@ -254,7 +259,7 @@ function enforceExperienceIntegrity(originalResume, tailoredText) {
   const expSection = structure.sections.find((s) => s.key === 'experience');
   if (!expSection?.content) return tailoredText;
 
-  const originalJobs = splitExperienceContentIntoJobs(expSection.content);
+  const originalJobs = splitExperienceJobsNormalized(expSection.content);
   if (!originalJobs.length) return tailoredText;
 
   const blueprint = buildExperienceBlueprint(originalJobs);
@@ -262,8 +267,12 @@ function enforceExperienceIntegrity(originalResume, tailoredText) {
   const rebuilt = [];
 
   for (let i = 0; i < blueprint.length; i += 1) {
-    const matchedBlock = matchTailoredBlockForBlueprint(blueprint[i], tailoredJobs);
-    rebuilt.push(rebuildJobFromBlueprint(blueprint[i], matchedBlock));
+    const matchedBlock =
+      matchTailoredBlockForBlueprint(blueprint[i], tailoredJobs) || tailoredJobs[i]?.text || '';
+    const mergedBlock = rebuildJobFromBlueprint(blueprint[i], matchedBlock);
+    const { formatJobBlockFromBlueprint } = require('./resumeKitLayoutService');
+    const { bullets } = splitJobHeaderAndBullets(mergedBlock);
+    rebuilt.push(formatJobBlockFromBlueprint(blueprint[i], bullets));
   }
 
   let text = replaceExperienceSectionContent(tailoredText, structure, rebuilt.join('\n\n').trim());
@@ -276,7 +285,7 @@ function experienceNeedsPerfection(originalResume, tailoredText) {
   const expSection = structure.sections.find((s) => s.key === 'experience');
   if (!expSection?.content) return false;
 
-  const originalJobs = splitExperienceContentIntoJobs(expSection.content);
+  const originalJobs = splitExperienceJobsNormalized(expSection.content);
   const blueprint = buildExperienceBlueprint(originalJobs);
   const tailoredJobs = splitExperienceContentIntoJobs(extractExperienceContent(tailoredText, structure));
 
@@ -316,7 +325,7 @@ async function perfectExperienceBullets({
   const expSection = structure.sections.find((s) => s.key === 'experience');
   if (!expSection?.content) return tailoredText;
 
-  const originalJobs = splitExperienceContentIntoJobs(expSection.content);
+  const originalJobs = splitExperienceJobsNormalized(expSection.content);
   const blueprint = buildExperienceBlueprint(originalJobs);
   if (!blueprint.length) return tailoredText;
 
@@ -327,20 +336,21 @@ async function perfectExperienceBullets({
   const system = `You are a resume perfection specialist. Rewrite ONLY experience accomplishment bullets so they match the target job description.
 
 NON-NEGOTIABLE RULES:
-1. Return EXACTLY ${blueprint.length} job(s) — same employers, titles, and dates as the blueprint headers (copy headers verbatim).
-2. Each job must have EXACTLY ${TARGET_BULLETS_PER_JOB} bullets (or the blueprint bulletCount when higher). If originalBullets has fewer, derive additional bullets by decomposing scope, technologies, and outcomes from the same real accomplishments — never invent employers, dates, or false metrics.
-3. Job headers must NOT start with bullet characters (-, •, *). Put headers on their own lines; bullets only for accomplishments.
+1. Return EXACTLY ${blueprint.length} job(s) in the same order as the blueprint.
+2. Each job must have EXACTLY the blueprint bulletCount for that job — same count as the candidate's original resume for that role. Rewrite wording only; do not add or remove bullets.
+3. Do NOT return job headers, titles, companies, or dates — bullets array only.
 4. Rewrite bullet wording to mirror job description requirements and keywords using the candidate's real accomplishments only.
 5. Keep the same facts, scope, and metrics from originalBullets — substitute phrasing and keywords to match the posting.
-6. Never invent employers, dates, titles, certifications, or false metrics.
-7. Every bullet: one complete sentence, 180-320 characters, starts with a strong action verb, includes relevant JD keywords naturally.
+6. Never invent employers, dates, titles, certifications, sales quotas, revenue metrics, or false claims.
+7. Do not rewrite platform engineering work as sales/account executive accomplishments unless the resume already contains that function.
+8. Every bullet: one complete sentence, 180-320 characters, starts with a strong action verb, includes relevant JD keywords naturally.
 
 ${RESUME_INTEGRITY_CONTRACT}
 
-Return JSON only:
+Return JSON only — one entry per blueprint job, same order, bullets only (no headers):
 {
   "jobs": [
-    { "header": "exact header from blueprint", "bullets": ["rewritten bullet 1", "rewritten bullet 2"] }
+    { "bullets": ["rewritten bullet 1", "rewritten bullet 2"] }
   ]
 }`;
 
@@ -379,6 +389,12 @@ ${String(profile?.resumeText || originalResume || '').slice(0, 6000)}`;
 
     const jobs = parsePerfectionJson(result.content || '');
     if (!jobs.length) return enforceExperienceIntegrity(originalResume, tailoredText);
+
+    const { rebuildExperienceFromBulletOutput } = require('./resumeBlueprintService');
+    const merged = rebuildExperienceFromBulletOutput(originalResume, jobs);
+    if (merged) {
+      return replaceExperienceSectionContent(tailoredText, structure, merged);
+    }
 
     const rebuilt = [];
     for (let i = 0; i < blueprint.length; i += 1) {

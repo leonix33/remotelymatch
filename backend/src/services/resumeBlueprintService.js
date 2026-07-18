@@ -3,14 +3,17 @@
  * AI may only rewrite experience accomplishment bullets; all structure is assembled here.
  */
 const { parseResumeStructure } = require('./resumeStructureService');
-const { splitExperienceContentIntoJobs, preserveExperienceFromOriginal } = require('./resumeExperiencePreserveService');
+const {
+  splitExperienceJobsNormalized,
+  preserveExperienceFromOriginal,
+  replaceExperienceSectionContent,
+} = require('./resumeExperiencePreserveService');
 const {
   buildExperienceBlueprint,
   enforceExperienceIntegrity,
   perfectExperienceBullets,
 } = require('./resumeExperiencePerfectionService');
 const { restoreImmutableSections, fixCoverLetterDuplicateApply } = require('./resumeSectionSanitizeService');
-const { normalizeTailoredResumeLayout } = require('./resumeKitLayoutService');
 const { RESUME_INTEGRITY_CONTRACT } = require('../config/tailorDefaults');
 
 function escapeRegExp(text) {
@@ -50,10 +53,103 @@ function restoreEditableSectionFromOriginal(originalResume, tailoredText, sectio
   return `${tailoredText.slice(0, slice.start)}${section.content}${tailoredText.slice(slice.end)}`;
 }
 
+function stripLeadingHeader(text, structure) {
+  const name = structure.headerLines[0]?.trim();
+  if (!name || !String(text || '').trim().startsWith(name)) return String(text || '').trim();
+
+  for (const section of structure.sections) {
+    if (!section.heading) continue;
+    const re = new RegExp(`\\n${escapeRegExp(section.heading)}\\s*\\n`, 'i');
+    const match = String(text).match(re);
+    if (match?.index != null) {
+      return String(text).slice(match.index + 1).trim();
+    }
+  }
+
+  const parts = String(text).split(/\n\n+/);
+  return parts.length > 1 ? parts.slice(1).join('\n\n').trim() : text;
+}
+
+function restoreContactHeader(originalResume, text) {
+  const structure = parseResumeStructure(originalResume);
+  const headerBlock = structure.headerLines
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+  if (!headerBlock) return text;
+
+  const body = stripLeadingHeader(text, structure);
+  return `${headerBlock}\n\n${body}`.trim();
+}
+
+function normalizeBulletText(line) {
+  return String(line || '')
+    .trim()
+    .replace(/^[-•*●▪]+\s*/, '');
+}
+
+const FABRICATION_PATTERNS = [
+  /\bexceeded sales quotas\b/i,
+  /\bachieved quota targets\b/i,
+  /\brecurring revenue pipeline\b/i,
+  /\btrusted advisor\b/i,
+  /\bterritory plan\b/i,
+  /\bdiscovery calls\b/i,
+  /\btailored demos\b/i,
+  /\baccount executive\b/i,
+  /\bcross-functional relationships with infrastructure,, and operations\b/i,
+];
+
+function isFabricatedBullet(bullet, originalBullets) {
+  const text = normalizeBulletText(bullet);
+  if (!text) return false;
+  const hay = originalBullets.map(normalizeBulletText).join(' ').toLowerCase();
+  return FABRICATION_PATTERNS.some((pattern) => pattern.test(text) && !pattern.test(hay));
+}
+
+function pickTailoredBullet(fromAi, seed, originalBullets) {
+  const ai = normalizeBulletText(fromAi);
+  const fallback = normalizeBulletText(seed);
+  if (ai.length < 15) return fallback;
+  if (isFabricatedBullet(ai, originalBullets)) return fallback;
+  return ai;
+}
+
+function rebuildExperienceFromBulletOutput(originalResume, jobsOutput = []) {
+  const structure = parseResumeStructure(originalResume);
+  const expSection = structure.sections.find((s) => s.key === 'experience');
+  if (!expSection?.content) return null;
+
+  const originalJobs = splitExperienceJobsNormalized(expSection.content);
+  const blueprint = buildExperienceBlueprint(originalJobs);
+  const { formatJobBlockFromBlueprint } = require('./resumeKitLayoutService');
+
+  const blocks = blueprint.map((bp, idx) => {
+    const aiBullets = Array.isArray(jobsOutput[idx]?.bullets) ? jobsOutput[idx].bullets : [];
+    const bullets = [];
+    for (let j = 0; j < bp.bulletCount; j += 1) {
+      const fromAi = aiBullets[j];
+      const seed = bp.originalBullets[j] || bp.originalBullets[0] || '';
+      bullets.push(pickTailoredBullet(fromAi, seed, bp.originalBullets));
+    }
+    return formatJobBlockFromBlueprint(bp, bullets);
+  });
+
+  return blocks.join('\n\n').trim();
+}
+
+function replaceExperienceFromBlueprint(originalResume, text, jobsOutput) {
+  const structure = parseResumeStructure(originalResume);
+  const merged = rebuildExperienceFromBulletOutput(originalResume, jobsOutput);
+  if (!merged) return text;
+  return replaceExperienceSectionContent(text, structure, merged);
+}
+
 function buildResumeBlueprint(originalResume) {
   const structure = parseResumeStructure(originalResume);
   const expSection = structure.sections.find((s) => s.key === 'experience');
-  const jobs = splitExperienceContentIntoJobs(expSection?.content || '');
+  const jobs = splitExperienceJobsNormalized(expSection?.content || '');
 
   return {
     structure,
@@ -70,12 +166,13 @@ function assembleBlueprintResume(originalResume, tailoredText, kit = {}) {
   let text = String(tailoredText || originalResume || '').trim();
   if (!text) return text;
 
+  text = restoreContactHeader(originalResume, text);
   text = restoreImmutableSections(originalResume, text);
   text = restoreEditableSectionFromOriginal(originalResume, text, 'summary');
   text = restoreEditableSectionFromOriginal(originalResume, text, 'skills');
-  text = preserveExperienceFromOriginal(originalResume, text);
   text = enforceExperienceIntegrity(originalResume, text);
-  text = normalizeTailoredResumeLayout(originalResume, text);
+  const { applyFinalResumeFormatting } = require('./resumeKitLayoutService');
+  text = applyFinalResumeFormatting(originalResume, text);
 
   const coverLetter = fixCoverLetterDuplicateApply(kit.coverLetterParagraph || '');
   return { tailoredResumeText: text.trim(), coverLetterParagraph: coverLetter };
@@ -112,7 +209,8 @@ async function generateCoverLetter({ userId, profile, job, jobDescription, conta
 
   const env = require('../config/env');
   const system = `Write a 4-sentence cover letter paragraph for a job application.
-Use only facts from the resume. No fluff (excited, passionate, leverage). Return JSON: { "coverLetterParagraph": "..." }`;
+The letter must be written FOR the specific role title in the user message — match that role's function (sales, engineering, etc.), not a generic platform engineer pitch.
+Use only facts from the resume that support THIS role. No fluff (excited, passionate, leverage). Return JSON: { "coverLetterParagraph": "..." }`;
 
   const user = `Role: ${job?.title || 'Role'} at ${job?.company || 'Company'}
 Candidate: ${contact?.name || profile?.displayName || 'Candidate'}
@@ -175,4 +273,9 @@ module.exports = {
   tailorResumeFromBlueprint,
   generateCoverLetter,
   restoreEditableSectionFromOriginal,
+  restoreContactHeader,
+  rebuildExperienceFromBulletOutput,
+  replaceExperienceFromBlueprint,
+  pickTailoredBullet,
+  isFabricatedBullet,
 };

@@ -43,7 +43,7 @@ CERTIFICATIONS
 AWS Solutions Architect Associate | CKA`;
 
 describe('resumeExperiencePerfectionService', () => {
-  it('builds blueprint with target bullet counts per job', () => {
+  it('builds blueprint with original bullet counts per job', () => {
     const structure = parseResumeStructure(fiveJobResume);
     const exp = structure.sections.find((s) => s.key === 'experience');
     const { splitExperienceContentIntoJobs } = require('../services/resumeExperiencePreserveService');
@@ -51,9 +51,12 @@ describe('resumeExperiencePerfectionService', () => {
     const blueprint = buildExperienceBlueprint(jobs);
 
     assert.equal(blueprint.length, 5);
-    assert.ok(blueprint.every((b) => b.bulletCount >= TARGET_BULLETS_PER_JOB));
-    assert.equal(blueprint[0].bulletCount, TARGET_BULLETS_PER_JOB);
-    assert.equal(blueprint[1].bulletCount, TARGET_BULLETS_PER_JOB);
+    assert.equal(blueprint[0].bulletCount, 3);
+    assert.equal(blueprint[1].bulletCount, 2);
+    assert.equal(blueprint[2].bulletCount, 2);
+    assert.equal(blueprint[3].bulletCount, 2);
+    assert.equal(blueprint[4].bulletCount, 2);
+    assert.ok(blueprint.every((b) => b.bulletCount === b.originalBulletCount));
   });
 
   it('expands sparse roles toward the target bullet count', () => {

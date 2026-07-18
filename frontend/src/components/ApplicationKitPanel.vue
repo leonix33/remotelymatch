@@ -211,7 +211,7 @@ watch(
       </p>
 
       <p class="mt-3 rounded-lg border border-teal-900/40 bg-teal-950/20 px-3 py-2 text-xs text-teal-100/90">
-        Your credentials and education stay intact. We rewrite experience bullets and summary for this role, score ATS fit,
+        Your credentials, summary, and education stay intact. We rewrite experience bullets for this role, score ATS fit,
         and optionally attach the <strong class="text-teal-200">tailored resume + cover letter</strong> when you apply.
       </p>
 
