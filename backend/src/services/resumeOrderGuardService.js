@@ -106,13 +106,14 @@ function guardTailoredSummary(originalResume, tailoredText) {
  */
 function rebuildResumeInOriginalOrder(originalResume, tailoredText) {
   const structure = parseResumeStructure(originalResume);
+  const text = unglueSectionHeadings(tailoredText, structure);
   const headings = structure.sections.map((s) => s.heading).filter(Boolean);
 
   const sectionOutputs = structure.sections.map((section) => {
     if (section.immutable) {
       return { heading: section.heading, content: section.content };
     }
-    let extracted = extractSectionContentByHeading(tailoredText, section.heading, headings);
+    let extracted = extractSectionContentByHeading(text, section.heading, headings);
     if (section.key === 'education' && extracted) {
       extracted = dedupeEducationLines(extracted);
     }
@@ -126,13 +127,21 @@ function rebuildResumeInOriginalOrder(originalResume, tailoredText) {
 }
 
 function fixGluedSectionHeadings(text, structure) {
+  return unglueSectionHeadings(text, structure);
+}
+
+function unglueSectionHeadings(text, structure) {
   let out = String(text || '');
   for (const section of structure.sections) {
     const heading = section.heading;
     if (!heading || heading.length < 4) continue;
-    const re = new RegExp(`([^\\n\\s])(${escapeRegExp(heading)})\\s*\\n`, 'gi');
-    out = out.replace(re, '$1\n\n$2\n');
+    const re = new RegExp(`([^\\n\\s])(${escapeRegExp(heading)})(?=\\s*\\n|\\s|$)`, 'gi');
+    out = out.replace(re, '$1\n\n$2');
+    const reNewline = new RegExp(`([^\\n\\s])(${escapeRegExp(heading)})\\s*\\n`, 'gi');
+    out = out.replace(reNewline, '$1\n\n$2\n');
   }
+  out = out.replace(/(CERTIFICATIONS)(\s*\1)+/gi, '$1');
+  out = out.replace(/(PROFESSIONAL EXPERIENCE)(\s*\1)+/gi, '$1');
   return out.replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -155,14 +164,15 @@ function dedupeEducationLines(content) {
  * Truncate resume at the first repeated section heading (e.g. duplicate CERTIFICATIONS blocks).
  */
 function stripDuplicateSectionBlocks(text, structure) {
+  let cleaned = unglueSectionHeadings(text, structure);
   const headings = structure.sections.map((s) => s.heading).filter(Boolean);
-  let cutAt = text.length;
+  let cutAt = cleaned.length;
 
   for (const heading of headings) {
     const re = new RegExp(`(?:^|\\n)(${escapeRegExp(heading)})\\s*\\n`, 'gi');
     let count = 0;
     let match;
-    while ((match = re.exec(text)) !== null) {
+    while ((match = re.exec(cleaned)) !== null) {
       count += 1;
       if (count === 2 && match.index < cutAt) {
         cutAt = match.index;
@@ -170,10 +180,23 @@ function stripDuplicateSectionBlocks(text, structure) {
     }
   }
 
-  const glued = text.search(/CERTIFICATIONS\s*CERTIFICATIONS/i);
+  const expSection = structure.sections.find((s) => s.key === 'experience');
+  if (expSection?.heading) {
+    const expRe = new RegExp(`(?:^|\\n)${escapeRegExp(expSection.heading)}\\s*\\n`, 'gi');
+    let expMatch;
+    let expCount = 0;
+    while ((expMatch = expRe.exec(cleaned)) !== null) {
+      expCount += 1;
+      if (expCount === 2 && expMatch.index < cutAt) {
+        cutAt = expMatch.index;
+      }
+    }
+  }
+
+  const glued = cleaned.search(/CERTIFICATIONS\s*CERTIFICATIONS/i);
   if (glued >= 0 && glued < cutAt) cutAt = glued;
 
-  return text.slice(0, cutAt).replace(/\n{3,}/g, '\n\n').trim();
+  return cleaned.slice(0, cutAt).replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function ensureSectionSpacing(text, structure) {
@@ -194,4 +217,5 @@ module.exports = {
   ensureSectionSpacing,
   fixGluedSectionHeadings,
   stripDuplicateSectionBlocks,
+  unglueSectionHeadings,
 };

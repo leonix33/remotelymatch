@@ -218,7 +218,9 @@ function formatJobBlockFromBlueprint(blueprintEntry, bullets) {
     .filter(Boolean);
 
   const headerLines = buildCanonicalJobHeader(blueprintEntry);
-  return [...headerLines, ...cleanedBullets].filter(Boolean).join('\n');
+  const headerTaglines = headerLines.filter((l) => isRoleTagline(l));
+  const headerCore = headerLines.filter((l) => !isRoleTagline(l));
+  return [...headerCore, ...headerTaglines, ...cleanedBullets].filter(Boolean).join('\n');
 }
 
 function mergeBulletsForJob(blueprintEntry, tailoredBlock) {

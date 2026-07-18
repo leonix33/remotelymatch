@@ -128,4 +128,41 @@ Cloud Platform Engineer Feb 2022 Present
     assert.ok(!fixed.includes('CERTIFICATIONSCERTIFICATIONS'));
     assert.ok(!/Cloud Platform Engineer\nCloud Platform Engineer Feb 2022 Present\nCloud Platform Engineer Feb 2022 Present/m.test(fixed));
   });
+
+  it('strips glued programs.CERTIFICATIONS tail from user v17 output', () => {
+    const gluedTail = `${leonixProfile.split('PROFESSIONAL EXPERIENCE')[0]}PROFESSIONAL EXPERIENCE
+Cloud Platform Engineer
+Feb 2022 – Present
+Bon Secours Mercy Health
+- Architected and deployed Azure Databricks environments from scratch including secure workspace architecture, cluster policies, VNet injection, private endpoints, and integration with Azure Data Lake, Key Vault, and Azure Data Factory – enterprise data platform supporting analytics, data engineering, and AI workloads running reliably since deployment.
+DevOps Engineer
+Aug 2020 Jan 2022
+Wimora Technology
+- Built and secured Kubernetes clusters including deployments, scaling, ingress controllers, and network policies – Kubernetes platform availability maintained and production incidents resolved within SLA.
+Cloud Engineer / DevOps
+Dec 2016 Jul 2020
+PRIMUS Global Services
+- Supported on-premises to AWS migration initiatives modernizing legacy workloads and improving scalability – legacy workloads migrated with operational continuity maintained across all client migration programs.CERTIFICATIONS
+CERTIFICATIONS
+Azure DevOps Engineer Expert | CKA | Terraform Associate
+
+PROFESSIONAL EXPERIENCE
+Cloud Platform Engineer
+Feb 2022 – Present
+- Built and secured Kubernetes clusters including deployments, scaling, ingress controllers, and network policies – Kubernetes platform availability maintained and production incidents resolved within SLA.CERTIFICATIONSCERTIFICATIONS
+CERTIFICATIONS
+Azure DevOps Engineer Expert | CKA | Terraform Associate
+
+PROFESSIONAL EXPERIENCE
+Cloud Platform Engineer
+Feb 2022 – Present
+- Built and operated multi-account AWS environments using EC2, VPC, IAM, S3, RDS, Lambda, and CloudFormation for enterprise and regulated clients – infrastructure availability and SOC 2-aligned security controls maintained across all managed client environments.CERTIFICATIONS`;
+
+    const fixed = assembleBlueprintResume(leonixProfile, gluedTail).tailoredResumeText;
+    assert.equal((fixed.match(/\nCERTIFICATIONS\s*\n/gi) || []).length, 1);
+    assert.equal((fixed.match(/\nPROFESSIONAL EXPERIENCE\s*\n/gi) || []).length, 1);
+    assert.ok(!fixed.includes('CERTIFICATIONSCERTIFICATIONS'));
+    assert.ok(fixed.includes('Wimora Technology'));
+    assert.ok(!/- Healthcare \| Azure & Databricks Platform/i.test(fixed));
+  });
 });

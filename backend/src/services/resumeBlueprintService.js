@@ -166,6 +166,10 @@ function assembleBlueprintResume(originalResume, tailoredText, kit = {}) {
   let text = String(tailoredText || originalResume || '').trim();
   if (!text) return text;
 
+  const structure = parseResumeStructure(originalResume);
+  const { unglueSectionHeadings } = require('./resumeOrderGuardService');
+  text = unglueSectionHeadings(text, structure);
+
   text = restoreContactHeader(originalResume, text);
   text = restoreImmutableSections(originalResume, text);
   text = restoreEditableSectionFromOriginal(originalResume, text, 'summary');
