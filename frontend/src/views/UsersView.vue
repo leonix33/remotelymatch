@@ -247,7 +247,11 @@ const filteredUsers = computed(() => {
 });
 
 const seatsMax = computed(() => teamUsage.value?.limits?.members ?? null);
-const atSeatLimit = computed(() => seatsMax.value != null && users.value.length >= seatsMax.value);
+const teamMemberCount = computed(() => {
+  if (teamUsage.value?.members != null) return teamUsage.value.members;
+  return users.value.filter((u) => u.active !== false).length;
+});
+const atSeatLimit = computed(() => seatsMax.value != null && teamMemberCount.value >= seatsMax.value);
 
 function userInitials(name) {
   return (name || '?')
@@ -270,6 +274,16 @@ function randomPassword() {
 
 function generatePassword() {
   form.value.password = randomPassword();
+}
+
+function openInviteForm() {
+  showInviteForm.value = true;
+  if (!form.value.password) generatePassword();
+}
+
+function toggleInviteForm() {
+  showInviteForm.value = !showInviteForm.value;
+  if (showInviteForm.value && !form.value.password) generatePassword();
 }
 
 async function sendDeliveryTest() {
@@ -420,7 +434,7 @@ onMounted(() => {
         </p>
       </div>
       <div class="card px-4 py-3 text-center">
-        <p class="text-2xl font-bold text-teal-300">{{ users.length }}<span v-if="seatsMax" class="text-lg text-slate-500"> / {{ seatsMax }}</span></p>
+        <p class="text-2xl font-bold text-teal-300">{{ teamMemberCount }}<span v-if="seatsMax" class="text-lg text-slate-500"> / {{ seatsMax }}</span></p>
         <p class="text-xs text-slate-500">seats used</p>
       </div>
     </div>
@@ -530,7 +544,7 @@ onMounted(() => {
           type="button"
           class="btn-primary text-sm"
           :disabled="atSeatLimit"
-          @click="showInviteForm = true"
+          @click="openInviteForm"
         >
           + Invite someone
         </button>
@@ -547,7 +561,7 @@ onMounted(() => {
       </div>
 
       <p v-if="atSeatLimit" class="mt-4 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-        Seat limit reached ({{ seatsMax }}). Upgrade your plan or remove a member before inviting someone new.
+        Seat limit reached ({{ teamMemberCount }}/{{ seatsMax }}). Upgrade your plan or remove a member before inviting someone new.
       </p>
 
       <p v-if="userSearch && !filteredUsers.length" class="mt-4 text-sm text-slate-500">No members match “{{ userSearch }}”.</p>
@@ -783,7 +797,7 @@ onMounted(() => {
       <button
         type="button"
         class="flex w-full items-center justify-between gap-3 text-left"
-        @click="showInviteForm = !showInviteForm"
+        @click="toggleInviteForm"
       >
         <div>
           <h3 class="text-lg font-semibold text-slate-200">Invite someone new</h3>

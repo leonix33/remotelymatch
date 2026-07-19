@@ -25,7 +25,9 @@ const createUserSchema = z.object({
 
 async function listUsers(req, res, next) {
   try {
-    const users = await User.find().select('-passwordHash').sort({ createdAt: -1 }).lean();
+    const team = await teamService.getTeamForUser(req.user.sub);
+    const query = team?._id ? { teamId: team._id } : {};
+    const users = await User.find(query).select('-passwordHash').sort({ createdAt: -1 }).lean();
     if (!env.mongoUri || !users.length) {
       return res.json(users);
     }
@@ -59,18 +61,24 @@ async function createUser(req, res, next) {
       return res.status(400).json({ message: 'Password must be at least 8 characters' });
     }
 
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(409).json({ message: 'Email already exists' });
-
     const adminTeam = await teamService.getTeamForUser(req.user.sub);
     if (adminTeam) {
       const limits = Team.planLimits(adminTeam.plan);
       const members = await User.countDocuments({ teamId: adminTeam._id, active: true });
       if (members >= limits.members) {
         return res.status(403).json({
-          message: `Team member limit reached (${limits.members}). Upgrade to Pro for more seats.`,
+          message: `Team member limit reached (${members}/${limits.members} seats on ${adminTeam.plan}). Remove a member or upgrade your plan before inviting someone new.`,
         });
       }
+    }
+
+    const exists = await User.findOne({ email });
+    if (exists) {
+      return res.status(409).json({
+        message: exists.teamId?.toString() === adminTeam?._id?.toString()
+          ? 'That email is already on your team. Reset their password or unblock them instead of creating a new invite.'
+          : 'Email already exists on another account. Use a different email or remove the old account first.',
+      });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
