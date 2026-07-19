@@ -24,7 +24,7 @@ const expandedJobId = ref(null);
 const approvedLocally = ref(new Set());
 const skippedLocally = ref(new Set());
 
-const { acting, actionMessage, actionError, approveJob, skipJob } = useJobApprove();
+const { acting, actionMessage, actionError, approveJob, approveAndApplyJob, skipJob } = useJobApprove();
 
 function toggleInsight(jobId) {
   expandedJobId.value = expandedJobId.value === jobId ? null : jobId;
@@ -107,6 +107,14 @@ async function onApprove(job) {
   emit('approved', job);
 }
 
+async function onApproveAndApply(job) {
+  const ok = await approveAndApplyJob(job, { tailorResume: true, useTailoredResume: true, autoApply: true });
+  if (!ok) return;
+  approvedLocally.value = new Set([...approvedLocally.value, job.jobId]);
+  jobs.value = jobs.value.filter((j) => j.jobId !== job.jobId);
+  emit('approved', job);
+}
+
 async function onSkip(job) {
   const ok = await skipJob(job);
   if (!ok) return;
@@ -164,9 +172,18 @@ defineExpose({ refresh: load });
             type="button"
             class="btn-primary min-h-[44px] px-5 text-sm font-semibold"
             :disabled="acting === job.jobId"
+            @click="onApproveAndApply(job)"
+          >
+            {{ acting === job.jobId ? 'Applying…' : 'Approve & apply' }}
+          </button>
+          <button
+            v-if="jobStatus(job) !== 'approved'"
+            type="button"
+            class="btn-secondary min-h-[44px] px-4 text-sm"
+            :disabled="acting === job.jobId"
             @click="onApprove(job)"
           >
-            {{ acting === job.jobId ? 'Adding…' : 'Add to queue' }}
+            Approve only
           </button>
           <RouterLink
             v-else
@@ -212,7 +229,8 @@ defineExpose({ refresh: load });
       </ul>
 
       <p v-if="jobs.length" class="mt-3 text-xs text-slate-500">
-        One tap adds a role to your queue with a tailored resume.
+        <strong class="text-slate-400">Approve &amp; apply</strong> submits in one step.
+        Use <strong class="text-slate-400">Approve only</strong> if you want to batch apply from step 3 or the Queue.
         <RouterLink to="/approvals" class="text-teal-400 hover:underline">Open queue</RouterLink>
         ·
         <RouterLink to="/jobs" class="text-teal-400 hover:underline">Browse all jobs</RouterLink>

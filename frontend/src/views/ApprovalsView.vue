@@ -40,6 +40,7 @@ const applying = ref(false);
 const applyMessage = ref('');
 const applyEmailNotice = ref('');
 const tailorOnApprove = ref(false);
+const applyAfterApprove = ref(true);
 const applyResumeMode = ref('base');
 const kitJob = ref(null);
 const kitOpen = ref(false);
@@ -189,13 +190,26 @@ async function submitApply({ jobIds, force = false } = {}) {
     applyMessage.value = data.message || `Applied to ${data.count ?? ids.length} job(s)`;
     applyEmailNotice.value = formatApplyEmailNotice(data.emailNotification);
     await load();
+    return { ok: true, count: data.count ?? ids.length, jobIds: ids };
   } catch (e) {
     const d = e.response?.data;
     applyMessage.value = d?.message || d?.hint || 'Apply failed';
     applyEmailNotice.value = formatApplyEmailNotice(d?.emailNotification);
     if (d?.hint) error.value = d.hint;
+    return { ok: false };
   } finally {
     applying.value = false;
+  }
+}
+
+async function maybeApplyAfterApprove(jobIds) {
+  if (!applyAfterApprove.value || !jobIds?.length) return;
+  queueBanner.value = `Approved ${jobIds.length} job(s) — submitting…`;
+  const result = await submitApply({ jobIds, force: true });
+  if (result?.ok) {
+    queueBanner.value = `Approved and applied to ${result.count} job(s).`;
+  } else {
+    queueBanner.value = 'Approved — apply failed. Use Apply approved below or try again.';
   }
 }
 
@@ -292,8 +306,34 @@ async function approve(jobId) {
       tailorResume: tailorOnApprove.value,
     });
     await load();
+    if (applyAfterApprove.value) {
+      await maybeApplyAfterApprove([jobId]);
+    } else {
+      queueBanner.value = 'Approved — use Apply approved above when ready.';
+    }
   } catch (e) {
     error.value = e.response?.data?.message || 'Approve failed';
+  } finally {
+    acting.value = '';
+  }
+}
+
+async function approveAndApply(jobId) {
+  acting.value = jobId;
+  try {
+    await http.post(`/approvals/${encodeURIComponent(jobId)}/approve`, {
+      tailorResume: tailorOnApprove.value,
+    });
+    await load();
+    queueBanner.value = 'Approved — submitting…';
+    const result = await submitApply({ jobIds: [jobId], force: true });
+    if (result?.ok) {
+      queueBanner.value = 'Approved and applied.';
+    } else {
+      queueBanner.value = 'Approved — apply failed. Try Apply on the approved tab.';
+    }
+  } catch (e) {
+    error.value = e.response?.data?.message || 'Approve & apply failed';
   } finally {
     acting.value = '';
   }
@@ -322,6 +362,7 @@ async function bulkApproveSelected() {
     });
     applyMessage.value = data.message;
     await load();
+    await maybeApplyAfterApprove(ids);
   } catch (e) {
     error.value = e.response?.data?.message || 'Bulk approve failed';
   } finally {
@@ -354,6 +395,7 @@ async function bulkApprove(count) {
     });
     applyMessage.value = data.message;
     await load();
+    await maybeApplyAfterApprove(ids);
   } catch (e) {
     error.value = e.response?.data?.message || 'Bulk approve failed';
   } finally {
@@ -448,6 +490,9 @@ onMounted(() => {
   profileStore.fetch().catch(() => {});
   tailorOnApprove.value = Boolean(profileStore.profile?.tailorResumeOnApply);
   applyResumeMode.value = profileStore.profile?.defaultApplyResumeMode === 'tailored' ? 'tailored' : 'base';
+  if (route.query.status === 'approved' || route.query.status === 'pending' || route.query.status === 'rejected') {
+    status.value = String(route.query.status);
+  }
   load();
   loadWhisper();
   if (route.query.jobId) highlightQueuedJob(String(route.query.jobId));
@@ -461,8 +506,8 @@ onMounted(() => {
         <h2 class="text-2xl font-bold text-slate-100">{{ isAdmin ? 'Apply queue' : 'Queue' }}</h2>
         <p class="mt-1 max-w-xl text-slate-400">
           {{ isAdmin
-            ? 'Triage by interview likelihood — approve roles with the best chance of a human reply.'
-            : 'Polish tailored resumes, apply when ready, then generate follow-up kits to reach recruiters.' }}
+            ? 'Approve strong matches, then apply in one click — or batch apply everything already approved.'
+            : 'Approve → apply. Turn on “Apply immediately after approve” or use the Apply button for jobs already approved.' }}
         </p>
       </div>
       <div class="mobile-queue-stats flex flex-wrap gap-3">
@@ -502,22 +547,29 @@ onMounted(() => {
             :disabled="applying"
             @click="applyApproved()"
           >
-            {{ applying ? 'Applying…' : (applyResumeMode === 'tailored' ? (status === 'approved' && approvedReadyCount ? `Apply ${approvedReadyCount} ready` : 'Apply ready jobs') : `Apply ${counts.approved} approved`) }}
+            {{ applying ? 'Applying…' : (applyResumeMode === 'tailored' && approvedReadyCount ? `Apply ${approvedReadyCount} ready` : `Apply ${counts.approved} approved`) }}
           </button>
           <button
-            v-if="applyResumeMode === 'tailored'"
+            v-if="applyResumeMode === 'tailored' && approvedNotReadyCount"
             type="button"
             class="btn-secondary px-4 py-2 text-sm"
             :disabled="applying"
             @click="applyApproved({ force: true })"
           >
-            Apply anyway (all {{ counts.approved }})
+            Apply anyway ({{ counts.approved }})
           </button>
         </div>
       </div>
     </div>
 
     <ApplyWorkflowBanner class="mt-6" />
+
+    <div
+      v-if="queueBanner"
+      class="mt-4 rounded-xl border border-teal-900/40 bg-teal-950/20 px-4 py-3 text-sm text-teal-200"
+    >
+      {{ queueBanner }}
+    </div>
 
     <div
       v-if="counts.approved > 0 || counts.pending > 0"
@@ -546,6 +598,10 @@ onMounted(() => {
       <label class="flex items-center gap-2 text-xs text-slate-400">
         <input v-model="tailorOnApprove" type="checkbox" class="accent-teal-500" />
         Tailor resume on approve
+      </label>
+      <label class="flex items-center gap-2 text-xs text-slate-400">
+        <input v-model="applyAfterApprove" type="checkbox" class="accent-teal-500" />
+        Apply immediately after approve
       </label>
       <span class="text-slate-600">|</span>
       <button class="btn-primary text-xs" :disabled="bulkActing" @click="bulkApprove(5)">Approve top 5</button>
@@ -618,9 +674,15 @@ onMounted(() => {
     <div v-if="loading" class="mt-8 text-slate-400">Loading queue…</div>
     <div v-else class="mt-6">
       <p class="mb-3 text-sm text-slate-500">{{ pageLabel }}</p>
-      <div v-if="items.length && status === 'pending'" class="mb-3 flex items-center gap-2 text-sm text-slate-500">
-        <input type="checkbox" class="accent-teal-500" :checked="allSelected" @change="toggleSelectAll" />
-        Select all on this page
+      <div v-if="items.length && status === 'pending'" class="mb-3 flex flex-wrap items-center gap-4 text-sm text-slate-500">
+        <label class="flex items-center gap-2">
+          <input type="checkbox" class="accent-teal-500" :checked="allSelected" @change="toggleSelectAll" />
+          Select all on this page
+        </label>
+        <label class="flex items-center gap-2 text-xs text-slate-400">
+          <input v-model="applyAfterApprove" type="checkbox" class="accent-teal-500" />
+          Apply immediately after approve
+        </label>
       </div>
       <div class="space-y-3">
         <div
@@ -728,8 +790,11 @@ onMounted(() => {
               </button>
             </template>
             <template v-if="status === 'pending' || job.status === 'pending'">
-              <button class="btn-primary" :disabled="acting === job.jobId" @click="approve(job.jobId)">
-                Approve
+              <button class="btn-primary" :disabled="acting === job.jobId" @click="approveAndApply(job.jobId)">
+                {{ acting === job.jobId ? 'Working…' : 'Approve & apply' }}
+              </button>
+              <button class="btn-secondary" :disabled="acting === job.jobId" @click="approve(job.jobId)">
+                Approve only
               </button>
               <button class="btn-secondary" :disabled="acting === job.jobId" @click="reject(job.jobId)">
                 Skip

@@ -78,8 +78,27 @@ const currentWizardStep = computed(() => {
 
 const applyButtonLabel = computed(() => {
   if (applying.value) return applyStep.value || 'Working…';
-  if (autoApplyEnabled.value) return `Apply to top ${jobCount.value} callback matches`;
-  return `Prepare ${jobCount.value} high-callback applications`;
+  const approved = queueCounts.value.approved || 0;
+  const n = approved > 0 ? Math.min(jobCount.value, approved) : jobCount.value;
+  if (approved > 0) {
+    return autoApplyEnabled.value
+      ? `Apply ${n} approved job${n === 1 ? '' : 's'}`
+      : `Prepare ${n} approved application${n === 1 ? '' : 's'}`;
+  }
+  if (autoApplyEnabled.value) return `Approve & apply top ${jobCount.value} matches`;
+  return `Approve & prepare top ${jobCount.value} matches`;
+});
+
+const applyHelperText = computed(() => {
+  const approved = queueCounts.value.approved || 0;
+  const pending = queueCounts.value.pending || 0;
+  if (approved > 0 && pending > 0) {
+    return `${approved} approved waiting · step 3 applies those first, then pulls from ${pending} pending if needed.`;
+  }
+  if (approved > 0) {
+    return `${approved} job${approved === 1 ? '' : 's'} approved — click below to submit.`;
+  }
+  return 'Approves strong matches, then submits (or prepares kits if submit is off).';
 });
 
 function syncFromProfile(p) {
@@ -92,7 +111,7 @@ function syncFromProfile(p) {
   digestEmail.value = p.digestEmail || '';
   applicantName.value = p.applicantName || p.displayName || auth.user?.name || '';
   if (p.defaultQuickApplyCount) jobCount.value = p.defaultQuickApplyCount;
-  autoApplyEnabled.value = p.autoApplyEnabled === true;
+  autoApplyEnabled.value = p.autoApplyEnabled !== false;
   if (!hasResume.value) resumeExpanded.value = true;
 }
 
@@ -325,8 +344,8 @@ onMounted(async () => {
       <div class="flex items-center gap-3">
         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500/20 text-sm font-bold text-teal-300">3</span>
         <div>
-          <h2 class="font-semibold text-slate-100">Apply</h2>
-          <p class="text-sm text-slate-500">Tailor for a few high-callback roles — quality beats spray-and-pray</p>
+          <h2 class="font-semibold text-slate-100">Apply approved jobs</h2>
+          <p class="text-sm text-slate-500">One click submits roles you already approved — or approves new matches first</p>
         </div>
       </div>
 
@@ -354,9 +373,11 @@ onMounted(async () => {
           </label>
           <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
             <input v-model="autoApplyEnabled" type="checkbox" class="accent-teal-500" @change="saveSettings" />
-            Submit immediately (off = review kits first)
+            Submit immediately (uncheck to approve + tailor only)
           </label>
         </div>
+
+        <p class="text-xs text-slate-500">{{ applyHelperText }}</p>
 
         <div class="rounded-lg border border-teal-900/40 bg-teal-950/20 p-3 text-sm text-teal-200/90">
           <p class="font-medium text-teal-300">Quality-first strategy</p>
@@ -399,6 +420,14 @@ onMounted(async () => {
         {{ applyButtonLabel }}
       </button>
 
+      <RouterLink
+        v-if="queueCounts.approved > 0"
+        to="/approvals?status=approved"
+        class="btn-secondary mt-3 block w-full py-3 text-center text-sm"
+      >
+        Open {{ queueCounts.approved }} approved in Queue
+      </RouterLink>
+
       <p v-if="applyError" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ applyError }}</p>
       <p v-if="message" class="mt-4 rounded-lg bg-teal-500/10 px-3 py-2 text-sm text-teal-200">{{ message }}</p>
     </section>
@@ -416,11 +445,11 @@ onMounted(async () => {
       <div class="mt-5 grid grid-cols-3 gap-3 text-center">
         <div class="rounded-xl bg-slate-800/50 p-3">
           <p class="text-2xl font-bold text-amber-300">{{ queueCounts.pending }}</p>
-          <p class="text-xs text-slate-500">in queue</p>
+          <p class="text-xs text-slate-500">pending</p>
         </div>
         <div class="rounded-xl bg-slate-800/50 p-3">
           <p class="text-2xl font-bold text-teal-300">{{ queueCounts.approved }}</p>
-          <p class="text-xs text-slate-500">ready</p>
+          <p class="text-xs text-slate-500">approved</p>
         </div>
         <div class="rounded-xl bg-slate-800/50 p-3">
           <p class="text-2xl font-bold text-slate-200">{{ queueCounts.applied }}</p>
