@@ -337,7 +337,10 @@ function cleanHeaderArtifacts(text) {
 }
 
 function applyFinalResumeFormatting(originalResume, tailoredText) {
-  if (!(originalResume || '').trim() || !(tailoredText || '').trim()) return tailoredText;
+  const { coerceResumeText } = require('./resumeRepairService');
+  const resumeText = coerceResumeText(originalResume);
+  const tailored = coerceResumeText(tailoredText);
+  if (!resumeText.trim() || !tailored.trim()) return tailoredText;
 
   const { parseResumeStructure } = require('./resumeStructureService');
   const {
@@ -347,12 +350,12 @@ function applyFinalResumeFormatting(originalResume, tailoredText) {
     stripDuplicateSectionBlocks,
   } = require('./resumeOrderGuardService');
 
-  let text = rebuildResumeInOriginalOrder(originalResume, tailoredText);
-  text = normalizeExperienceLayout(originalResume, text);
-  text = formatSkillsInResume(text, originalResume);
-  text = formatEducationInResume(text, originalResume);
+  let text = rebuildResumeInOriginalOrder(resumeText, tailored);
+  text = normalizeExperienceLayout(resumeText, text);
+  text = formatSkillsInResume(text, resumeText);
+  text = formatEducationInResume(text, resumeText);
   text = cleanHeaderArtifacts(text);
-  const structure = parseResumeStructure(originalResume);
+  const structure = parseResumeStructure(resumeText);
   text = stripDuplicateSectionBlocks(text, structure);
   text = ensureSectionSpacing(text, structure);
   text = fixGluedSectionHeadings(text, structure);
@@ -360,10 +363,13 @@ function applyFinalResumeFormatting(originalResume, tailoredText) {
 }
 
 function normalizeTailoredResumeLayout(originalResume, tailoredText) {
-  if (!(originalResume || '').trim() || !(tailoredText || '').trim()) return tailoredText;
+  const { coerceResumeText } = require('./resumeRepairService');
+  const resumeText = coerceResumeText(originalResume);
+  const tailored = coerceResumeText(tailoredText);
+  if (!resumeText.trim() || !tailored.trim()) return tailoredText;
 
   const { assembleBlueprintResume } = require('./resumeBlueprintService');
-  return assembleBlueprintResume(originalResume, tailoredText).tailoredResumeText;
+  return assembleBlueprintResume(resumeText, tailored).tailoredResumeText;
 }
 
 module.exports = {

@@ -623,7 +623,9 @@ function finalizeNormalizedKit(kit, pageTarget, jobDescription = '') {
 }
 
 function repairKitAgainstProfile(originalResume, kit, jobDescription = '') {
-  if (!kit?.tailored || !(originalResume || '').trim()) return kit;
+  const { coerceResumeText } = require('./resumeRepairService');
+  const resumeText = coerceResumeText(originalResume);
+  if (!kit?.tailored || !resumeText.trim()) return kit;
 
   const raw =
     kit.tailoredResumeText ||
@@ -634,7 +636,7 @@ function repairKitAgainstProfile(originalResume, kit, jobDescription = '') {
   if (!raw.trim()) return kit;
 
   const { assembleBlueprintResume } = require('./resumeBlueprintService');
-  const assembled = assembleBlueprintResume(originalResume, raw, kit);
+  const assembled = assembleBlueprintResume(resumeText, raw, kit);
   const pageTarget = clampPageCount(kit.supplementPagesTarget || kit.pageCount || DEFAULT_SUPPLEMENT_PAGES);
   return finalizeNormalizedKit(
     {
@@ -650,8 +652,10 @@ function repairKitAgainstProfile(originalResume, kit, jobDescription = '') {
 function enrichKitForDisplay(kit, originalResume = '') {
   if (!kit?.tailored) return kit;
 
-  if ((originalResume || '').trim()) {
-    return repairKitAgainstProfile(originalResume, kit);
+  const { coerceResumeText } = require('./resumeRepairService');
+  const resumeText = coerceResumeText(originalResume);
+  if (resumeText.trim()) {
+    return repairKitAgainstProfile(resumeText, kit);
   }
 
   const raw =

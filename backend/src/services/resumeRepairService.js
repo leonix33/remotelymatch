@@ -176,8 +176,19 @@ function reconcileSpuriousToolsSections(sections) {
   return out;
 }
 
+function coerceResumeText(value) {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (Buffer.isBuffer(value)) return value.toString('utf8');
+  if (typeof value === 'object') {
+    if (typeof value.resumeText === 'string') return value.resumeText;
+    if (typeof value.text === 'string') return value.text;
+  }
+  return String(value);
+}
+
 function repairResumeText(text) {
-  const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  const lines = coerceResumeText(text).replace(/\r\n/g, '\n').split('\n');
   return repairResumeLines(lines).join('\n');
 }
 
@@ -191,6 +202,7 @@ function prepareResumeTextForParsing(text) {
 }
 
 module.exports = {
+  coerceResumeText,
   repairResumeText,
   repairResumeLines,
   isSpuriousToolsContent,

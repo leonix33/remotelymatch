@@ -11,6 +11,7 @@ const applicantContactService = require('./applicantContactService');
 const llmService = require('./llmService');
 const env = require('../config/env');
 const { resolveTailorOptions, ATS_TARGET_MIN, HIGH_MATCH_TARGET, KIT_PIPELINE_VERSION } = require('../config/tailorDefaults');
+const { coerceResumeText } = require('./resumeRepairService');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
@@ -77,7 +78,7 @@ async function findJob(userId, jobId) {
 async function persistEnrichedKit(userId, jobId, kit) {
   if (!kit?.tailored) return kit;
   const profile = await profileService.getOrCreate(userId);
-  const originalResume = profile?.resumeText || '';
+  const originalResume = coerceResumeText(profile?.resumeText);
   const enriched = resumeTailorService.enrichKitForDisplay(kit, originalResume);
   const changed =
     enriched.tailoredResumeText !== kit.tailoredResumeText ||
@@ -139,7 +140,7 @@ async function refineKitToTarget(userId, kit, context = {}) {
     maxPasses = resolveTailorOptions().polishMaxPasses,
   } = context;
 
-  if (!kit?.tailored || !profile?.resumeText?.trim()) {
+  if (!kit?.tailored || !coerceResumeText(profile?.resumeText).trim()) {
     return { kit, passes: [], ready: false };
   }
 
@@ -169,7 +170,7 @@ async function refineKitToTarget(userId, kit, context = {}) {
       break;
     }
 
-    working = resumeTailorService.repairKitAgainstProfile(profile.resumeText, working, jobDescription);
+    working = resumeTailorService.repairKitAgainstProfile(coerceResumeText(profile.resumeText), working, jobDescription);
     working = resumeTailorService.applyAtsMetadata(working, jobDescription, job);
     passes.push({
       pass,
@@ -440,7 +441,8 @@ async function generateForJob(userId, jobId, options = {}) {
   const canonical = resolveTailorOptions();
   const { supplementPages, tailorMode, highMatchTarget } = canonical;
 
-  if (!(profile?.resumeText || '').trim() || profile.resumeText.trim().length < 50) {
+  const resumeText = coerceResumeText(profile?.resumeText);
+  if (!resumeText.trim() || resumeText.trim().length < 50) {
     const err = new Error('Add your resume in Profile before generating a tailored application kit.');
     err.status = 400;
     throw err;
@@ -500,7 +502,7 @@ async function generateForJob(userId, jobId, options = {}) {
   }
 
   // Blueprint pipeline: generate bullets + cover letter, then one server-side push to 100% JD keyword match.
-  kit = resumeTailorService.repairKitAgainstProfile(profile.resumeText, kit, jobDescription);
+  kit = resumeTailorService.repairKitAgainstProfile(resumeText, kit, jobDescription);
   kit = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
 
   let refinePasses = [];
@@ -790,7 +792,7 @@ async function listKits(userId) {
     applicationKitStore.listForUser(userId),
     profileService.getOrCreate(userId),
   ]);
-  const originalResume = profile?.resumeText || '';
+  const originalResume = coerceResumeText(profile?.resumeText);
   const items = [];
   for (const kit of kits) {
     if (!kit?.tailored) {

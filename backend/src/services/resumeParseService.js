@@ -1,7 +1,7 @@
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 const { normalizeResumeLayout, preserveLineBreaksFromExtracted } = require('./resumeLayoutService');
-const { repairResumeText, prepareResumeTextForParsing } = require('./resumeRepairService');
+const { coerceResumeText, repairResumeText, prepareResumeTextForParsing } = require('./resumeRepairService');
 
 const GENERAL_MUST_CATALOG = [
   'project management',
@@ -612,7 +612,7 @@ function parseResumeFromText(resumeText) {
 }
 
 function enrichProfileResponse(profile) {
-  const raw = profile.resumeText || '';
+  const raw = coerceResumeText(profile.resumeText);
   const unreadable = raw.trim() ? isUnreadableResumeText(raw) : false;
   const resumeText = unreadable ? '' : prepareResumeTextForParsing(raw);
   const extractedSkills = unreadable

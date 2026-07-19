@@ -165,20 +165,22 @@ function buildResumeBlueprint(originalResume) {
  * Single deterministic assembly pass — no AI section rewrites.
  */
 function assembleBlueprintResume(originalResume, tailoredText, kit = {}) {
-  let text = String(tailoredText || originalResume || '').trim();
-  if (!text) return text;
+  const { coerceResumeText } = require('./resumeRepairService');
+  const resumeText = coerceResumeText(originalResume);
+  let text = coerceResumeText(tailoredText || resumeText).trim();
+  if (!text) return { tailoredResumeText: '', coverLetterParagraph: fixCoverLetterDuplicateApply(kit.coverLetterParagraph || '') };
 
-  const structure = parseResumeStructure(originalResume);
+  const structure = parseResumeStructure(resumeText);
   const { unglueSectionHeadings } = require('./resumeOrderGuardService');
   text = unglueSectionHeadings(text, structure);
 
-  text = restoreContactHeader(originalResume, text);
-  text = restoreImmutableSections(originalResume, text);
-  text = restoreEditableSectionFromOriginal(originalResume, text, 'summary');
-  text = restoreEditableSectionFromOriginal(originalResume, text, 'skills');
-  text = enforceExperienceIntegrity(originalResume, text);
+  text = restoreContactHeader(resumeText, text);
+  text = restoreImmutableSections(resumeText, text);
+  text = restoreEditableSectionFromOriginal(resumeText, text, 'summary');
+  text = restoreEditableSectionFromOriginal(resumeText, text, 'skills');
+  text = enforceExperienceIntegrity(resumeText, text);
   const { applyFinalResumeFormatting } = require('./resumeKitLayoutService');
-  text = applyFinalResumeFormatting(originalResume, text);
+  text = applyFinalResumeFormatting(resumeText, text);
 
   const coverLetter = fixCoverLetterDuplicateApply(kit.coverLetterParagraph || '');
   return { tailoredResumeText: text.trim(), coverLetterParagraph: coverLetter };

@@ -77,6 +77,21 @@ Built multi-account AWS environments using EC2, VPC, IAM, S3, RDS, Lambda, and C
     assert.ok(enriched.tailoredResumeText.includes('into CI/CD pipelines'));
     assert.ok(enriched.tailoredResumeText.includes('PRIMUS Global Services'));
   });
+
+  it('enrichKitForDisplay accepts a profile object instead of resume text', () => {
+    const profile = {
+      resumeText: `Alex Rivera\nalex@example.com\n\nPROFESSIONAL EXPERIENCE\nDevOps Engineer — Acme\n- Kubernetes and Terraform`,
+    };
+    const kit = {
+      tailored: true,
+      pageCount: 1,
+      supplementPagesTarget: 3,
+      tailoredResumeText: `${profile.resumeText}\n- Added JD keyword coverage bullet`,
+    };
+    const enriched = enrichKitForDisplay(kit, profile);
+    assert.ok(enriched.tailoredResumeText.includes('Alex Rivera'));
+    assert.ok(enriched.tailoredResumeText.includes('Kubernetes'));
+  });
 });
 
 describe('applicationKitService attachKitToApplyItem', () => {
