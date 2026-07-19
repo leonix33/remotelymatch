@@ -11,7 +11,7 @@ import { RouterLink } from 'vue-router';
       </RouterLink>
       <span class="text-slate-600">→</span>
       <RouterLink to="/approvals" class="rounded-lg bg-slate-800/80 px-2.5 py-1.5 text-teal-300 hover:bg-slate-800">
-        2. Queue — polish
+        2. Queue — tailor to 100%
       </RouterLink>
       <span class="text-slate-600">→</span>
       <RouterLink to="/follow-ups" class="rounded-lg bg-slate-800/80 px-2.5 py-1.5 text-violet-300 hover:bg-slate-800">
@@ -19,7 +19,7 @@ import { RouterLink } from 'vue-router';
       </RouterLink>
     </div>
     <p class="mt-3 text-xs text-slate-500">
-      Auto apply gets you out the door fast. Use Queue to polish resumes to 95% ATS, then Follow-ups to reach recruiters.
+      One click tailors every queued role to 100% JD keyword match on the server, then Follow-ups reach recruiters.
     </p>
   </div>
 </template>

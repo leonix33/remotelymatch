@@ -10,7 +10,7 @@ describe('tailorDefaults', () => {
     assert.equal(a.tailorMode, TAILOR_MODE);
     assert.equal(a.highMatchTarget, HIGH_MATCH_TARGET);
     assert.equal(a.supplementPages, 4);
-    assert.equal(a.atsTargetMin, 90);
+    assert.equal(a.atsTargetMin, 100);
     assert.ok(a.generateMaxPasses >= 0);
     assert.ok(a.polishMaxPasses >= 1);
   });

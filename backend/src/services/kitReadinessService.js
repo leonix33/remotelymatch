@@ -1,6 +1,19 @@
 const READY_ATS_TARGET = 100;
-const READY_ATS_MIN = 90;
-const READY_JD_MIN = 80;
+const READY_ATS_MIN = 100;
+const READY_JD_MIN = 100;
+
+function isKitAtTarget(kit, target = READY_ATS_TARGET) {
+  if (!kit) return false;
+  const hasKit = Boolean(kit.tailored || kit.hasKit);
+  if (!hasKit) return false;
+
+  const ats = Number(kit.atsScore ?? kit.estimatedMatchPct ?? 0);
+  const jd = Number(kit.jdMatchPct ?? 0);
+  const red = Number(kit.atsRed ?? 0);
+  if (!Number.isFinite(ats)) return false;
+
+  return ats >= target && jd >= target && red === 0;
+}
 
 function isKitReadyToApply(kit) {
   if (!kit) return false;
@@ -8,10 +21,7 @@ function isKitReadyToApply(kit) {
   if (!hasKit) return false;
   if (kit.useForApply === false) return false;
 
-  const ats = Number(kit.atsScore);
-  if (!Number.isFinite(ats)) return false;
-
-  return ats >= READY_ATS_MIN;
+  return isKitAtTarget(kit, READY_ATS_MIN);
 }
 
 function buildKitSummary(kit, jobStatus) {
@@ -54,6 +64,7 @@ module.exports = {
   READY_ATS_TARGET,
   READY_ATS_MIN,
   READY_JD_MIN,
+  isKitAtTarget,
   isKitReadyToApply,
   buildKitSummary,
 };

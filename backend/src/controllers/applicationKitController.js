@@ -125,4 +125,22 @@ async function kitCompare(req, res, next) {
   }
 }
 
-module.exports = { listKits, getKit, generateKit, polishKit, updatePreference, atsScore, kitCompare };
+async function tailorKit(req, res, next) {
+  try {
+    const jobIds = Array.isArray(req.body?.jobIds) ? req.body.jobIds : [];
+    if (!jobIds.length) {
+      return res.status(400).json({ message: 'Provide jobIds — the queue roles you want tailored to 100% JD keyword match.' });
+    }
+    const result = await applicationKitService.tailorQueueJobs(req.user.sub, jobIds, {
+      authEmail: req.user.email,
+      tailorFocus: req.body?.tailorFocus || '',
+      forceGenerate: req.body?.forceGenerate !== false,
+      req,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listKits, getKit, generateKit, polishKit, tailorKit, updatePreference, atsScore, kitCompare };

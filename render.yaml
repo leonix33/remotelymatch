@@ -87,7 +87,7 @@ services:
       - key: TAILOR_DEFAULT_PAGES
         value: "4"
       - key: TAILOR_ATS_TARGET_MIN
-        value: "90"
+        value: "100"
       - key: RESEND_API_KEY
         sync: false
       # Reliable delivery: Gmail App Password (recommended primary — works for Yahoo/iCloud/Gmail)

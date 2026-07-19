@@ -53,6 +53,7 @@ const page = ref(1);
 const pageSize = 25;
 const selected = ref(new Set());
 const polishing = ref('');
+const tailoringQueue = ref(false);
 const expandedInsightJobId = ref(null);
 
 function toggleInsight(jobId) {
@@ -176,7 +177,7 @@ async function submitApply({ jobIds, force = false } = {}) {
     if (!ids.length) {
       applyMessage.value =
         applyResumeMode.value === 'tailored'
-          ? 'No approved jobs with a ready tailored kit. Use Polish until ready or Apply anyway.'
+          ? 'No approved jobs with a ready tailored kit. Use Tailor queue to 100% or Apply anyway.'
           : 'No approved jobs to apply.';
       return;
     }
@@ -231,28 +232,56 @@ async function polishUntilReady(job) {
   polishing.value = job.jobId;
   polishMsg.value = '';
   error.value = '';
-  const profile = profileStore.profile || {};
   try {
-    polishMsg.value = `Running one polish pass (~20s) toward ${READY_ATS_MIN}%+ ATS…`;
-    const { data } = await http.post(`/applications/kit/${encodeURIComponent(job.jobId)}/polish`, {
-      highMatchTarget: READY_ATS_TARGET,
-      supplementPages: profile.defaultSupplementPages || 3,
-    }, { timeout: 300000 });
+    polishMsg.value = `Tailoring to ${READY_ATS_TARGET}% JD keyword match (~30–90s)…`;
+    const { data } = await http.post(`/applications/kit/${encodeURIComponent(job.jobId)}/polish`, {}, { timeout: 300000 });
     patchJobKit(job.jobId, data.kit);
     const kit = items.value.find((j) => j.jobId === job.jobId)?.kit;
     const last = data.passes?.[data.passes.length - 1];
     const passLine = data.passes?.length
-      ? `ATS ${last?.atsScore ?? kit?.atsScore ?? '—'}% · Fit ${last?.jdMatchPct ?? kit?.jdMatchPct ?? '—'}% after ${data.passes.length} step(s)`
+      ? `ATS ${last?.atsScore ?? kit?.atsScore ?? '—'}% · JD ${last?.jdMatchPct ?? kit?.jdMatchPct ?? '—'}% after ${data.passes.length} step(s)`
       : `ATS ${kit?.atsScore ?? '—'}%`;
     if (data.ready || isKitReadyToApply(kit)) {
       polishMsg.value = `Ready to apply — ${passLine}`;
       return;
     }
-    polishMsg.value = `Best achieved: ${passLine} — click Polish again if still below ${READY_ATS_MIN}%.`;
+    polishMsg.value = `Best achieved: ${passLine}. Queue-wide tailor may close remaining keyword gaps.`;
   } catch (e) {
-    error.value = formatApiError(e, 'Polish until ready failed');
+    error.value = formatApiError(e, 'Tailoring failed');
   } finally {
     polishing.value = '';
+  }
+}
+
+function queueJobIdsForTailoring() {
+  const fromSelection = [...selected.value];
+  if (fromSelection.length) return fromSelection;
+  return items.value.map((j) => j.jobId);
+}
+
+async function tailorQueueTo100() {
+  const jobIds = queueJobIdsForTailoring();
+  if (!jobIds.length) {
+    polishMsg.value = 'Select jobs in the queue or load a tab with jobs first.';
+    return;
+  }
+
+  tailoringQueue.value = true;
+  polishMsg.value = '';
+  error.value = '';
+  try {
+    polishMsg.value = `Tailoring ${jobIds.length} queued role(s) to ${READY_ATS_TARGET}% JD keyword match…`;
+    const { data } = await http.post(
+      '/applications/kits/tailor-queue',
+      { jobIds },
+      { timeout: 600000 }
+    );
+    await load();
+    polishMsg.value = `Tailored ${data.total} role(s) — ${data.readyCount} at ${READY_ATS_TARGET}% keyword match.`;
+  } catch (e) {
+    error.value = formatApiError(e, 'Queue tailoring failed');
+  } finally {
+    tailoringQueue.value = false;
   }
 }
 
@@ -386,7 +415,7 @@ function kitBadge(job) {
   if (job.kit?.applied) return { label: 'Applied', cls: 'badge-teal' };
   if (!job.kit?.hasKit) return null;
   if (job.kit.useForApply === false) return { label: 'Kit saved · base on apply', cls: 'badge-slate' };
-  const mode = job.kit.tailorMode === 'high_match' ? '95% match kit' : 'kit ready';
+  const mode = job.kit.tailorMode === 'high_match' ? '100% match kit' : 'kit ready';
   return { label: `${job.kit.pageCount || 3}-page ${mode}`, cls: 'badge-teal' };
 }
 
@@ -496,10 +525,20 @@ onMounted(() => {
     >
       <p class="font-medium text-amber-200">Polish &amp; follow up</p>
       <p class="mt-1 text-xs text-amber-100/80">
-        <strong>Polish until ready</strong> targets 95% ATS on each tailored resume.
+        <strong>Tailor queue to 100%</strong> runs one server-side push per role toward full JD keyword match.
         <strong>Generate follow-up kit</strong> drafts recruiter outreach after you apply.
         <RouterLink to="/follow-ups" class="text-violet-300 hover:underline">Follow-ups</RouterLink> tracks replies and day-5 reminders.
       </p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="btn-primary px-4 py-2 text-sm"
+          :disabled="tailoringQueue || !items.length"
+          @click="tailorQueueTo100"
+        >
+          {{ tailoringQueue ? 'Tailoring queue…' : (selected.size ? `Tailor ${selected.size} selected to 100%` : 'Tailor queue to 100%') }}
+        </button>
+      </div>
     </div>
 
     <div v-if="status === 'pending' && counts.pending > 0 && isAdmin" class="mt-6 card flex flex-wrap items-center gap-3 p-4">
@@ -659,7 +698,7 @@ onMounted(() => {
               :disabled="polishing === job.jobId"
               @click="polishUntilReady(job)"
             >
-              {{ polishing === job.jobId ? 'Polishing…' : (job.kit?.hasKit ? 'Polish until ready' : 'Generate & polish') }}
+              {{ polishing === job.jobId ? 'Tailoring…' : (job.kit?.hasKit ? 'Tailor to 100%' : 'Generate & tailor') }}
             </button>
             <button
               type="button"

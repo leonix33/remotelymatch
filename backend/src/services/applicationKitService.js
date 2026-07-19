@@ -3,14 +3,14 @@ const applicationService = require('./applicationService');
 const jobService = require('./jobService');
 const localApprovalService = require('./localApprovalService');
 const applicationKitStore = require('./applicationKitStore');
-const { buildKitSummary, isKitReadyToApply, READY_ATS_MIN } = require('./kitReadinessService');
+const { buildKitSummary, isKitReadyToApply, isKitAtTarget, READY_ATS_MIN } = require('./kitReadinessService');
 const activityService = require('./activityService');
 const jobDescriptionService = require('./jobDescriptionService');
 const resumeTailorService = require('./resumeTailorService');
 const applicantContactService = require('./applicantContactService');
 const llmService = require('./llmService');
 const env = require('../config/env');
-const { resolveTailorOptions, ATS_TARGET_MIN, KIT_PIPELINE_VERSION } = require('../config/tailorDefaults');
+const { resolveTailorOptions, ATS_TARGET_MIN, HIGH_MATCH_TARGET, KIT_PIPELINE_VERSION } = require('../config/tailorDefaults');
 
 async function findJob(userId, jobId) {
   const fromFeed = jobService.readJobsFromSqlite(5000).find((j) => j.jobId === jobId);
@@ -120,6 +120,232 @@ async function getKit(userId, jobId) {
   return kit;
 }
 
+async function buildTailorFocusFromKit(kit, fallback = '') {
+  const { getRedTerms } = require('./atsKeywordService');
+  const focusParts = [
+    ...(kit?.uncoveredRequirements || []),
+    ...getRedTerms(kit, 12),
+  ].filter(Boolean);
+  return focusParts.length ? focusParts.slice(0, 12).join(', ') : fallback;
+}
+
+async function refineKitToTarget(userId, kit, context = {}) {
+  const {
+    profile,
+    job,
+    jobDescription,
+    authEmail,
+    tailorFocus = '',
+    maxPasses = resolveTailorOptions().polishMaxPasses,
+  } = context;
+
+  if (!kit?.tailored || !profile?.resumeText?.trim()) {
+    return { kit, passes: [], ready: false };
+  }
+
+  const contact =
+    context.contact ||
+    (await applicantContactService.resolveApplicantContact(userId, profile, authEmail));
+  let working = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
+  const passes = [];
+
+  if (isKitAtTarget(working, HIGH_MATCH_TARGET)) {
+    return { kit: working, passes, ready: true };
+  }
+
+  for (let pass = 1; pass <= maxPasses && !isKitAtTarget(working, HIGH_MATCH_TARGET); pass += 1) {
+    const focus = await buildTailorFocusFromKit(working, tailorFocus);
+    try {
+      working = await resumeTailorService.perfectExperienceForKit({
+        userId,
+        profile,
+        job,
+        jobDescription,
+        kit: working,
+        tailorFocus: focus,
+      });
+    } catch (err) {
+      console.warn(`Refine pass ${pass} failed for ${job?.jobId || job?.id}:`, err.message);
+      break;
+    }
+
+    working = resumeTailorService.repairKitAgainstProfile(profile.resumeText, working, jobDescription);
+    working = resumeTailorService.applyAtsMetadata(working, jobDescription, job);
+    passes.push({
+      pass,
+      phase: 'refine',
+      atsScore: working.atsScore ?? null,
+      jdMatchPct: working.jdMatchPct ?? null,
+      atsRed: working.atsRed ?? null,
+    });
+  }
+
+  return {
+    kit: working,
+    passes,
+    ready: isKitAtTarget(working, HIGH_MATCH_TARGET),
+  };
+}
+
+async function persistTailoredKit(userId, jobId, kit, job, meta = {}) {
+  const canonical = resolveTailorOptions();
+  return applicationKitStore.set(userId, jobId, {
+    ...kit,
+    pipelineVersion: KIT_PIPELINE_VERSION,
+    jobId,
+    jobTitle: job.title,
+    company: job.company,
+    jobUrl: job.url,
+    formatted: resumeTailorService.formatKitAsText(kit),
+    generatedAt: new Date().toISOString(),
+    useForApply: meta.useForApply !== undefined ? meta.useForApply !== false : kit.useForApply !== false,
+    tailorFocus: meta.tailorFocus || '',
+    supplementPagesTarget: canonical.supplementPages,
+    tailorMode: canonical.tailorMode,
+    highMatchTarget: canonical.highMatchTarget,
+    perfectionPasses: meta.perfectionPasses ?? kit.perfectionPasses ?? 0,
+  });
+}
+
+async function tailorJobToTarget(userId, jobId, options = {}) {
+  const { authEmail, tailorFocus: initialFocus, forceGenerate = false, req } = options;
+  const profile = await profileService.getOrCreate(userId);
+  const canonical = resolveTailorOptions();
+
+  if (!(await llmService.isLive(userId))) {
+    const err = new Error(
+      'AI API key required — add ANTHROPIC_API_KEY (recommended) or OPENAI_API_KEY on the server, or your OpenAI key in Profile → AI Integration.'
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  const job = options.job || (await findJob(userId, jobId));
+  if (!job) {
+    const err = new Error('Job not found — re-open the posting from your queue or re-apply to refresh this role.');
+    err.status = 404;
+    throw err;
+  }
+
+  let kit = await applicationKitStore.get(userId, jobId);
+  const passes = [];
+
+  if (!kit?.tailored || forceGenerate || kit.pipelineVersion !== KIT_PIPELINE_VERSION) {
+    kit = await generateForJob(userId, jobId, {
+      tailorResume: true,
+      force: true,
+      authEmail,
+      tailorFocus: initialFocus || '',
+      job,
+      skipRefine: true,
+      recordActivity: false,
+      req,
+    });
+    passes.push({
+      pass: 0,
+      phase: 'generate',
+      atsScore: kit.atsScore ?? null,
+      jdMatchPct: kit.jdMatchPct ?? null,
+      atsRed: kit.atsRed ?? null,
+    });
+  }
+
+  const jobDescription = await jobDescriptionService.resolveJobDescription(job);
+  const contact = await applicantContactService.resolveApplicantContact(userId, profile, authEmail);
+  const tailorFocus = initialFocus || kit.tailorFocus || '';
+
+  const refined = await refineKitToTarget(userId, kit, {
+    profile,
+    job,
+    jobDescription,
+    contact,
+    authEmail,
+    tailorFocus,
+    maxPasses: options.maxPasses ?? canonical.polishMaxPasses,
+  });
+  passes.push(...refined.passes);
+
+  const saved = await persistTailoredKit(userId, jobId, refined.kit, job, {
+    useForApply: kit.useForApply,
+    tailorFocus: (await buildTailorFocusFromKit(refined.kit, tailorFocus)) || tailorFocus,
+    perfectionPasses: (kit.perfectionPasses || 0) + refined.passes.length,
+  });
+
+  const result = {
+    kit: saved,
+    passes,
+    ready: refined.ready,
+    target: HIGH_MATCH_TARGET,
+  };
+
+  await activityService.recordActivity({
+    req,
+    userId,
+    type: 'polish_kit',
+    entityType: 'job',
+    entityId: jobId,
+    summary: `Tailored to ${saved.atsScore ?? '—'}% ATS / ${saved.jdMatchPct ?? '—'}% JD fit`,
+    meta: {
+      ready: result.ready,
+      passes: passes.length,
+      atsScore: saved.atsScore ?? null,
+      jdMatchPct: saved.jdMatchPct ?? null,
+      company: saved.company,
+      title: saved.jobTitle,
+    },
+  });
+
+  return result;
+}
+
+async function tailorQueueJobs(userId, jobIds = [], options = {}) {
+  const ids = [...new Set((jobIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+  if (!ids.length) {
+    return { total: 0, readyCount: 0, results: [] };
+  }
+
+  const concurrency = Math.min(3, Math.max(1, Number(options.concurrency) || 3));
+  const results = [];
+
+  for (let i = 0; i < ids.length; i += concurrency) {
+    const chunk = ids.slice(i, i + concurrency);
+    const chunkResults = await Promise.all(
+      chunk.map(async (jobId) => {
+        try {
+          const result = await tailorJobToTarget(userId, jobId, {
+            authEmail: options.authEmail,
+            tailorFocus: options.tailorFocus || '',
+            forceGenerate: options.forceGenerate !== false,
+            req: options.req,
+          });
+          return {
+            jobId,
+            ok: true,
+            ready: result.ready,
+            atsScore: result.kit?.atsScore ?? null,
+            jdMatchPct: result.kit?.jdMatchPct ?? null,
+            passes: result.passes?.length ?? 0,
+          };
+        } catch (err) {
+          return {
+            jobId,
+            ok: false,
+            error: err.message || 'Tailoring failed',
+          };
+        }
+      })
+    );
+    results.push(...chunkResults);
+  }
+
+  return {
+    total: results.length,
+    readyCount: results.filter((r) => r.ok && r.ready).length,
+    results,
+    target: HIGH_MATCH_TARGET,
+  };
+}
+
 async function ensureMinimumAtsScore(
   userId,
   kit,
@@ -194,7 +420,7 @@ function formatKitGenerationError(err) {
 }
 
 async function generateForJob(userId, jobId, options = {}) {
-  const { tailorResume = true, force = false, authEmail, tailorFocus } = options;
+  const { tailorResume = true, force = false, authEmail, tailorFocus, skipRefine = false } = options;
 
   if (!tailorResume) {
     return {
@@ -273,24 +499,32 @@ async function generateForJob(userId, jobId, options = {}) {
     throw err;
   }
 
-  // Blueprint pipeline: generate already tailors bullets + optional ATS pass.
+  // Blueprint pipeline: generate bullets + cover letter, then one server-side push to 100% JD keyword match.
   kit = resumeTailorService.repairKitAgainstProfile(profile.resumeText, kit, jobDescription);
   kit = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
 
-  const saved = await applicationKitStore.set(userId, jobId, {
-    ...kit,
-    pipelineVersion: KIT_PIPELINE_VERSION,
-    jobId,
-    jobTitle: job.title,
-    company: job.company,
-    jobUrl: job.url,
-    formatted: resumeTailorService.formatKitAsText(kit),
-    generatedAt: new Date().toISOString(),
-    useForApply: existing?.useForApply !== false,
-    tailorFocus: tailorFocus !== undefined ? String(tailorFocus).slice(0, 2000) : existing?.tailorFocus || '',
-    supplementPagesTarget: supplementPages,
-    tailorMode,
-    highMatchTarget,
+  let refinePasses = [];
+  if (!skipRefine) {
+    const refined = await refineKitToTarget(userId, kit, {
+      profile,
+      job,
+      jobDescription,
+      authEmail,
+      tailorFocus: tailorFocus || existing?.tailorFocus || '',
+      maxPasses: canonical.polishMaxPasses,
+    });
+    kit = refined.kit;
+    refinePasses = refined.passes;
+  }
+
+  const saved = await persistTailoredKit(userId, jobId, kit, job, {
+    useForApply: existing?.useForApply,
+    tailorFocus:
+      (await buildTailorFocusFromKit(kit, tailorFocus || existing?.tailorFocus || '')) ||
+      tailorFocus ||
+      existing?.tailorFocus ||
+      '',
+    perfectionPasses: 1 + refinePasses.length,
   });
 
   if (options.recordActivity !== false) {
@@ -314,148 +548,21 @@ async function generateForJob(userId, jobId, options = {}) {
 }
 
 async function polishUntilReady(userId, jobId, options = {}) {
-  const { authEmail, tailorFocus: initialFocus } = options;
-  const profile = await profileService.getOrCreate(userId);
-  const canonical = resolveTailorOptions();
-  const { highMatchTarget, supplementPages, tailorMode } = canonical;
-
-  if (!(await llmService.isLive(userId))) {
-    const err = new Error(
-      'AI API key required — add ANTHROPIC_API_KEY (recommended) or OPENAI_API_KEY on the server, or your OpenAI key in Profile → AI Integration.'
-    );
-    err.status = 400;
-    throw err;
-  }
-
-  const job = options.job || (await findJob(userId, jobId));
-  if (!job) {
-    const err = new Error('Job not found — re-open the posting from your queue or re-apply to refresh this role.');
-    err.status = 404;
-    throw err;
-  }
-
-  let kit = await applicationKitStore.get(userId, jobId);
-  const passes = [];
-
-  if (!kit?.tailored) {
-    kit = await generateForJob(userId, jobId, {
-      tailorResume: true,
-      force: true,
-      authEmail,
-      highMatchTarget,
-      supplementPages,
-      tailorMode: 'high_match',
-      tailorFocus: initialFocus || '',
-      job,
-      recordActivity: false,
-    });
-    passes.push({ round: 0, phase: 'generate', atsScore: kit.atsScore ?? null, jdMatchPct: kit.jdMatchPct ?? null });
-    if (isKitReadyToApply({ tailored: true, hasKit: true, atsScore: kit.atsScore, useForApply: kit.useForApply !== false })) {
-      const result = { kit, passes, ready: true };
-      await activityService.recordActivity({
-        req: options.req,
-        userId,
-        type: 'polish_kit',
-        entityType: 'job',
-        entityId: jobId,
-        summary: `Polished kit — ATS ${kit.atsScore ?? '—'}%`,
-        meta: { ready: true, passes: passes.length, atsScore: kit.atsScore ?? null, company: kit.company, title: kit.jobTitle },
-      });
-      return result;
-    }
-  }
-
-  const jobDescription = await jobDescriptionService.resolveJobDescription(job);
-  const contact = await applicantContactService.resolveApplicantContact(userId, profile, authEmail);
-  let tailorFocus = initialFocus || kit.tailorFocus || '';
-  const scored = resumeTailorService.applyAtsMetadata(kit, jobDescription, job);
-
-  if (
-    isKitReadyToApply({
-      tailored: true,
-      hasKit: true,
-      atsScore: scored.atsScore,
-      useForApply: scored.useForApply !== false,
-    })
-  ) {
-    return { kit: scored, passes, ready: true };
-  }
-
-  const { getRedTerms } = require('./atsKeywordService');
-  const focusParts = [
-    ...(scored.uncoveredRequirements || []),
-    ...getRedTerms(scored, 12),
-  ].filter(Boolean);
-  if (focusParts.length) tailorFocus = focusParts.slice(0, 12).join(', ');
-
-  let polished;
-  try {
-    polished = await resumeTailorService.perfectExperienceForKit({
-      userId,
-      profile,
-      job,
-      jobDescription,
-      kit: scored,
-    });
-  } catch (err) {
-    console.warn(`Polish failed for ${jobId}:`, err.message);
-    const wrapped = new Error(err.message || 'AI polish request failed — try again in a moment.');
-    wrapped.status = err.status || 502;
-    throw wrapped;
-  }
-
-  polished = resumeTailorService.repairKitAgainstProfile(profile.resumeText, polished, jobDescription);
-
-  kit = await applicationKitStore.set(userId, jobId, {
-    ...polished,
-    pipelineVersion: KIT_PIPELINE_VERSION,
-    jobId,
-    jobTitle: job.title,
-    company: job.company,
-    jobUrl: job.url,
-    formatted: resumeTailorService.formatKitAsText(polished),
-    generatedAt: new Date().toISOString(),
-    useForApply: kit.useForApply !== false,
-    tailorFocus,
-    supplementPagesTarget: supplementPages,
-    tailorMode: 'high_match',
-    highMatchTarget,
+  return tailorJobToTarget(userId, jobId, {
+    ...options,
+    forceGenerate: options.forceGenerate ?? false,
   });
-
-  passes.push({ round: 1, phase: 'refine', atsScore: kit.atsScore ?? null, jdMatchPct: kit.jdMatchPct ?? null });
-
-  const result = {
-    kit,
-    passes,
-    ready: isKitReadyToApply({
-      tailored: true,
-      hasKit: true,
-      atsScore: kit.atsScore,
-      useForApply: kit.useForApply !== false,
-    }),
-  };
-  await activityService.recordActivity({
-    req: options.req,
-    userId,
-    type: 'polish_kit',
-    entityType: 'job',
-    entityId: jobId,
-    summary: `Polished kit — ATS ${kit.atsScore ?? '—'}%`,
-    meta: {
-      ready: result.ready,
-      passes: passes.length,
-      atsScore: kit.atsScore ?? null,
-      company: kit.company,
-      title: kit.jobTitle,
-    },
-  });
-  return result;
 }
 
 async function generateOnApprove(userId, jobId, tailorResume, options = {}) {
   if (!tailorResume) return null;
   try {
-    return await generateForJob(userId, jobId, { tailorResume: true, ...options });
+    const result = await tailorJobToTarget(userId, jobId, {
+      ...options,
+      forceGenerate: true,
+      recordActivity: options.recordActivity !== false,
+    });
+    return result.kit;
   } catch (err) {
     console.warn(`Application kit generation failed for ${jobId}:`, err.message);
     return null;
@@ -529,14 +636,15 @@ async function prepareApplyItems(userId, jobs, options = {}) {
     const jobId = job.jobId || job.id;
     let kit = await applicationKitStore.get(userId, jobId);
     let generationFailed = false;
-    if (!kit?.tailored || kit.pipelineVersion !== KIT_PIPELINE_VERSION) {
+    if (!kit?.tailored || kit.pipelineVersion !== KIT_PIPELINE_VERSION || !isKitAtTarget(kit, HIGH_MATCH_TARGET)) {
       try {
-        kit = await generateForJob(userId, jobId, {
-          tailorResume: true,
-          force: true,
+        const tailored = await tailorJobToTarget(userId, jobId, {
           authEmail,
           job,
+          forceGenerate: !kit?.tailored || kit.pipelineVersion !== KIT_PIPELINE_VERSION,
+          recordActivity: false,
         });
+        kit = tailored.kit;
       } catch (err) {
         console.warn(`Kit generation failed for ${jobId}:`, err.message);
         generationFailed = true;
@@ -741,6 +849,8 @@ module.exports = {
   getKit,
   generateForJob,
   polishUntilReady,
+  tailorJobToTarget,
+  tailorQueueJobs,
   generateOnApprove,
   attachKitToApplyItem,
   repairAllStoredKits,

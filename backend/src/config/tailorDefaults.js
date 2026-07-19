@@ -2,8 +2,8 @@ const env = require('./env');
 
 const TAILOR_MODE = 'high_match';
 const HIGH_MATCH_TARGET = 100;
-const ATS_TARGET_MIN = Math.min(100, Math.max(85, Number(process.env.TAILOR_ATS_TARGET_MIN) || 90));
-const KIT_PIPELINE_VERSION = '2026-07-18-v20-tagline-polish';
+const ATS_TARGET_MIN = Math.min(100, Math.max(85, Number(process.env.TAILOR_ATS_TARGET_MIN) || 100));
+const KIT_PIPELINE_VERSION = '2026-07-19-v21-single-push-100';
 const TARGET_BULLETS_PER_JOB = Math.min(
   12,
   Math.max(8, Number(process.env.TAILOR_BULLETS_PER_JOB) || 10)
@@ -48,7 +48,7 @@ function describeTailorQuality() {
     supplementPages: DEFAULT_SUPPLEMENT_PAGES,
     label: 'Standard high-match tailoring',
     description:
-      `Every user gets the same tailoring contract: all employers preserved, ~${TARGET_BULLETS_PER_JOB} bullets per role, credentials intact — bullet wording tailored to each posting (~4 pages, 90%+ ATS).`,
+      `Every user gets the same tailoring contract: all employers preserved, ~${TARGET_BULLETS_PER_JOB} bullets per role, credentials intact — one server-side push to 100% JD keyword match per queued role (~4 pages).`,
   };
 }
 

@@ -3,6 +3,7 @@ const { isAdminRole } = require('../utils/roles');
 const profileService = require('../services/profileService');
 const platformSettingsService = require('../services/platformSettingsService');
 const emailService = require('../services/emailService');
+const { KIT_PIPELINE_VERSION } = require('../config/tailorDefaults');
 
 async function buildHealthBase() {
   const mongoose = require('mongoose');
@@ -51,6 +52,7 @@ async function buildHealthBase() {
     ),
     customDomain: env.customDomain || null,
     clientOrigins: env.clientOrigins,
+    kitPipelineVersion: KIT_PIPELINE_VERSION,
     time: new Date().toISOString(),
   };
 }

@@ -678,7 +678,7 @@ async function polishExistingKit({ userId, profile, job, jobDescription, kit, ta
   });
 }
 
-async function perfectExperienceForKit({ userId, profile, job, jobDescription, kit }) {
+async function perfectExperienceForKit({ userId, profile, job, jobDescription, kit, tailorFocus = '' }) {
   if (!kit?.tailoredResumeText || !profile?.resumeText) return kit;
 
   const llmService = require('./llmService');
@@ -696,8 +696,12 @@ async function perfectExperienceForKit({ userId, profile, job, jobDescription, k
 
   const { getRedTerms } = require('./atsKeywordService');
   const scored = applyAtsMetadata(kit, jobDescription, job);
-  const focusParts = [...(scored.uncoveredRequirements || []), ...getRedTerms(scored, 10)].filter(Boolean);
-  const tailorFocus = focusParts.slice(0, 10).join(', ');
+  const focusParts = [
+    ...(scored.uncoveredRequirements || []),
+    ...getRedTerms(scored, 10),
+    tailorFocus,
+  ].filter(Boolean);
+  const focus = focusParts.slice(0, 10).join(', ');
 
   const tailoredResumeText = await tailorExperienceBullets({
     userId,
@@ -705,7 +709,7 @@ async function perfectExperienceForKit({ userId, profile, job, jobDescription, k
     job,
     jobDescription,
     baseText: kit.tailoredResumeText,
-    tailorFocus,
+    tailorFocus: focus,
   });
   const assembled = assembleBlueprintResume(profile.resumeText, tailoredResumeText, kit);
   const enriched = finalizeNormalizedKit(
@@ -744,7 +748,6 @@ async function generateBlueprintKit({
     assembleBlueprintResume,
     generateCoverLetter,
   } = require('./resumeBlueprintService');
-  const { ATS_TARGET_MIN } = require('../config/tailorDefaults');
 
   if (!(await llmService.isLive(userId))) {
     return buildDemoKit(profile, job, fullJd, contact, options);
@@ -775,38 +778,6 @@ async function generateBlueprintKit({
 
     kit = normalizeKit(kit, profile, job, fullJd, missingKeywords, contact, options);
     let scored = applyAtsMetadata(kit, fullJd, job);
-
-    if ((scored.atsScore ?? 0) < ATS_TARGET_MIN) {
-      const { getRedTerms } = require('./atsKeywordService');
-      const focusParts = [
-        ...(scored.uncoveredRequirements || []),
-        ...getRedTerms(scored, 10),
-        tailorFocus,
-      ].filter(Boolean);
-      const atsFocus = focusParts.slice(0, 10).join(', ');
-      tailoredResumeText = await tailorExperienceBullets({
-        userId,
-        profile,
-        job,
-        jobDescription: fullJd,
-        baseText: scored.tailoredResumeText,
-        tailorFocus: atsFocus,
-      });
-      const assembled = assembleBlueprintResume(profile.resumeText, tailoredResumeText, scored);
-      scored = applyAtsMetadata(
-        normalizeKit(
-          { ...scored, tailoredResumeText: assembled.tailoredResumeText },
-          profile,
-          job,
-          fullJd,
-          missingKeywords,
-          contact,
-          options
-        ),
-        fullJd,
-        job
-      );
-    }
 
     scored.coverLetterParagraph = await generateCoverLetter({
       userId,
