@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import http from '../api/http';
 import { useAuthStore } from '../stores/auth';
 import PasswordInput from '../components/PasswordInput.vue';
@@ -281,6 +281,17 @@ function openInviteForm() {
   error.value = '';
   showInviteModal.value = true;
   if (!form.value.password) generatePassword();
+  nextTick(() => {
+    document.getElementById('team-invite-form')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+
+function toggleInviteForm() {
+  if (showInviteModal.value) {
+    closeInviteModal();
+    return;
+  }
+  openInviteForm();
 }
 
 function closeInviteModal() {
@@ -544,10 +555,55 @@ onMounted(() => {
         <button
           type="button"
           class="btn-primary text-sm"
-          @click="openInviteForm"
+          @click="toggleInviteForm"
         >
-          + Invite someone
+          {{ showInviteModal ? 'Close invite form' : '+ Invite someone' }}
         </button>
+      </div>
+
+      <div v-if="showInviteModal" id="team-invite-form" class="mt-4 card border border-teal-700/40 p-6">
+        <form @submit.prevent="createUser">
+          <h3 class="font-semibold text-slate-200">Invite team member</h3>
+          <p class="mt-1 text-sm text-slate-500">
+            Creates their account immediately and sends login details by email when delivery is configured.
+          </p>
+          <p v-if="atSeatLimit" class="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+            Seat limit reached ({{ teamMemberCount }}/{{ seatsMax }}). Remove a member or upgrade before inviting.
+          </p>
+          <p v-if="error && showInviteModal" class="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
+
+          <div class="mt-6 space-y-4">
+            <div>
+              <label class="mb-1 block text-sm text-slate-400">Full name</label>
+              <input v-model="form.name" required class="input" placeholder="Alex Rivera" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm text-slate-400">Email</label>
+              <input v-model="form.email" type="email" required class="input" placeholder="alex@example.com" />
+            </div>
+            <div>
+              <label class="mb-1 block text-sm text-slate-400">Temporary password</label>
+              <div class="flex gap-2">
+                <PasswordInput v-model="form.password" class="flex-1" required :minlength="8" placeholder="8+ characters" />
+                <button type="button" class="btn-secondary shrink-0 px-3 text-sm" @click="generatePassword">Generate</button>
+              </div>
+            </div>
+            <div>
+              <label class="mb-1 block text-sm text-slate-400">Role</label>
+              <select v-model="form.role" class="input">
+                <option value="user">User — jobs, applications, AI tools</option>
+                <option value="admin">Admin — can invite and manage team</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mt-6 flex flex-wrap gap-3">
+            <button type="button" class="btn-secondary" @click="closeInviteModal">Cancel</button>
+            <button type="submit" class="btn-primary" :disabled="saving">
+              {{ saving ? 'Creating…' : 'Create & send invite' }}
+            </button>
+          </div>
+        </form>
       </div>
 
       <div v-if="users.length > 3" class="mt-4">
@@ -799,8 +855,8 @@ onMounted(() => {
           <h3 class="text-lg font-semibold text-slate-200">Invite someone new</h3>
           <p class="text-sm text-slate-500">Create an account and send login details by email.</p>
         </div>
-        <button type="button" class="btn-primary text-sm" @click="openInviteForm">
-          Open invite form
+        <button type="button" class="btn-primary text-sm" @click="toggleInviteForm">
+          {{ showInviteModal ? 'Close invite form' : 'Open invite form' }}
         </button>
       </div>
       <div class="mt-6 card p-6">
@@ -820,118 +876,67 @@ onMounted(() => {
       </div>
     </div>
 
-    <div
-      v-if="showInviteModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="invite-modal-title"
-      @click.self="closeInviteModal"
-      @keydown.escape="closeInviteModal"
-    >
-      <form class="card w-full max-w-lg p-6" @submit.prevent="createUser">
-        <h3 id="invite-modal-title" class="font-semibold text-slate-200">Invite team member</h3>
-        <p class="mt-1 text-sm text-slate-500">
-          Creates their account immediately and sends login details by email when delivery is configured.
-        </p>
-        <p v-if="atSeatLimit" class="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-          Seat limit reached ({{ teamMemberCount }}/{{ seatsMax }}). Remove a member or upgrade before inviting — you can still try if you believe seats are free.
-        </p>
-        <p v-if="error && showInviteModal" class="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
-
-        <div class="mt-6 space-y-4">
-          <div>
-            <label class="mb-1 block text-sm text-slate-400">Full name</label>
-            <input v-model="form.name" required class="input" placeholder="Alex Rivera" autofocus />
+    <Teleport to="body">
+      <div
+        v-if="nameEditTarget"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet"
+        @click.self="nameEditTarget = null"
+      >
+        <form class="card w-full max-w-md p-6" @submit.prevent="submitNameEdit">
+          <h3 class="font-semibold text-slate-200">Application name</h3>
+          <p class="mt-1 text-sm text-slate-500">
+            {{ nameEditTarget.name }} · {{ nameEditTarget.email }}
+          </p>
+          <p class="mt-2 text-xs text-slate-600">
+            This is the name employers and recruiters see on job forms and tailored resumes.
+          </p>
+          <input
+            v-model="nameEditValue"
+            type="text"
+            required
+            minlength="2"
+            class="input mt-4"
+            placeholder="Full legal name"
+          />
+          <div class="mt-6 flex gap-3">
+            <button type="button" class="btn-secondary flex-1" @click="nameEditTarget = null">Cancel</button>
+            <button type="submit" class="btn-primary flex-1" :disabled="nameEditSaving">
+              {{ nameEditSaving ? 'Saving…' : 'Save' }}
+            </button>
           </div>
-          <div>
-            <label class="mb-1 block text-sm text-slate-400">Email</label>
-            <input v-model="form.email" type="email" required class="input" placeholder="alex@example.com" />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-slate-400">Temporary password</label>
-            <div class="flex gap-2">
-              <PasswordInput v-model="form.password" class="flex-1" required :minlength="8" placeholder="8+ characters" />
-              <button type="button" class="btn-secondary shrink-0 px-3 text-sm" @click="generatePassword">Generate</button>
-            </div>
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-slate-400">Role</label>
-            <select v-model="form.role" class="input">
-              <option value="user">User — jobs, applications, AI tools</option>
-              <option value="admin">Admin — can invite and manage team</option>
-            </select>
-          </div>
-        </div>
+        </form>
+      </div>
 
-        <div class="mt-6 flex gap-3">
-          <button type="button" class="btn-secondary flex-1" @click="closeInviteModal">Cancel</button>
-          <button type="submit" class="btn-primary flex-1" :disabled="saving">
-            {{ saving ? 'Creating…' : 'Create & send invite' }}
-          </button>
-        </div>
-      </form>
-    </div>
-
-    <div
-      v-if="nameEditTarget"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet"
-      @click.self="nameEditTarget = null"
-    >
-      <form class="card w-full max-w-md p-6" @submit.prevent="submitNameEdit">
-        <h3 class="font-semibold text-slate-200">Application name</h3>
-        <p class="mt-1 text-sm text-slate-500">
-          {{ nameEditTarget.name }} · {{ nameEditTarget.email }}
-        </p>
-        <p class="mt-2 text-xs text-slate-600">
-          This is the name employers and recruiters see on job forms and tailored resumes.
-        </p>
-        <input
-          v-model="nameEditValue"
-          type="text"
-          required
-          minlength="2"
-          class="input mt-4"
-          placeholder="Full legal name"
-        />
-        <div class="mt-6 flex gap-3">
-          <button type="button" class="btn-secondary flex-1" @click="nameEditTarget = null">Cancel</button>
-          <button type="submit" class="btn-primary flex-1" :disabled="nameEditSaving">
-            {{ nameEditSaving ? 'Saving…' : 'Save' }}
-          </button>
-        </div>
-      </form>
-    </div>
-
-    <div
-      v-if="resetTarget"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet"
-      @click.self="resetTarget = null"
-    >
-      <form class="card w-full max-w-md p-6" @submit.prevent="submitReset">
-        <h3 class="font-semibold text-slate-200">Reset password</h3>
-        <p class="mt-1 text-sm text-slate-500">{{ resetTarget.name }} · {{ resetTarget.email }}</p>
-        <p class="mt-2 text-xs text-amber-300/90">Sets a new password immediately. User must be <strong>Active</strong> to log in.</p>
-        <PasswordInput
-          v-model="resetPassword"
-          class="mt-4"
-          required
-          :minlength="8"
-          placeholder="New temporary password"
-        />
-        <div class="mt-3 flex justify-end">
-          <button type="button" class="text-xs text-teal-400 hover:underline" @click="resetPassword = randomPassword()">
-            Generate password
-          </button>
-        </div>
-        <div class="mt-6 flex gap-3">
-          <button type="button" class="btn-secondary flex-1" @click="resetTarget = null">Cancel</button>
-          <button type="submit" class="btn-primary flex-1" :disabled="resetSaving">
-            {{ resetSaving ? 'Saving…' : 'Reset' }}
-          </button>
-        </div>
-      </form>
-    </div>
+      <div
+        v-if="resetTarget"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet"
+        @click.self="resetTarget = null"
+      >
+        <form class="card w-full max-w-md p-6" @submit.prevent="submitReset">
+          <h3 class="font-semibold text-slate-200">Reset password</h3>
+          <p class="mt-1 text-sm text-slate-500">{{ resetTarget.name }} · {{ resetTarget.email }}</p>
+          <p class="mt-2 text-xs text-amber-300/90">Sets a new password immediately. User must be <strong>Active</strong> to log in.</p>
+          <PasswordInput
+            v-model="resetPassword"
+            class="mt-4"
+            required
+            :minlength="8"
+            placeholder="New temporary password"
+          />
+          <div class="mt-3 flex justify-end">
+            <button type="button" class="text-xs text-teal-400 hover:underline" @click="resetPassword = randomPassword()">
+              Generate password
+            </button>
+          </div>
+          <div class="mt-6 flex gap-3">
+            <button type="button" class="btn-secondary flex-1" @click="resetTarget = null">Cancel</button>
+            <button type="submit" class="btn-primary flex-1" :disabled="resetSaving">
+              {{ resetSaving ? 'Saving…' : 'Reset' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Teleport>
 
     <div
       v-if="menuUser"
@@ -1042,25 +1047,27 @@ onMounted(() => {
       </div>
     </div>
 
-    <div
-      v-if="deleteTarget"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet"
-      @click.self="deleteTarget = null"
-    >
-      <div class="card w-full max-w-md p-6">
-        <h3 class="font-semibold text-slate-200">Delete user?</h3>
-        <p class="mt-2 text-sm text-slate-400">
-          Remove <strong class="text-slate-200">{{ deleteTarget.name }}</strong> ({{ deleteTarget.email }})?
-          Their profile, queue, and activity data will be permanently deleted. You can invite them again later.
-        </p>
-        <p v-if="error" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
-        <div class="mt-6 flex gap-3">
-          <button type="button" class="btn-secondary flex-1" @click="deleteTarget = null">Cancel</button>
-          <button type="button" class="btn-primary flex-1 bg-red-600 hover:bg-red-500" :disabled="deleteSaving" @click="confirmDelete">
-            {{ deleteSaving ? 'Deleting…' : 'Delete user' }}
-          </button>
+    <Teleport to="body">
+      <div
+        v-if="deleteTarget"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet"
+        @click.self="deleteTarget = null"
+      >
+        <div class="card w-full max-w-md p-6">
+          <h3 class="font-semibold text-slate-200">Delete user?</h3>
+          <p class="mt-2 text-sm text-slate-400">
+            Remove <strong class="text-slate-200">{{ deleteTarget.name }}</strong> ({{ deleteTarget.email }})?
+            Their profile, queue, and activity data will be permanently deleted. You can invite them again later.
+          </p>
+          <p v-if="error" class="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
+          <div class="mt-6 flex gap-3">
+            <button type="button" class="btn-secondary flex-1" @click="deleteTarget = null">Cancel</button>
+            <button type="button" class="btn-primary flex-1 bg-red-600 hover:bg-red-500" :disabled="deleteSaving" @click="confirmDelete">
+              {{ deleteSaving ? 'Deleting…' : 'Delete user' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
