@@ -26,6 +26,11 @@ const createUserSchema = z.object({
 async function listUsers(req, res, next) {
   try {
     const team = await teamService.getTeamForUser(req.user.sub);
+    const actor = await User.findById(req.user.sub).select('teamId role');
+    if (team && actor && actor.teamId?.toString() !== team._id.toString()) {
+      actor.teamId = team._id;
+      await actor.save();
+    }
     const query = team?._id ? { teamId: team._id } : {};
     const users = await User.find(query).select('-passwordHash').sort({ createdAt: -1 }).lean();
     if (!env.mongoUri || !users.length) {

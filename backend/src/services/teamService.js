@@ -86,6 +86,13 @@ async function incrementUsage(userId, type) {
 async function getUsageSummary(userId) {
   const team = await getTeamForUser(userId);
   if (!team) return null;
+
+  const actor = await User.findById(userId).select('teamId');
+  if (actor && actor.teamId?.toString() !== team._id.toString()) {
+    actor.teamId = team._id;
+    await actor.save();
+  }
+
   resetUsageIfNewMonth(team);
   await team.save();
   const limits = Team.planLimits(team.plan);

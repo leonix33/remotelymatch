@@ -28,7 +28,7 @@ const nameEditValue = ref('');
 const nameEditSaving = ref(false);
 const menuUser = ref(null);
 const userSearch = ref('');
-const showInviteForm = ref(false);
+const showInviteModal = ref(false);
 const testEmailTo = ref('');
 const testEmailSending = ref(false);
 const testEmailMsg = ref('');
@@ -95,6 +95,7 @@ async function createUser() {
       success.value = `Account created for ${data.email}. Share the login details below.`;
     }
     await load();
+    showInviteModal.value = false;
   } catch (e) {
     error.value = e.response?.data?.message || 'Could not create user';
   } finally {
@@ -277,13 +278,13 @@ function generatePassword() {
 }
 
 function openInviteForm() {
-  showInviteForm.value = true;
+  error.value = '';
+  showInviteModal.value = true;
   if (!form.value.password) generatePassword();
 }
 
-function toggleInviteForm() {
-  showInviteForm.value = !showInviteForm.value;
-  if (showInviteForm.value && !form.value.password) generatePassword();
+function closeInviteModal() {
+  showInviteModal.value = false;
 }
 
 async function sendDeliveryTest() {
@@ -543,7 +544,6 @@ onMounted(() => {
         <button
           type="button"
           class="btn-primary text-sm"
-          :disabled="atSeatLimit"
           @click="openInviteForm"
         >
           + Invite someone
@@ -794,55 +794,16 @@ onMounted(() => {
     </div>
 
     <div class="mt-10 border-t border-slate-800/80 pt-8">
-      <button
-        type="button"
-        class="flex w-full items-center justify-between gap-3 text-left"
-        @click="toggleInviteForm"
-      >
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 class="text-lg font-semibold text-slate-200">Invite someone new</h3>
           <p class="text-sm text-slate-500">Create an account and send login details by email.</p>
         </div>
-        <span class="text-slate-500">{{ showInviteForm ? '▴' : '▾' }}</span>
-      </button>
-
-      <div v-show="showInviteForm" class="mt-6 grid gap-8 xl:grid-cols-2">
-      <form class="card p-6" @submit.prevent="createUser">
-        <h3 class="font-semibold text-slate-200">New team member</h3>
-        <p class="mt-1 text-sm text-slate-500">They’ll get an email with a login link and temporary password when email is configured.</p>
-
-        <div class="mt-6 space-y-4">
-          <div>
-            <label class="mb-1 block text-sm text-slate-400">Full name</label>
-            <input v-model="form.name" required class="input" placeholder="Alex Rivera" />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-slate-400">Email</label>
-            <input v-model="form.email" type="email" required class="input" placeholder="alex@example.com" />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-slate-400">Temporary password</label>
-            <div class="flex gap-2">
-              <PasswordInput v-model="form.password" class="flex-1" required :minlength="8" placeholder="8+ characters" />
-              <button type="button" class="btn-secondary shrink-0 px-3 text-sm" @click="generatePassword">Generate</button>
-            </div>
-            <p class="mt-1 text-xs text-slate-500">Copy and send via WhatsApp or text if the invite email doesn’t arrive.</p>
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-slate-400">Role</label>
-            <select v-model="form.role" class="input">
-              <option value="user">User — jobs, applications, AI tools</option>
-              <option value="admin">Admin — can invite and manage team</option>
-            </select>
-          </div>
-        </div>
-
-        <button type="submit" class="btn-primary mt-6 w-full sm:w-auto" :disabled="saving || atSeatLimit">
-          {{ saving ? 'Creating…' : 'Create account & send invite' }}
+        <button type="button" class="btn-primary text-sm" @click="openInviteForm">
+          Open invite form
         </button>
-      </form>
-
-      <div class="card p-6">
+      </div>
+      <div class="mt-6 card p-6">
         <h3 class="font-semibold text-slate-200">Role guide</h3>
         <ul class="mt-4 space-y-3 text-sm text-slate-400">
           <li class="flex gap-3"><span class="badge badge-gold">Admin</span> Invite users, manage team, run agent, full access</li>
@@ -857,7 +818,59 @@ onMounted(() => {
           </ul>
         </div>
       </div>
-      </div>
+    </div>
+
+    <div
+      v-if="showInviteModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 mobile-modal-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="invite-modal-title"
+      @click.self="closeInviteModal"
+      @keydown.escape="closeInviteModal"
+    >
+      <form class="card w-full max-w-lg p-6" @submit.prevent="createUser">
+        <h3 id="invite-modal-title" class="font-semibold text-slate-200">Invite team member</h3>
+        <p class="mt-1 text-sm text-slate-500">
+          Creates their account immediately and sends login details by email when delivery is configured.
+        </p>
+        <p v-if="atSeatLimit" class="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          Seat limit reached ({{ teamMemberCount }}/{{ seatsMax }}). Remove a member or upgrade before inviting — you can still try if you believe seats are free.
+        </p>
+        <p v-if="error && showInviteModal" class="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{{ error }}</p>
+
+        <div class="mt-6 space-y-4">
+          <div>
+            <label class="mb-1 block text-sm text-slate-400">Full name</label>
+            <input v-model="form.name" required class="input" placeholder="Alex Rivera" autofocus />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm text-slate-400">Email</label>
+            <input v-model="form.email" type="email" required class="input" placeholder="alex@example.com" />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm text-slate-400">Temporary password</label>
+            <div class="flex gap-2">
+              <PasswordInput v-model="form.password" class="flex-1" required :minlength="8" placeholder="8+ characters" />
+              <button type="button" class="btn-secondary shrink-0 px-3 text-sm" @click="generatePassword">Generate</button>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1 block text-sm text-slate-400">Role</label>
+            <select v-model="form.role" class="input">
+              <option value="user">User — jobs, applications, AI tools</option>
+              <option value="admin">Admin — can invite and manage team</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" class="btn-secondary flex-1" @click="closeInviteModal">Cancel</button>
+          <button type="submit" class="btn-primary flex-1" :disabled="saving">
+            {{ saving ? 'Creating…' : 'Create & send invite' }}
+          </button>
+        </div>
+      </form>
     </div>
 
     <div
